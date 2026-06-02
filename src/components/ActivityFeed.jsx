@@ -1,10 +1,9 @@
 import { differenceInDays, parseISO } from 'date-fns'
 
-const TODAY = new Date('2026-06-02')
-const G     = '#8CC63F'
+const G = '#8CC63F'
 
 function timeAgo(dateStr) {
-  const days = differenceInDays(TODAY, parseISO(dateStr))
+  const days = differenceInDays(new Date(), parseISO(dateStr))
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7)  return `${days}d ago`

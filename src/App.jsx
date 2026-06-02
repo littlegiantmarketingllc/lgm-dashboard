@@ -40,15 +40,12 @@ function pctChange(curr, prev) {
   return Math.round((curr - prev) / prev * 100)
 }
 
-// ─── Loading screen ───────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center gap-5">
       <div className="relative w-14 h-14">
         <div className="absolute inset-0 rounded-full border-4 border-brand-border" />
-        <div
-          className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin"
-        />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin" />
       </div>
       <div className="text-center">
         <p className="text-brand-heading font-semibold text-base">Loading dashboard…</p>
@@ -58,7 +55,6 @@ function LoadingScreen() {
   )
 }
 
-// ─── Error screen ─────────────────────────────────────────────────────────────
 function ErrorScreen({ message, onRetry }) {
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
@@ -67,23 +63,17 @@ function ErrorScreen({ message, onRetry }) {
         style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
       >
         <div className="text-4xl mb-4">⚠️</div>
-        <h2 className="text-brand-heading font-bold text-lg mb-2">
-          Could not load data
-        </h2>
+        <h2 className="text-brand-heading font-bold text-lg mb-2">Could not load data</h2>
         <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
-
         <div className="bg-brand-bg rounded-xl p-4 text-left mb-6 text-xs text-brand-muted space-y-1.5">
-          <p className="font-semibold text-brand-heading text-[11px] uppercase tracking-wider mb-2">
-            Quick checklist
-          </p>
+          <p className="font-semibold text-brand-heading text-[11px] uppercase tracking-wider mb-2">Quick checklist</p>
           <p>1. Open the sheet → <strong>File → Share → Publish to web</strong></p>
           <p>2. Choose <strong>Entire Document</strong> + <strong>CSV</strong> → Publish</p>
           <p>3. Also set sharing to <strong>Anyone with the link can view</strong></p>
         </div>
-
         <button
           onClick={onRetry}
-          className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-all"
+          className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold"
           style={{ background: '#8CC63F', boxShadow: '0 2px 8px rgba(140,198,63,0.35)' }}
         >
           Try Again
@@ -93,17 +83,12 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-// ─── Main dashboard ───────────────────────────────────────────────────────────
 export default function App() {
-  const [rangeDays, setRangeDays]   = useState(30)
-  const { statuses, setStatus }     = useCallStatus()
+  const [rangeDays, setRangeDays] = useState(30)
+  const { statuses, setStatus }   = useCallStatus()
   const { calls, loading, error, lastUpdated, refetch } = useGoogleSheets()
 
-  // Show full-screen states only on initial load (no data yet)
-  if (loading && calls.length === 0) return <LoadingScreen />
-  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
-
-  // ── Derived data (all computed from live `calls`) ──────────────────────────
+  // ─── ALL hooks must be called unconditionally before any early return ───────
   const filteredCalls = useMemo(() => filterByRange(calls, rangeDays), [calls, rangeDays])
 
   const prevCalls = useMemo(() =>
@@ -192,15 +177,19 @@ export default function App() {
       ? +(weekCalls.reduce((s, c) => s + c.score, 0) / weekCalls.length).toFixed(1) : 0
     const totalMins     = filteredCalls.length * 32
     const callsThisWeek = weekCalls.length
-    const callsLastWeek = prevWeekCalls.length
-    const callsDelta    = pctChange(callsThisWeek, callsLastWeek)
-    return { avgScore, totalMins, callsThisWeek, callsLastWeek, callsDelta }
+    const callsDelta    = pctChange(callsThisWeek, prevWeekCalls.length)
+    return { avgScore, totalMins, callsThisWeek, callsDelta }
   }, [calls, filteredCalls])
 
   const recentActivity = useMemo(() =>
     [...calls].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 12),
     [calls]
   )
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Safe to return early after ALL hooks have been called
+  if (loading && calls.length === 0) return <LoadingScreen />
+  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -215,16 +204,16 @@ export default function App() {
       />
 
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Soft banner when background refresh errors (but we still have old data) */}
         {error && calls.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
             <span>⚠️</span>
-            <span>Auto-refresh failed — showing last known data. <button onClick={refetch} className="underline font-medium">Retry</button></span>
+            <span>Auto-refresh failed — showing last known data.{' '}
+              <button onClick={refetch} className="underline font-medium">Retry</button>
+            </span>
           </div>
         )}
 
         <div className="flex gap-7 items-start">
-          {/* Main column */}
           <div className="flex-1 min-w-0 space-y-6">
             <SummaryCards summary={summary} trends={trends} />
             <QuickStats stats={quickStats} />
@@ -241,7 +230,6 @@ export default function App() {
             <FrustratedTable calls={frustratedCalls} statuses={statuses} setStatus={setStatus} />
           </div>
 
-          {/* Activity sidebar */}
           <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
             <ActivityFeed calls={recentActivity} />
           </aside>
