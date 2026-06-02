@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    background-color: #F4F6F4;
+    color: #1A1A1A;
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #F4F6F4; }
+  ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8CC63F; }
+}
+
+/* Shimmer on "Little Giant Marketing" — visible on white header */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #5a8a28 0%,
+    #8CC63F 25%,
+    #aedd5e 48%,
+    #8CC63F 72%,
+    #5a8a28 100%
+  );
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2.8s linear infinite;
+}
+
+/* Card base shadow — light theme uses elevation over glow */
+.card-shadow {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+.card-shadow-md {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+}
+
+/* Active filter button glow */
+.btn-green-active {
+  box-shadow: 0 0 0 3px rgba(140,198,63,0.20);
+}
+
+/* Frustrated call rows */
+.frustrated-row {
+  border-left: 2px solid #EF4444;
+  transition: border-color 0.2s, background 0.2s;
+}
+.frustrated-row:hover { background: #FFF5F5; }
+.frustrated-row.reviewed {
+  border-left-color: #E5E7E5;
+  opacity: 0.55;
+}
+
+/* Score bar width transition */
+.score-bar-fill {
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tabular figures */
+.num { font-variant-numeric: tabular-nums; }
