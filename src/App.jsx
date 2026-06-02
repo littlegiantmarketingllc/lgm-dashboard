@@ -10,7 +10,7 @@ import ResolutionTracker from './components/ResolutionTracker'
 import FrustratedTable from './components/FrustratedTable'
 import ActivityFeed from './components/ActivityFeed'
 import { useCallStatus } from './hooks/useCallStatus'
-import { rawCalls } from './data/sampleData'
+import { useGoogleSheets } from './hooks/useGoogleSheets'
 
 const RANGE_OPTIONS = [
   { label: '7d',  value: 7 },
@@ -40,15 +40,75 @@ function pctChange(curr, prev) {
   return Math.round((curr - prev) / prev * 100)
 }
 
-export default function App() {
-  const [rangeDays, setRangeDays] = useState(30)
-  const { statuses, setStatus }   = useCallStatus()
+// ─── Loading screen ───────────────────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center gap-5">
+      <div className="relative w-14 h-14">
+        <div className="absolute inset-0 rounded-full border-4 border-brand-border" />
+        <div
+          className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin"
+        />
+      </div>
+      <div className="text-center">
+        <p className="text-brand-heading font-semibold text-base">Loading dashboard…</p>
+        <p className="text-brand-muted text-sm mt-1">Fetching data from Google Sheets</p>
+      </div>
+    </div>
+  )
+}
 
-  const filteredCalls = useMemo(() => filterByRange(rawCalls, rangeDays), [rangeDays])
+// ─── Error screen ─────────────────────────────────────────────────────────────
+function ErrorScreen({ message, onRetry }) {
+  return (
+    <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
+      <div
+        className="bg-white rounded-2xl border border-brand-border p-8 max-w-lg w-full text-center"
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
+      >
+        <div className="text-4xl mb-4">⚠️</div>
+        <h2 className="text-brand-heading font-bold text-lg mb-2">
+          Could not load data
+        </h2>
+        <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
+
+        <div className="bg-brand-bg rounded-xl p-4 text-left mb-6 text-xs text-brand-muted space-y-1.5">
+          <p className="font-semibold text-brand-heading text-[11px] uppercase tracking-wider mb-2">
+            Quick checklist
+          </p>
+          <p>1. Open the sheet → <strong>File → Share → Publish to web</strong></p>
+          <p>2. Choose <strong>Entire Document</strong> + <strong>CSV</strong> → Publish</p>
+          <p>3. Also set sharing to <strong>Anyone with the link can view</strong></p>
+        </div>
+
+        <button
+          onClick={onRetry}
+          className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-all"
+          style={{ background: '#8CC63F', boxShadow: '0 2px 8px rgba(140,198,63,0.35)' }}
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main dashboard ───────────────────────────────────────────────────────────
+export default function App() {
+  const [rangeDays, setRangeDays]   = useState(30)
+  const { statuses, setStatus }     = useCallStatus()
+  const { calls, loading, error, lastUpdated, refetch } = useGoogleSheets()
+
+  // Show full-screen states only on initial load (no data yet)
+  if (loading && calls.length === 0) return <LoadingScreen />
+  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
+
+  // ── Derived data (all computed from live `calls`) ──────────────────────────
+  const filteredCalls = useMemo(() => filterByRange(calls, rangeDays), [calls, rangeDays])
 
   const prevCalls = useMemo(() =>
-    rangeDays < 9999 ? filterByWindow(rawCalls, rangeDays * 2, rangeDays) : [],
-    [rangeDays]
+    rangeDays < 9999 ? filterByWindow(calls, rangeDays * 2, rangeDays) : [],
+    [calls, rangeDays]
   )
 
   const summary = useMemo(() => {
@@ -97,7 +157,7 @@ export default function App() {
     const today = new Date()
     const start = subDays(today, days - 1)
     return eachDayOfInterval({ start, end: today }).map(day => {
-      const dateStr = format(day, 'yyyy-MM-dd')
+      const dateStr  = format(day, 'yyyy-MM-dd')
       const dayCalls = filteredCalls.filter(c => c.date === dateStr)
       return {
         date:       format(day, 'MMM d'),
@@ -113,7 +173,7 @@ export default function App() {
   )
 
   const topPerformerData = useMemo(() => {
-    const weekCalls = filterByRange(rawCalls, 7)
+    const weekCalls = filterByRange(calls, 7)
     const map = {}
     for (const call of weekCalls) {
       if (!map[call.employee]) map[call.employee] = { name: call.employee, calls: 0, totalScore: 0 }
@@ -123,11 +183,11 @@ export default function App() {
     return Object.values(map)
       .map(e => ({ ...e, avgScore: +(e.totalScore / e.calls).toFixed(1) }))
       .sort((a, b) => b.avgScore - a.avgScore)[0] ?? null
-  }, [])
+  }, [calls])
 
   const quickStats = useMemo(() => {
-    const weekCalls     = filterByRange(rawCalls, 7)
-    const prevWeekCalls = filterByWindow(rawCalls, 14, 7)
+    const weekCalls     = filterByRange(calls, 7)
+    const prevWeekCalls = filterByWindow(calls, 14, 7)
     const avgScore      = weekCalls.length
       ? +(weekCalls.reduce((s, c) => s + c.score, 0) / weekCalls.length).toFixed(1) : 0
     const totalMins     = filteredCalls.length * 32
@@ -135,20 +195,35 @@ export default function App() {
     const callsLastWeek = prevWeekCalls.length
     const callsDelta    = pctChange(callsThisWeek, callsLastWeek)
     return { avgScore, totalMins, callsThisWeek, callsLastWeek, callsDelta }
-  }, [filteredCalls])
+  }, [calls, filteredCalls])
 
   const recentActivity = useMemo(() =>
-    [...rawCalls].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 12),
-    []
+    [...calls].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 12),
+    [calls]
   )
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
-      <Header rangeDays={rangeDays} setRangeDays={setRangeDays} rangeOptions={RANGE_OPTIONS} />
+      <Header
+        rangeDays={rangeDays}
+        setRangeDays={setRangeDays}
+        rangeOptions={RANGE_OPTIONS}
+        lastUpdated={lastUpdated}
+        onRefresh={refetch}
+        isRefreshing={loading}
+        dataError={error}
+      />
 
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-7 items-start">
+        {/* Soft banner when background refresh errors (but we still have old data) */}
+        {error && calls.length > 0 && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Auto-refresh failed — showing last known data. <button onClick={refetch} className="underline font-medium">Retry</button></span>
+          </div>
+        )}
 
+        <div className="flex gap-7 items-start">
           {/* Main column */}
           <div className="flex-1 min-w-0 space-y-6">
             <SummaryCards summary={summary} trends={trends} />
@@ -170,7 +245,6 @@ export default function App() {
           <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
             <ActivityFeed calls={recentActivity} />
           </aside>
-
         </div>
       </div>
 

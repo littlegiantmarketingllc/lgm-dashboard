@@ -16,6 +16,7 @@ function RefreshIcon({ spinning }) {
 }
 
 function timeAgo(date) {
+  if (!date) return '—'
   const secs = Math.floor((Date.now() - date.getTime()) / 1000)
   if (secs < 10)  return 'just now'
   if (secs < 60)  return `${secs}s ago`
@@ -24,26 +25,20 @@ function timeAgo(date) {
   return `${Math.floor(mins / 60)}h ago`
 }
 
-export default function Header({ rangeDays, setRangeDays, rangeOptions }) {
-  const [refreshed, setRefreshed] = useState(new Date())
-  const [spinning, setSpinning]   = useState(false)
-  const [elapsed, setElapsed]     = useState('just now')
+export default function Header({
+  rangeDays, setRangeDays, rangeOptions,
+  lastUpdated, onRefresh, isRefreshing, dataError,
+}) {
+  const [elapsed, setElapsed] = useState('—')
 
+  // Recompute "X ago" every 15 s, reset when lastUpdated changes
   useEffect(() => {
-    const id = setInterval(() => setElapsed(timeAgo(refreshed)), 15000)
-    setElapsed(timeAgo(refreshed))
+    setElapsed(timeAgo(lastUpdated))
+    const id = setInterval(() => setElapsed(timeAgo(lastUpdated)), 15_000)
     return () => clearInterval(id)
-  }, [refreshed])
+  }, [lastUpdated])
 
-  const handleRefresh = () => {
-    if (spinning) return
-    setSpinning(true)
-    setTimeout(() => {
-      setRefreshed(new Date())
-      setSpinning(false)
-      setElapsed('just now')
-    }, 900)
-  }
+  const handleRefresh = () => { if (!isRefreshing && onRefresh) onRefresh() }
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
@@ -53,7 +48,6 @@ export default function Header({ rangeDays, setRangeDays, rangeOptions }) {
 
           {/* ── Logo + brand ── */}
           <div className="flex items-center gap-3 min-w-0">
-            {/* Actual LGM logo image */}
             <img
               src="/lgm-logo.png"
               alt="Little Giant Marketing"
@@ -64,7 +58,7 @@ export default function Header({ rangeDays, setRangeDays, rangeOptions }) {
               }}
             />
 
-            {/* SVG fallback (hidden unless img fails) */}
+            {/* SVG fallback */}
             <div className="flex-shrink-0 items-center gap-2.5 hidden" aria-hidden="true">
               <svg width="38" height="38" viewBox="0 0 44 44" fill="none">
                 <circle cx="22" cy="22" r="16" stroke="#4A4A4A" strokeWidth="6" fill="none"/>
@@ -79,7 +73,6 @@ export default function Header({ rangeDays, setRangeDays, rangeOptions }) {
               </div>
             </div>
 
-            {/* Brand text */}
             <div className="hidden sm:block leading-tight min-w-0">
               <p className="shimmer-text text-[10px] font-extrabold tracking-[0.2em] uppercase leading-none">
                 Little Giant Marketing
@@ -94,19 +87,24 @@ export default function Header({ rangeDays, setRangeDays, rangeOptions }) {
           {/* ── Right controls ── */}
           <div className="flex items-center gap-3 flex-shrink-0">
 
-            {/* Live indicator */}
+            {/* Live data indicator */}
             <div className="hidden md:flex items-center gap-1.5 text-brand-muted text-[11px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
-              Updated {elapsed}
+              {dataError ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />
+              )}
+              {lastUpdated ? `Updated ${elapsed}` : 'Loading…'}
             </div>
 
-            {/* Refresh button */}
+            {/* Refresh button — triggers a fresh Google Sheets fetch */}
             <button
               onClick={handleRefresh}
-              className="flex items-center gap-1.5 text-brand-muted hover:text-brand-text transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border border-brand-border hover:border-[#C8CCC8] bg-brand-bg"
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 text-brand-muted hover:text-brand-text transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border border-brand-border hover:border-[#C8CCC8] bg-brand-bg disabled:opacity-50"
             >
-              <RefreshIcon spinning={spinning} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshIcon spinning={isRefreshing} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
             </button>
 
             {/* Date range filter */}
