@@ -124,18 +124,22 @@ export default function App() {
     const sorted = [...filteredCalls].sort((a, b) => (a.date > b.date ? 1 : -1))
     for (const call of sorted) {
       if (!map[call.employee]) {
-        map[call.employee] = { name: call.employee, calls: 0, totalScore: 0, frustrated: 0, scores: [] }
+        map[call.employee] = { name: call.employee, calls: 0, totalScore: 0, frustrated: 0, scores: [], callLog: [] }
       }
       map[call.employee].calls++
       map[call.employee].totalScore += call.score
       if (call.frustrated) map[call.employee].frustrated++
       map[call.employee].scores.push(call.score)
+      if (call.summary) {
+        map[call.employee].callLog.push({ date: call.date, customer: call.customer, summary: call.summary })
+      }
     }
     return Object.values(map)
       .map(e => ({
         ...e,
-        avgScore:     +(e.totalScore / e.calls).toFixed(1),
-        recentScores: e.scores.slice(-5),
+        avgScore:        +(e.totalScore / e.calls).toFixed(1),
+        recentScores:    e.scores.slice(-5),
+        recentSummaries: e.callLog.slice(-3).reverse(), // last 3, most recent first
       }))
       .sort((a, b) => b.avgScore - a.avgScore)
   }, [filteredCalls])
@@ -173,10 +177,16 @@ export default function App() {
       map[call.employee].calls++
       map[call.employee].totalScore += call.score
     }
-    return Object.values(map)
-      .filter(e => e.calls >= 2)            // need ≥2 calls to be meaningful
+    const top = Object.values(map)
+      .filter(e => e.calls >= 2)
       .map(e => ({ ...e, avgScore: +(e.totalScore / e.calls).toFixed(1) }))
       .sort((a, b) => b.avgScore - a.avgScore)[0] ?? null
+    if (!top) return null
+    // Find their most recent call with a summary
+    const latestCall = [...filteredCalls]
+      .filter(c => c.employee === top.name && c.summary)
+      .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : (b.time > a.time ? 1 : -1)))[0]
+    return { ...top, latestSummary: latestCall?.summary || '', latestCustomer: latestCall?.customer || '' }
   }, [filteredCalls])
 
   // Quick stats — all from real data, all scoped to selected period

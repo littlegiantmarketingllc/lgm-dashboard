@@ -5,6 +5,7 @@ const EMPLOYEE_MESSAGES = {
   'Isaac Padilla':    'Exceptional consistency across all calls.',
   'Juan Estupinan':   'Strong performance and reliability.',
   'Preslav Slavchev': 'Outstanding client communication skills.',
+  'Manuela Ceballos': 'Impressive growth and dedication.',
   Karen:              'Impressive growth and dedication.',
   Maria:              'Solid team contributor this period.',
   Carlos:             'Consistent quality across every call.',
@@ -20,15 +21,14 @@ export default function TopPerformer({ performer }) {
     )
   }
 
-  const initials = performer.name.includes(' ')
+  const initials  = performer.name.includes(' ')
     ? performer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : performer.name.slice(0, 2).toUpperCase()
-
-  const message  = EMPLOYEE_MESSAGES[performer.name] ?? 'Outstanding performance this period.'
-  const barColor = performer.avgScore >= 8 ? G : '#EAB308'
+  const message   = EMPLOYEE_MESSAGES[performer.name] ?? 'Outstanding performance this period.'
+  const barColor  = performer.avgScore >= 8 ? G : '#EAB308'
 
   return (
-    <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col gap-5 p-6 relative overflow-hidden"
+    <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col gap-4 p-6 relative overflow-hidden"
       style={{
         animationDelay: '300ms',
         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
@@ -48,7 +48,7 @@ export default function TopPerformer({ performer }) {
         <span className="text-2xl">🥇</span>
       </div>
 
-      {/* Avatar — brand green per FIX 5 */}
+      {/* Avatar — solid brand green */}
       <div className="flex flex-col items-center gap-3">
         <div className="relative">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white"
@@ -59,7 +59,9 @@ export default function TopPerformer({ performer }) {
         </div>
         <div className="text-center">
           <p className="text-brand-text font-bold text-base">{performer.name}</p>
-          <p className="text-brand-muted text-[11px] mt-0.5">{performer.calls} call{performer.calls !== 1 ? 's' : ''} in period</p>
+          <p className="text-brand-muted text-[11px] mt-0.5">
+            {performer.calls} call{performer.calls !== 1 ? 's' : ''} in period
+          </p>
         </div>
       </div>
 
@@ -75,15 +77,23 @@ export default function TopPerformer({ performer }) {
       {/* Score bar */}
       <div className="h-1.5 rounded-full bg-brand-border overflow-hidden">
         <div className="h-full rounded-full score-bar-fill"
-          style={{
-            width: `${(performer.avgScore / 10) * 100}%`,
-            background: `linear-gradient(90deg, ${G}, ${GOLD})`,
-          }} />
+          style={{ width: `${(performer.avgScore / 10) * 100}%`, background: `linear-gradient(90deg, ${G}, ${GOLD})` }} />
       </div>
 
-      <p className="text-brand-muted text-[11px] text-center italic leading-relaxed">
-        "{message}"
-      </p>
+      {/* Motivational quote */}
+      <p className="text-brand-muted text-[11px] text-center italic leading-relaxed">"{message}"</p>
+
+      {/* Latest call summary */}
+      {performer.latestSummary && (
+        <div className="rounded-xl border border-brand-border bg-brand-bg px-3 py-2.5">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-brand-muted mb-1.5">
+            📞 Latest Call{performer.latestCustomer ? ` — ${performer.latestCustomer}` : ''}
+          </p>
+          <p className="text-[11px] text-brand-heading italic leading-relaxed">
+            {performer.latestSummary}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

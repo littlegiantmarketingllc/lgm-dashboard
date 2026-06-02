@@ -57,9 +57,9 @@ function parseDuration(raw) {
   return isNaN(n) ? 0 : Math.max(0, Math.round(n))
 }
 
-// Sheet columns: Employee, Date, Time, Customer, Score, Frustrated, Category, Duration (min), Status
+// Sheet columns: Employee, Date, Time, Customer, Score, Frustrated, Category, Duration (min), Status, Call Summary
 function rowToCall(row, idx) {
-  const [employee, date, time, customer, score, frustrated, category, duration] = row
+  const [employee, date, time, customer, score, frustrated, category, duration, , summary] = row
   const emp = (employee ?? '').trim()
   const dt  = parseDate(date)
   if (!emp || !dt) return null
@@ -73,6 +73,7 @@ function rowToCall(row, idx) {
     frustrated: parseFrustrated(frustrated),
     category:   (category ?? '').trim() || 'General',
     duration:   parseDuration(duration),
+    summary:    (summary ?? '').trim(),
   }
 }
 
