@@ -6,8 +6,10 @@ import QuickStats from './components/QuickStats'
 import TopPerformer from './components/TopPerformer'
 import EmployeeTable from './components/EmployeeTable'
 import MeetingsChart from './components/MeetingsChart'
+import ResolutionTracker from './components/ResolutionTracker'
 import FrustratedTable from './components/FrustratedTable'
 import ActivityFeed from './components/ActivityFeed'
+import { useCallStatus } from './hooks/useCallStatus'
 import { rawCalls } from './data/sampleData'
 
 const RANGE_OPTIONS = [
@@ -40,6 +42,7 @@ function pctChange(curr, prev) {
 
 export default function App() {
   const [rangeDays, setRangeDays] = useState(30)
+  const { statuses, setStatus }   = useCallStatus()
 
   const filteredCalls = useMemo(() => filterByRange(rawCalls, rangeDays), [rangeDays])
 
@@ -159,7 +162,8 @@ export default function App() {
             </div>
 
             <MeetingsChart data={chartData} />
-            <FrustratedTable calls={frustratedCalls} />
+            <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
+            <FrustratedTable calls={frustratedCalls} statuses={statuses} setStatus={setStatus} />
           </div>
 
           {/* Activity sidebar */}

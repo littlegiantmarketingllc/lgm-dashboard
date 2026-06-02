@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 
 const G = '#8CC63F'
@@ -19,23 +18,113 @@ function ScorePill({ score }) {
   )
 }
 
-export default function FrustratedTable({ calls }) {
-  const [reviewed, setReviewed] = useState(new Set())
+function resolvedAgo(ts) {
+  if (!ts) return ''
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 60)  return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60)  return `${m} min ago`
+  const h = Math.floor(m / 60)
+  if (h < 24)  return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
-  const toggle = (id) => setReviewed(prev => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
+function StatusBadge({ status }) {
+  if (status === 'resolved') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border"
+        style={{ color: G, background: `${G}10`, borderColor: `${G}28` }}
+      >
+        ✓ Resolved
+      </span>
+    )
+  }
+  if (status === 'in_progress') {
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-700 text-[11px] font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        In Progress
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-red-500 text-[11px] font-semibold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+      Action Required
+    </span>
+  )
+}
 
-  const pending   = calls.filter(c => !reviewed.has(c.id))
-  const doneCount = reviewed.size
+function ActionButtons({ callId, status, setStatus }) {
+  if (status === 'resolved') {
+    return (
+      <button
+        onClick={() => setStatus(callId, null)}
+        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200"
+        style={{ color: '#6B7280', borderColor: '#E5E7E5', background: 'transparent' }}
+      >
+        Undo
+      </button>
+    )
+  }
+
+  if (status === 'in_progress') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setStatus(callId, 'resolved')}
+          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 text-white"
+          style={{ background: G, borderColor: G, boxShadow: `0 1px 4px ${G}40` }}
+        >
+          Mark Complete
+        </button>
+        <button
+          onClick={() => setStatus(callId, null)}
+          className="text-[11px] font-semibold px-2 py-1.5 rounded-lg border transition-all duration-200"
+          style={{ color: '#6B7280', borderColor: '#E5E7E5' }}
+          title="Reset to Action Required"
+        >
+          ↩
+        </button>
+      </div>
+    )
+  }
+
+  // action_required — show both buttons
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => setStatus(callId, 'in_progress')}
+        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200"
+        style={{ color: '#D97706', background: '#FFFBEB', borderColor: '#FDE68A' }}
+      >
+        In Progress
+      </button>
+      <button
+        onClick={() => setStatus(callId, 'resolved')}
+        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 text-white"
+        style={{ background: G, borderColor: G, boxShadow: `0 1px 4px ${G}40` }}
+      >
+        Mark Complete
+      </button>
+    </div>
+  )
+}
+
+export default function FrustratedTable({ calls, statuses, setStatus }) {
+  const getStatus     = (id) => statuses[String(id)]?.status ?? 'action_required'
+  const getResolvedAt = (id) => statuses[String(id)]?.resolvedAt ?? null
+
+  const actionRequired = calls.filter(c => getStatus(c.id) === 'action_required').length
+  const inProgress     = calls.filter(c => getStatus(c.id) === 'in_progress').length
+  const resolved       = calls.filter(c => getStatus(c.id) === 'resolved').length
 
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{
-        animationDelay: '520ms',
+        animationDelay: '560ms',
         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
       }}
     >
@@ -52,23 +141,28 @@ export default function FrustratedTable({ calls }) {
           <p className="text-brand-muted text-[11px] mt-0.5">
             {calls.length === 0
               ? 'No frustrated calls in this period'
-              : `${pending.length} pending · ${doneCount} reviewed`}
+              : `${actionRequired} pending · ${inProgress} in progress · ${resolved} resolved`}
           </p>
         </div>
 
         {calls.length > 0 && (
-          <div className="flex items-center gap-2">
-            {doneCount > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {resolved > 0 && (
               <span
                 className="text-[11px] font-bold px-2.5 py-1 rounded-full border"
                 style={{ color: G, background: `${G}10`, borderColor: `${G}25` }}
               >
-                ✓ {doneCount} reviewed
+                ✓ {resolved} resolved
               </span>
             )}
-            {pending.length > 0 && (
+            {inProgress > 0 && (
+              <span className="text-amber-700 text-[11px] font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                ◌ {inProgress} in progress
+              </span>
+            )}
+            {actionRequired > 0 && (
               <span className="text-red-500 text-[11px] font-bold bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
-                ⚠ {pending.length} pending
+                ⚠ {actionRequired} pending
               </span>
             )}
           </div>
@@ -80,8 +174,11 @@ export default function FrustratedTable({ calls }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Customer', 'Date', 'Employee', 'Category', 'Score', 'Status', ''].map((h, i) => (
-                <th key={i} className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted first:pl-6">
+              {['Customer', 'Date', 'Employee', 'Category', 'Score', 'Status', 'Actions'].map((h, i) => (
+                <th
+                  key={i}
+                  className="px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted first:pl-6"
+                >
                   {h}
                 </th>
               ))}
@@ -93,22 +190,32 @@ export default function FrustratedTable({ calls }) {
                 <td colSpan={7} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <span className="text-4xl">✅</span>
-                    <p className="text-brand-muted text-sm">All clear — no frustrated clients this period</p>
+                    <p className="text-brand-muted text-sm">
+                      All clear — no frustrated clients this period
+                    </p>
                   </div>
                 </td>
               </tr>
             )}
+
             {calls.map((call, i) => {
-              const done = reviewed.has(call.id)
+              const status     = getStatus(call.id)
+              const resolvedAt = getResolvedAt(call.id)
+              const isResolved = status === 'resolved'
+
               return (
                 <tr
                   key={call.id}
-                  className={`animate-slide-in-row border-b border-brand-border/60 frustrated-row ${done ? 'reviewed' : ''}`}
-                  style={{ animationDelay: `${560 + i * 50}ms` }}
+                  className={`animate-slide-in-row border-b border-brand-border/60 frustrated-row transition-all duration-200 ${
+                    isResolved ? 'reviewed' : ''
+                  }`}
+                  style={{ animationDelay: `${600 + i * 50}ms` }}
                 >
                   {/* Customer */}
                   <td className="pl-6 pr-4 py-4">
-                    <span className="text-brand-text font-medium text-[13px]">{call.customer}</span>
+                    <span className="text-brand-text font-medium text-[13px]">
+                      {call.customer}
+                    </span>
                   </td>
 
                   {/* Date */}
@@ -141,40 +248,25 @@ export default function FrustratedTable({ calls }) {
                     <ScorePill score={call.score} />
                   </td>
 
-                  {/* Status */}
+                  {/* Status badge */}
                   <td className="px-4 py-4">
-                    {done ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border"
-                        style={{ color: G, background: `${G}10`, borderColor: `${G}25` }}
-                      >
-                        ✓ Reviewed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-red-500 text-[11px] font-semibold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        Needs Follow-up
-                      </span>
-                    )}
+                    <StatusBadge status={status} />
                   </td>
 
-                  {/* Action */}
-                  <td className="px-5 py-4 pr-6 text-right">
-                    <button
-                      onClick={() => toggle(call.id)}
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200"
-                      style={done
-                        ? { color: '#6B7280', borderColor: '#E5E7E5', background: 'transparent' }
-                        : {
-                            color: '#FFFFFF',
-                            background: G,
-                            borderColor: G,
-                            boxShadow: `0 1px 4px ${G}40`,
-                          }
-                      }
-                    >
-                      {done ? 'Undo' : 'Mark as Reviewed'}
-                    </button>
+                  {/* Action buttons + timestamp */}
+                  <td className="px-5 py-4 pr-6">
+                    <div className="flex flex-col gap-1 items-start">
+                      <ActionButtons
+                        callId={call.id}
+                        status={status}
+                        setStatus={setStatus}
+                      />
+                      {isResolved && resolvedAt && (
+                        <span className="text-[10px] text-brand-muted pl-0.5">
+                          Resolved {resolvedAgo(resolvedAt)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
