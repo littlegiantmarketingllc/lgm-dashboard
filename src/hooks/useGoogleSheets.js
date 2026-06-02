@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const SHEET_URL =
-  'https://docs.google.com/spreadsheets/d/1_v96dpphxyqpJi6dv-ePlfrJr67jfo8OFaQua8tVB3s/export?format=csv&gid=0'
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ9TCj76T9TTEpUxfy26VgDxQt7fpoJiaTJ1n0ITwk477r8_EgC-2tYB7mnoXfVwtw5BxzFvY0uA1gv/pub?output=csv'
 
 const REFRESH_MS = 60_000 // auto-refresh every 60 seconds
 
