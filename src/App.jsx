@@ -108,7 +108,7 @@ export default function App() {
   const [selectedAgency, setSelectedAgency]     = useState({ name: null, position: null })
 
   const { statuses, setStatus }                           = useCallStatus()
-  const { calls, loading, error, lastUpdated, refetch }   = useGoogleSheets()
+  const { calls, loading, error, lastUpdated, refetch, retrying } = useGoogleSheets()
 
   // Close modals on Escape
   useEffect(() => {
@@ -278,6 +278,7 @@ export default function App() {
         lastUpdated={lastUpdated}
         onRefresh={refetch}
         isRefreshing={loading}
+        retrying={retrying}
         dataError={error}
       />
 

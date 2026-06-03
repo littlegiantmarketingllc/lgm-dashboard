@@ -35,6 +35,11 @@ function timeAgo(date) {
   return `${Math.floor(mins / 60)}h ago`
 }
 
+function staleSecs(date) {
+  if (!date) return Infinity
+  return Math.floor((Date.now() - date.getTime()) / 1000)
+}
+
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 
 function FilterPills({ filter, setFilter }) {
@@ -118,18 +123,28 @@ function LogoMark() {
 export default function Header({
   filter, setFilter,
   categoryFilter, setCategoryFilter, allCategories,
-  lastUpdated, onRefresh, isRefreshing, dataError,
+  lastUpdated, onRefresh, isRefreshing, retrying, dataError,
 }) {
-  const [elapsed, setElapsed] = useState('—')
+  const [elapsed, setElapsed]   = useState('—')
+  const [isStale, setIsStale]   = useState(false)
 
   useEffect(() => {
-    setElapsed(timeAgo(lastUpdated))
-    const id = setInterval(() => setElapsed(timeAgo(lastUpdated)), 15_000)
+    function tick() {
+      setElapsed(timeAgo(lastUpdated))
+      // Warn when last successful fetch was more than 2 minutes ago
+      setIsStale(!isRefreshing && staleSecs(lastUpdated) > 120)
+    }
+    tick()
+    const id = setInterval(tick, 15_000)
     return () => clearInterval(id)
-  }, [lastUpdated])
+  }, [lastUpdated, isRefreshing])
 
-  const handleRefresh = () => { if (!isRefreshing && onRefresh) onRefresh() }
+  // Allow re-clicking Refresh even while fetching (will be a no-op in the hook
+  // if already in progress, but lets the user cancel retries and start fresh)
+  const handleRefresh = () => { if (onRefresh) onRefresh() }
   const isCustom = filter.type === 'custom'
+
+  const refreshLabel = retrying ? 'Retrying…' : isRefreshing ? 'Refreshing…' : 'Refresh'
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
@@ -140,18 +155,24 @@ export default function Header({
         <div className="hidden lg:flex items-center justify-between h-[60px] gap-4">
           <LogoMark />
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Live indicator */}
-            <div className="hidden md:flex items-center gap-1.5 text-brand-muted text-[11px] mr-1">
-              {dataError
-                ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />}
-              {lastUpdated ? `Updated ${elapsed}` : 'Loading…'}
+            {/* Live indicator / stale warning */}
+            <div className="hidden md:flex items-center gap-1.5 text-[11px] mr-1">
+              {(dataError || isStale)
+                ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />
+                : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block flex-shrink-0" />}
+              {isStale && !isRefreshing
+                ? <span className="text-amber-600 font-semibold">Data may be outdated — click Refresh</span>
+                : <span className="text-brand-muted">{lastUpdated ? `Updated ${elapsed}` : 'Loading…'}</span>}
             </div>
             {/* Refresh */}
-            <button onClick={handleRefresh} disabled={isRefreshing}
-              className="flex items-center gap-1.5 text-brand-muted hover:text-brand-text transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border border-brand-border hover:border-[#C8CCC8] bg-brand-bg disabled:opacity-50">
-              <RefreshIcon spinning={isRefreshing} />
-              <span>{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
+            <button onClick={handleRefresh}
+              className={`flex items-center gap-1.5 transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg ${
+                isStale && !isRefreshing
+                  ? 'text-amber-700 border-amber-300 hover:border-amber-400'
+                  : 'text-brand-muted hover:text-brand-text border-brand-border hover:border-[#C8CCC8]'
+              }`}>
+              <RefreshIcon spinning={isRefreshing || retrying} />
+              <span>{refreshLabel}</span>
             </button>
             {/* Category filter */}
             <CategorySelect
@@ -172,16 +193,22 @@ export default function Header({
           <div className="flex items-center justify-between h-14 gap-3">
             <LogoMark />
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="hidden sm:flex items-center gap-1.5 text-brand-muted text-[11px]">
-                {dataError
-                  ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                  : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />}
-                {lastUpdated ? `Updated ${elapsed}` : 'Loading…'}
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px]">
+                {(dataError || isStale)
+                  ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />
+                  : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block flex-shrink-0" />}
+                {isStale && !isRefreshing
+                  ? <span className="text-amber-600 font-semibold text-[10px]">Outdated — refresh</span>
+                  : <span className="text-brand-muted">{lastUpdated ? `Updated ${elapsed}` : 'Loading…'}</span>}
               </div>
-              <button onClick={handleRefresh} disabled={isRefreshing}
-                className="flex items-center gap-1.5 text-brand-muted hover:text-brand-text transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border border-brand-border bg-brand-bg disabled:opacity-50">
-                <RefreshIcon spinning={isRefreshing} />
-                <span className="hidden sm:inline">{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
+              <button onClick={handleRefresh}
+                className={`flex items-center gap-1.5 transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg ${
+                  isStale && !isRefreshing
+                    ? 'text-amber-700 border-amber-300'
+                    : 'text-brand-muted hover:text-brand-text border-brand-border'
+                }`}>
+                <RefreshIcon spinning={isRefreshing || retrying} />
+                <span className="hidden sm:inline">{refreshLabel}</span>
               </button>
             </div>
           </div>
