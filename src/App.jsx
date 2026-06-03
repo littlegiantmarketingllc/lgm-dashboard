@@ -48,6 +48,19 @@ function pctChange(curr, prev) {
 const PERIOD_LABEL = { '2d': 'the last 2 days', '7d': 'this week', '14d': 'the last 2 weeks', '30d': 'this month' }
 const PREV_LABEL   = { '2d': 'previous 2 days', '7d': 'last week', '14d': 'previous 2 weeks', '30d': 'last month' }
 
+function getModalPeriodLabel(filter, categoryFilter) {
+  let base
+  if (filter.type === 'today')  base = 'Today'
+  else if (filter.type === 'all') base = 'All time'
+  else if (filter.type === 'custom') {
+    base = filter.from && filter.to ? `${filter.from} → ${filter.to}` : 'Custom range'
+  } else {
+    const map = { '2d': 'Last 2 days', '7d': 'Last 7 days', '14d': 'Last 14 days', '30d': 'Last 30 days' }
+    base = map[filter.type] || `Last ${filter.type}`
+  }
+  return categoryFilter !== 'all' ? `${base} · ${categoryFilter}` : base
+}
+
 // ─── Loading / Error screens ─────────────────────────────────────────────────
 function LoadingScreen() {
   return (
@@ -346,7 +359,8 @@ export default function App() {
       {selectedEmployee && (
         <EmployeeModal
           employeeName={selectedEmployee}
-          calls={calls}
+          calls={filteredCalls}
+          periodLabel={getModalPeriodLabel(filter, categoryFilter)}
           onClose={() => setSelectedEmployee(null)}
         />
       )}

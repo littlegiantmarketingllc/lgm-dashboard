@@ -30,7 +30,7 @@ const TREND = {
   stable:     { icon: '→', label: 'Stable',    color: '#D97706' },
 }
 
-export default function EmployeeModal({ employeeName, calls, onClose }) {
+export default function EmployeeModal({ employeeName, calls, periodLabel, onClose }) {
   // Lock body scroll while open
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -43,7 +43,32 @@ export default function EmployeeModal({ employeeName, calls, onClose }) {
     .sort((a, b) => b.date > a.date ? 1 : b.date < a.date ? -1 : (b.time || '') > (a.time || '') ? 1 : -1)
 
   const total = empCalls.length
-  if (total === 0) return null
+
+  // Employee has no calls in the selected period — show a graceful empty state
+  if (total === 0) {
+    const initials = employeeName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div className="relative bg-white rounded-2xl w-full max-w-md p-8 text-center"
+          style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.20)' }}
+          onClick={e => e.stopPropagation()}>
+          <button onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center text-brand-muted hover:text-brand-text hover:bg-brand-bg transition-colors">
+            ✕
+          </button>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white mx-auto mb-4"
+            style={{ background: G }}>{initials}</div>
+          <h2 className="text-brand-heading font-bold text-base mb-1">{employeeName}</h2>
+          {periodLabel && (
+            <p className="text-[11px] text-brand-muted mb-4">📅 {periodLabel}</p>
+          )}
+          <p className="text-brand-muted text-sm">No calls recorded in this period.</p>
+          <p className="text-brand-muted/60 text-[11px] mt-1">Try selecting a wider date range.</p>
+        </div>
+      </div>
+    )
+  }
 
   const avgScore       = +(empCalls.reduce((s, c) => s + c.score, 0) / total).toFixed(1)
   const frustrated     = empCalls.filter(c => c.frustrated).length
@@ -94,6 +119,12 @@ export default function EmployeeModal({ employeeName, calls, onClose }) {
                   {trendCfg.icon} {trendCfg.label}
                 </span>
               </div>
+              {periodLabel && (
+                <p className="text-[10px] text-brand-muted mt-1 flex items-center gap-1">
+                  <span>📅</span>
+                  <span>Showing data for: <strong>{periodLabel}</strong></span>
+                </p>
+              )}
             </div>
           </div>
           <button onClick={onClose}
@@ -179,7 +210,7 @@ export default function EmployeeModal({ employeeName, calls, onClose }) {
           {/* Full call history */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-3">
-              Full Call History ({total} calls)
+              Call History — {periodLabel || 'Selected Period'} ({total} calls)
             </p>
             <div className="rounded-xl border border-brand-border overflow-hidden">
               <div className="overflow-x-auto">
