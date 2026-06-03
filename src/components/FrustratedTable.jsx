@@ -68,7 +68,6 @@ function ActionButtons({ callId, status, setStatus }) {
     </div>
   )
 
-  // action_required — stack vertically on mobile, side-by-side on sm+
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-1.5">
       <button onClick={() => setStatus(callId, 'in_progress')}
@@ -85,7 +84,7 @@ function ActionButtons({ callId, status, setStatus }) {
   )
 }
 
-export default function FrustratedTable({ calls, statuses, setStatus }) {
+export default function FrustratedTable({ calls, statuses, setStatus, onEmployeeClick, onAgencyClick }) {
   const getStatus     = (id) => statuses[String(id)]?.status ?? 'action_required'
   const getResolvedAt = (id) => statuses[String(id)]?.resolvedAt ?? null
 
@@ -139,13 +138,10 @@ export default function FrustratedTable({ calls, statuses, setStatus }) {
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
               <th className="px-3 sm:px-5 py-3 pl-4 sm:pl-6 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Customer</th>
-              {/* Date — hidden on xs */}
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Date</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Employee</th>
-              {/* Category — hidden on mobile */}
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden lg:table-cell">Category</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Score</th>
-              {/* Status — hidden on xs */}
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Status</th>
               <th className="px-3 sm:px-5 py-3 pr-4 sm:pr-6 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Actions</th>
             </tr>
@@ -174,32 +170,41 @@ export default function FrustratedTable({ calls, statuses, setStatus }) {
                     className={`animate-slide-in-row frustrated-row transition-all duration-200 ${isResolved ? 'reviewed' : ''}`}
                     style={{ animationDelay: `${600 + i * 50}ms` }}>
 
-                    {/* Customer */}
+                    {/* Customer — clickable */}
                     <td className="pl-4 sm:pl-6 pr-3 sm:pr-5 py-3">
-                      <span className="text-brand-text font-medium text-[12px] sm:text-[13px]">{call.customer}</span>
+                      <button
+                        onClick={e => onAgencyClick?.(call.customer, e)}
+                        className="text-brand-text font-medium text-[12px] sm:text-[13px] hover:text-brand-green transition-colors duration-150 text-left underline decoration-dotted underline-offset-2 decoration-brand-muted/50"
+                        title={`View ${call.customer} profile`}
+                      >
+                        {call.customer}
+                      </button>
                     </td>
 
-                    {/* Date — hidden on xs */}
+                    {/* Date */}
                     <td className="px-3 sm:px-5 py-3 text-brand-muted text-[11px] sm:text-[12px] hidden sm:table-cell whitespace-nowrap">
                       {format(parseISO(call.date), 'MMM d, yyyy')}
                     </td>
 
-                    {/* Employee */}
+                    {/* Employee — clickable */}
                     <td className="px-3 sm:px-5 py-3">
-                      <div className="flex items-center gap-1.5 sm:gap-2">
+                      <button
+                        onClick={() => onEmployeeClick?.(call.employee)}
+                        className="flex items-center gap-1.5 sm:gap-2 group"
+                        title={`View ${call.employee}'s profile`}
+                      >
                         <div className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold flex-shrink-0"
                           style={{ background: `${G}15`, color: G, border: `1px solid ${G}28` }}>
                           {call.employee.slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="text-brand-text text-[11px] sm:text-[12px]">
-                          {/* First name only on xs */}
+                        <span className="text-brand-text text-[11px] sm:text-[12px] group-hover:text-brand-green transition-colors duration-150">
                           <span className="hidden sm:inline">{call.employee}</span>
                           <span className="sm:hidden">{call.employee.split(' ')[0]}</span>
                         </span>
-                      </div>
+                      </button>
                     </td>
 
-                    {/* Category — hidden on mobile */}
+                    {/* Category */}
                     <td className="px-3 sm:px-5 py-3 hidden lg:table-cell">
                       <span className="text-brand-muted text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap">
                         {call.category}
@@ -211,7 +216,7 @@ export default function FrustratedTable({ calls, statuses, setStatus }) {
                       <ScorePill score={call.score} />
                     </td>
 
-                    {/* Status — hidden on xs */}
+                    {/* Status */}
                     <td className="px-3 sm:px-5 py-3 hidden sm:table-cell">
                       <StatusBadge status={status} />
                     </td>

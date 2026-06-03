@@ -28,7 +28,7 @@ function ChevronIcon({ open }) {
   )
 }
 
-function FeedRow({ call, isExpanded, onToggle }) {
+function FeedRow({ call, isExpanded, onToggle, onEmployeeClick, onAgencyClick }) {
   const initials     = call.employee.slice(0, 2).toUpperCase()
   const isFrustrated = call.frustrated
   const avCol        = isFrustrated ? '#EF4444' : G
@@ -41,27 +41,36 @@ function FeedRow({ call, isExpanded, onToggle }) {
     >
       {/* Main row */}
       <div
-        className="flex items-start gap-3 py-3 px-3 -mx-3 rounded-lg transition-colors duration-150 cursor-default"
+        className="flex items-start gap-3 py-3 px-3 -mx-3 rounded-lg transition-colors duration-150"
         onMouseEnter={e => e.currentTarget.style.background = '#F4F6F4'}
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
       >
-        {/* Avatar */}
+        {/* Avatar — clicking opens employee profile */}
         <div className="relative flex-shrink-0">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold"
+          <button
+            onClick={() => onEmployeeClick?.(call.employee)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold hover:opacity-80 transition-opacity"
             style={{ background: `${avCol}14`, color: avCol, border: `1px solid ${avCol}28` }}
+            title={`View ${call.employee}'s profile`}
           >
             {initials}
-          </div>
+          </button>
           {isFrustrated && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white" />
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white pointer-events-none" />
           )}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1 mb-0.5">
-            <p className="text-brand-text text-[12px] font-medium truncate">{call.customer}</p>
+            {/* Customer / agency name — clickable */}
+            <button
+              onClick={e => onAgencyClick?.(call.customer, e)}
+              className="text-brand-text text-[12px] font-medium truncate hover:text-brand-green transition-colors duration-150 text-left"
+              title={`View ${call.customer} profile`}
+            >
+              {call.customer}
+            </button>
             <span
               className="num text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
               style={{ color: scoreColor(call.score), background: `${scoreColor(call.score)}12` }}
@@ -69,13 +78,22 @@ function FeedRow({ call, isExpanded, onToggle }) {
               {call.score.toFixed(1)}
             </span>
           </div>
-          <p className="text-brand-muted text-[10px] truncate">
-            {call.employee} · {call.category}
-          </p>
+          <div className="flex items-center gap-1 text-brand-muted text-[10px] truncate">
+            {/* Employee name — clickable */}
+            <button
+              onClick={() => onEmployeeClick?.(call.employee)}
+              className="hover:text-brand-green transition-colors duration-150 truncate"
+              title={`View ${call.employee}'s profile`}
+            >
+              {call.employee}
+            </button>
+            <span className="flex-shrink-0">·</span>
+            <span className="truncate">{call.category}</span>
+          </div>
           <p className="text-brand-muted/50 text-[10px] mt-0.5">{timeAgo(call.date)}</p>
         </div>
 
-        {/* Expand chevron — only if there's a summary */}
+        {/* Expand chevron */}
         {hasSummary && (
           <button
             onClick={() => onToggle(call.id)}
@@ -102,7 +120,7 @@ function FeedRow({ call, isExpanded, onToggle }) {
   )
 }
 
-export default function ActivityFeed({ calls }) {
+export default function ActivityFeed({ calls, onEmployeeClick, onAgencyClick }) {
   const [expanded, setExpanded] = useState(new Set())
 
   const toggle = (id) => setExpanded(prev => {
@@ -124,7 +142,7 @@ export default function ActivityFeed({ calls }) {
               <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot inline-block" style={{ background: G }} />
               Recent Activity
             </h2>
-            <p className="text-brand-muted text-[11px] mt-0.5">Last {calls.length} calls · tap ❯ for summary</p>
+            <p className="text-brand-muted text-[11px] mt-0.5">Last {calls.length} calls · click names to explore</p>
           </div>
           <span
             className="text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase border"
@@ -143,6 +161,8 @@ export default function ActivityFeed({ calls }) {
             call={call}
             isExpanded={expanded.has(call.id)}
             onToggle={toggle}
+            onEmployeeClick={onEmployeeClick}
+            onAgencyClick={onAgencyClick}
           />
         ))}
       </div>

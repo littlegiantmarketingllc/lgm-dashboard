@@ -37,7 +37,6 @@ function timeAgo(date) {
 
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 
-// Reusable filter pill strip — used in both desktop row and mobile strip
 function FilterPills({ filter, setFilter }) {
   const setType = (v) => setFilter(p => ({ ...p, type: v }))
   return (
@@ -63,7 +62,28 @@ function FilterPills({ filter, setFilter }) {
   )
 }
 
-// Logo mark — shared between desktop and mobile rows
+function CategorySelect({ categories, value, onChange }) {
+  const isFiltered = value !== 'all'
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="text-[11px] font-semibold border rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer flex-shrink-0 transition-colors duration-150"
+      style={{
+        background:   isFiltered ? `${G}10` : '#F4F6F4',
+        borderColor:  isFiltered ? `${G}50` : '#E5E7E5',
+        color:        isFiltered ? '#3a6b10' : '#6B7280',
+        boxShadow:    isFiltered ? `0 0 0 2px ${G}20` : 'none',
+      }}
+    >
+      <option value="all">All Categories</option>
+      {categories.map(cat => (
+        <option key={cat} value={cat}>{cat}</option>
+      ))}
+    </select>
+  )
+}
+
 function LogoMark() {
   return (
     <div className="flex items-center gap-3 min-w-0">
@@ -73,7 +93,6 @@ function LogoMark() {
         className="h-8 sm:h-9 w-auto flex-shrink-0 object-contain"
         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
       />
-      {/* SVG fallback */}
       <div className="flex-shrink-0 items-center gap-2 hidden" aria-hidden="true">
         <svg width="32" height="32" viewBox="0 0 44 44" fill="none">
           <circle cx="22" cy="22" r="16" stroke="#4A4A4A" strokeWidth="6" fill="none"/>
@@ -81,7 +100,6 @@ function LogoMark() {
             stroke="#8CC63F" strokeWidth="4" strokeLinecap="round" fill="none"/>
         </svg>
       </div>
-      {/* Brand text — hidden on xs, shown on sm+ */}
       <div className="hidden sm:block leading-tight min-w-0">
         <p className="shimmer-text text-[10px] font-extrabold tracking-[0.2em] uppercase leading-none">
           Little Giant Marketing
@@ -90,7 +108,6 @@ function LogoMark() {
           Quality Control Dashboard
         </p>
       </div>
-      {/* Compact brand text — xs only */}
       <p className="sm:hidden text-brand-heading font-semibold text-[13px] whitespace-nowrap">
         QC Dashboard
       </p>
@@ -100,6 +117,7 @@ function LogoMark() {
 
 export default function Header({
   filter, setFilter,
+  categoryFilter, setCategoryFilter, allCategories,
   lastUpdated, onRefresh, isRefreshing, dataError,
 }) {
   const [elapsed, setElapsed] = useState('—')
@@ -121,9 +139,9 @@ export default function Header({
         {/* ── DESKTOP layout (lg+): single row ───────────────────────── */}
         <div className="hidden lg:flex items-center justify-between h-[60px] gap-4">
           <LogoMark />
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Live indicator */}
-            <div className="hidden md:flex items-center gap-1.5 text-brand-muted text-[11px]">
+            <div className="hidden md:flex items-center gap-1.5 text-brand-muted text-[11px] mr-1">
               {dataError
                 ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
                 : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />}
@@ -135,7 +153,13 @@ export default function Header({
               <RefreshIcon spinning={isRefreshing} />
               <span>{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
             </button>
-            {/* Filter pills — desktop: pill group */}
+            {/* Category filter */}
+            <CategorySelect
+              categories={allCategories}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
+            {/* Date filter pills */}
             <div className="flex items-center gap-0.5 bg-brand-bg border border-brand-border rounded-lg p-0.5">
               <FilterPills filter={filter} setFilter={setFilter} />
             </div>
@@ -148,14 +172,12 @@ export default function Header({
           <div className="flex items-center justify-between h-14 gap-3">
             <LogoMark />
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Live indicator — sm+ only */}
               <div className="hidden sm:flex items-center gap-1.5 text-brand-muted text-[11px]">
                 {dataError
                   ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
                   : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />}
                 {lastUpdated ? `Updated ${elapsed}` : 'Loading…'}
               </div>
-              {/* Refresh — icon only on xs */}
               <button onClick={handleRefresh} disabled={isRefreshing}
                 className="flex items-center gap-1.5 text-brand-muted hover:text-brand-text transition-colors text-[11px] px-2.5 py-1.5 rounded-lg border border-brand-border bg-brand-bg disabled:opacity-50">
                 <RefreshIcon spinning={isRefreshing} />
@@ -164,15 +186,21 @@ export default function Header({
             </div>
           </div>
 
-          {/* Row 2: horizontally scrollable filter strip */}
+          {/* Row 2: horizontally scrollable filter strip (category + date pills) */}
           <div className="border-t border-brand-border/40 overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 pb-0.5">
-            <div className="flex items-center gap-1 py-2 w-max">
+            <div className="flex items-center gap-1.5 py-2 w-max">
+              <CategorySelect
+                categories={allCategories}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+              />
+              <div className="w-px h-5 bg-brand-border flex-shrink-0" />
               <FilterPills filter={filter} setFilter={setFilter} />
             </div>
           </div>
         </div>
 
-        {/* ── Custom date pickers (all breakpoints, below both layouts) ── */}
+        {/* ── Custom date pickers (all breakpoints) ── */}
         {isCustom && (
           <div className="border-t border-brand-border/50 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="text-brand-muted text-[11px] font-semibold flex-shrink-0">Date range:</span>

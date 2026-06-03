@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { subDays, format, eachDayOfInterval, parseISO, startOfDay } from 'date-fns'
+import { useState, useMemo, useEffect } from 'react'
+import { subDays, format, eachDayOfInterval } from 'date-fns'
 import Header from './components/Header'
 import SummaryCards from './components/SummaryCards'
 import QuickStats from './components/QuickStats'
@@ -9,12 +9,13 @@ import MeetingsChart from './components/MeetingsChart'
 import ResolutionTracker from './components/ResolutionTracker'
 import FrustratedTable from './components/FrustratedTable'
 import ActivityFeed from './components/ActivityFeed'
+import TeamInsights from './components/TeamInsights'
+import EmployeeModal from './components/EmployeeModal'
+import AgencyCard from './components/AgencyCard'
 import { useCallStatus } from './hooks/useCallStatus'
 import { useGoogleSheets } from './hooks/useGoogleSheets'
 
 // ─── Filter helpers ───────────────────────────────────────────────────────────
-// filter = { type: 'today'|'2d'|'7d'|'14d'|'30d'|'all'|'custom', from: '', to: '' }
-
 function todayStr() { return format(new Date(), 'yyyy-MM-dd') }
 
 function getDateWindow(filter) {
@@ -22,7 +23,7 @@ function getDateWindow(filter) {
   if (filter.type === 'all')    return { from: '0000-01-01', to: '9999-12-31' }
   if (filter.type === 'today')  return { from: today, to: today }
   if (filter.type === 'custom') return { from: filter.from || today, to: filter.to || today }
-  const days = parseInt(filter.type)    // '7d' → 7
+  const days = parseInt(filter.type)
   return { from: format(subDays(new Date(), days), 'yyyy-MM-dd'), to: today }
 }
 
@@ -32,7 +33,6 @@ function filterCalls(calls, filter) {
 }
 
 function getPrevCalls(calls, filter) {
-  // Prev period only makes sense for fixed-day filters
   if (['all', 'today', 'custom'].includes(filter.type)) return []
   const days = parseInt(filter.type)
   const to   = format(subDays(new Date(), days + 1), 'yyyy-MM-dd')
@@ -44,6 +44,9 @@ function pctChange(curr, prev) {
   if (prev === 0) return null
   return Math.round((curr - prev) / prev * 100)
 }
+
+const PERIOD_LABEL = { '2d': 'the last 2 days', '7d': 'this week', '14d': 'the last 2 weeks', '30d': 'this month' }
+const PREV_LABEL   = { '2d': 'previous 2 days', '7d': 'last week', '14d': 'previous 2 weeks', '30d': 'last month' }
 
 // ─── Loading / Error screens ─────────────────────────────────────────────────
 function LoadingScreen() {
@@ -86,13 +89,39 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main app ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [filter, setFilter]         = useState({ type: '30d', from: '', to: '' })
-  const { statuses, setStatus }     = useCallStatus()
-  const { calls, loading, error, lastUpdated, refetch } = useGoogleSheets()
+  const [filter, setFilter]                     = useState({ type: '30d', from: '', to: '' })
+  const [categoryFilter, setCategoryFilter]     = useState('all')
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [selectedAgency, setSelectedAgency]     = useState({ name: null, position: null })
+
+  const { statuses, setStatus }                           = useCallStatus()
+  const { calls, loading, error, lastUpdated, refetch }   = useGoogleSheets()
+
+  // Close modals on Escape
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setSelectedEmployee(null)
+      setSelectedAgency({ name: null, position: null })
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Dynamic categories extracted from all loaded calls
+  const allCategories = useMemo(() => {
+    const cats = new Set(calls.map(c => c.category).filter(Boolean))
+    return [...cats].sort()
+  }, [calls])
 
   // ── All useMemo hooks MUST come before any conditional return ────────────
-  const filteredCalls = useMemo(() => filterCalls(calls, filter), [calls, filter])
-  const prevCalls     = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
+  const filteredCalls = useMemo(() => {
+    let c = filterCalls(calls, filter)
+    if (categoryFilter !== 'all') c = c.filter(x => x.category === categoryFilter)
+    return c
+  }, [calls, filter, categoryFilter])
+
+  const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
 
   const summary = useMemo(() => {
     const total      = filteredCalls.length
@@ -108,14 +137,13 @@ export default function App() {
     return { total, positive, frustrated }
   }, [prevCalls])
 
-  // Only show trend % when prev period has ≥5 calls AND filter has a comparison period
   const trends = useMemo(() => {
     const canCompare = prevCalls.length >= 5 &&
       !['all', 'today', 'custom'].includes(filter.type)
     return {
-      total:     canCompare ? pctChange(summary.total,     prevSummary.total)    : null,
-      positive:  canCompare ? pctChange(summary.positive,  prevSummary.positive) : null,
-      frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated)     : null,
+      total:      canCompare ? pctChange(summary.total,     prevSummary.total)    : null,
+      positive:   canCompare ? pctChange(summary.positive,  prevSummary.positive) : null,
+      frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated)      : null,
     }
   }, [summary, prevSummary, prevCalls, filter])
 
@@ -139,7 +167,7 @@ export default function App() {
         ...e,
         avgScore:        +(e.totalScore / e.calls).toFixed(1),
         recentScores:    e.scores.slice(-5),
-        recentSummaries: e.callLog.slice(-3).reverse(), // last 3, most recent first
+        recentSummaries: e.callLog.slice(-3).reverse(),
       }))
       .sort((a, b) => b.avgScore - a.avgScore)
   }, [filteredCalls])
@@ -169,7 +197,6 @@ export default function App() {
     [filteredCalls]
   )
 
-  // Top performer from the selected period (not hardcoded to 7d)
   const topPerformerData = useMemo(() => {
     const map = {}
     for (const call of filteredCalls) {
@@ -182,28 +209,25 @@ export default function App() {
       .map(e => ({ ...e, avgScore: +(e.totalScore / e.calls).toFixed(1) }))
       .sort((a, b) => b.avgScore - a.avgScore)[0] ?? null
     if (!top) return null
-    // Find their most recent call with a summary
     const latestCall = [...filteredCalls]
       .filter(c => c.employee === top.name && c.summary)
       .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : (b.time > a.time ? 1 : -1)))[0]
     return { ...top, latestSummary: latestCall?.summary || '', latestCustomer: latestCall?.customer || '' }
   }, [filteredCalls])
 
-  // Quick stats — all from real data, all scoped to selected period
   const quickStats = useMemo(() => {
-    const total      = filteredCalls.length
-    const avgScore   = total
+    const total       = filteredCalls.length
+    const avgScore    = total
       ? +(filteredCalls.reduce((s, c) => s + c.score, 0) / total).toFixed(1) : 0
-    const totalMins  = filteredCalls.reduce((s, c) => s + (c.duration || 0), 0)
+    const totalMins   = filteredCalls.reduce((s, c) => s + (c.duration || 0), 0)
     const avgDuration = total ? Math.round(totalMins / total) : 0
-    const withScore  = filteredCalls.filter(c => c.score > 0).length
+    const withScore   = filteredCalls.filter(c => c.score > 0).length
     const responseRate = total ? Math.round((withScore / total) * 100) : 0
-    const prevCount  = prevCalls.length
-    const callsDelta = prevCount >= 5 ? pctChange(total, prevCount) : null
+    const prevCount   = prevCalls.length
+    const callsDelta  = prevCount >= 5 ? pctChange(total, prevCount) : null
     return { avgScore, totalMins: Math.round(totalMins), avgDuration, responseRate, totalCalls: total, callsDelta }
   }, [filteredCalls, prevCalls])
 
-  // Recent activity sorted by date+time from sheet
   const recentActivity = useMemo(() =>
     [...calls]
       .sort((a, b) => {
@@ -215,6 +239,18 @@ export default function App() {
   )
   // ──────────────────────────────────────────────────────────────────────────
 
+  const handleEmployeeClick = (name) => setSelectedEmployee(name)
+  const handleAgencyClick   = (name, e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setSelectedAgency({ name, position: { x: rect.left + rect.width / 2, y: rect.bottom } })
+  }
+
+  // ── Smart date intelligence ───────────────────────────────────────────────
+  const showTodayEmpty     = filter.type === 'today' && filteredCalls.length === 0 && !loading
+  const showPeriodBanner   = !['all', 'today', 'custom'].includes(filter.type) && prevCalls.length >= 5
+  const periodLabel        = PERIOD_LABEL[filter.type] || 'this period'
+  const prevPeriodLabel    = PREV_LABEL[filter.type]   || 'last period'
+
   if (loading && calls.length === 0) return <LoadingScreen />
   if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
 
@@ -223,6 +259,9 @@ export default function App() {
       <Header
         filter={filter}
         setFilter={setFilter}
+        categoryFilter={categoryFilter}
+        setCategoryFilter={setCategoryFilter}
+        allCategories={allCategories}
         lastUpdated={lastUpdated}
         onRefresh={refetch}
         isRefreshing={loading}
@@ -239,25 +278,63 @@ export default function App() {
           </div>
         )}
 
+        {showTodayEmpty && (
+          <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
+            <span>📅</span>
+            <span>No calls recorded today yet. Data updates every 60 seconds.</span>
+          </div>
+        )}
+
+        {showPeriodBanner && (
+          <div className="mb-4 rounded-xl border border-brand-border bg-white px-4 py-3 text-sm text-brand-heading flex items-center gap-2"
+            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            <span>📊</span>
+            <span>
+              Team handled{' '}
+              <strong>{summary.total}</strong> calls {periodLabel} vs{' '}
+              <strong>{prevSummary.total}</strong> {prevPeriodLabel}
+              {trends.total !== null && (
+                <> —{' '}
+                  <strong style={{ color: trends.total >= 0 ? '#8CC63F' : '#EF4444' }}>
+                    {trends.total >= 0 ? '+' : ''}{trends.total}%
+                  </strong>
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
         <div className="flex gap-6 xl:gap-7 items-start">
           <div className="flex-1 min-w-0 space-y-4 sm:space-y-6">
             <SummaryCards summary={summary} trends={trends} />
             <QuickStats stats={quickStats} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <TopPerformer performer={topPerformerData} />
+              <TopPerformer performer={topPerformerData} onEmployeeClick={handleEmployeeClick} />
               <div className="lg:col-span-2">
-                <EmployeeTable employees={employeeStats} />
+                <EmployeeTable employees={employeeStats} onEmployeeClick={handleEmployeeClick} />
               </div>
             </div>
 
+            <TeamInsights calls={filteredCalls} prevCalls={prevCalls} />
+
             <MeetingsChart data={chartData} />
             <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
-            <FrustratedTable calls={frustratedCalls} statuses={statuses} setStatus={setStatus} />
+            <FrustratedTable
+              calls={frustratedCalls}
+              statuses={statuses}
+              setStatus={setStatus}
+              onEmployeeClick={handleEmployeeClick}
+              onAgencyClick={handleAgencyClick}
+            />
           </div>
 
           <aside className="hidden xl:flex flex-col w-[300px] 2xl:w-[320px] flex-shrink-0 sticky top-[105px]">
-            <ActivityFeed calls={recentActivity} />
+            <ActivityFeed
+              calls={recentActivity}
+              onEmployeeClick={handleEmployeeClick}
+              onAgencyClick={handleAgencyClick}
+            />
           </aside>
         </div>
       </div>
@@ -265,6 +342,22 @@ export default function App() {
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
         Little Giant Marketing &mdash; Quality Control Dashboard
       </footer>
+
+      {selectedEmployee && (
+        <EmployeeModal
+          employeeName={selectedEmployee}
+          calls={calls}
+          onClose={() => setSelectedEmployee(null)}
+        />
+      )}
+      {selectedAgency.name && (
+        <AgencyCard
+          agencyName={selectedAgency.name}
+          calls={calls}
+          position={selectedAgency.position}
+          onClose={() => setSelectedAgency({ name: null, position: null })}
+        />
+      )}
     </div>
   )
 }

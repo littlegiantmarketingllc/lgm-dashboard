@@ -67,8 +67,22 @@ function SummaryTooltip({ emp, pos }) {
   )
 }
 
-export default function EmployeeTable({ employees }) {
+function SearchIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-brand-muted flex-shrink-0" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+  )
+}
+
+export default function EmployeeTable({ employees, onEmployeeClick }) {
   const [tooltip, setTooltip] = useState(null)
+  const [search, setSearch]   = useState('')
+
+  const displayed = search.trim()
+    ? employees.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))
+    : employees
 
   const showTooltip = (e, emp) => {
     if (!emp.recentSummaries?.length) return
@@ -86,14 +100,61 @@ export default function EmployeeTable({ employees }) {
           <div className="min-w-0">
             <h2 className="text-brand-heading font-semibold text-sm">Employee Performance</h2>
             <p className="text-brand-muted text-[11px] mt-0.5 hidden sm:block">
-              Ranked by average score · hover name for recent summaries
+              Ranked by average score · click name for full profile
             </p>
-            <p className="text-brand-muted text-[11px] mt-0.5 sm:hidden">Ranked by average score</p>
+            <p className="text-brand-muted text-[11px] mt-0.5 sm:hidden">Tap name for profile</p>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest px-2 sm:px-2.5 py-1 rounded-full border flex-shrink-0"
-            style={{ color: G, background: `${G}10`, borderColor: `${G}25` }}>
-            {employees.length} agents
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Search bar */}
+            <div className="relative hidden sm:flex items-center">
+              <span className="absolute left-2.5 pointer-events-none">
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search…"
+                className="pl-8 pr-3 py-1.5 text-[12px] border border-brand-border rounded-lg bg-brand-bg focus:outline-none focus:border-brand-green w-28 focus:w-36 transition-all duration-200 placeholder:text-brand-muted/60"
+              />
+              {search && (
+                <button onClick={() => setSearch('')}
+                  className="absolute right-2 text-brand-muted hover:text-brand-text">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest px-2 sm:px-2.5 py-1 rounded-full border flex-shrink-0"
+              style={{ color: G, background: `${G}10`, borderColor: `${G}25` }}>
+              {displayed.length} agent{displayed.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+
+        {/* Mobile search */}
+        <div className="sm:hidden px-4 py-2.5 border-b border-brand-border/60">
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 pointer-events-none">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name…"
+              className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-brand-border rounded-lg bg-brand-bg focus:outline-none focus:border-brand-green placeholder:text-brand-muted/60"
+            />
+            {search && (
+              <button onClick={() => setSearch('')}
+                className="absolute right-2.5 text-brand-muted hover:text-brand-text">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Table */}
@@ -103,23 +164,21 @@ export default function EmployeeTable({ employees }) {
               <tr className="border-b border-brand-border bg-brand-bg/60">
                 <th className="px-3 sm:px-4 py-3 pl-4 sm:pl-6 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">#</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Employee</th>
-                {/* Calls — hidden on xs */}
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Calls</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Score</th>
-                {/* Trend sparkline — hidden on mobile */}
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden md:table-cell">Trend</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Frustrated</th>
               </tr>
             </thead>
             <tbody>
-              {employees.length === 0 && (
+              {displayed.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-brand-muted text-sm">
-                    No data for selected period
+                    {search ? `No employees match "${search}"` : 'No data for selected period'}
                   </td>
                 </tr>
               )}
-              {employees.map((emp, i) => (
+              {displayed.map((emp, i) => (
                 <tr key={emp.name}
                   className="animate-slide-in-row border-b border-brand-border/60 transition-colors duration-150"
                   style={{ animationDelay: `${400 + i * 60}ms`, background: i % 2 === 0 ? '#FFFFFF' : '#F9FAF9' }}
@@ -133,24 +192,24 @@ export default function EmployeeTable({ employees }) {
 
                   {/* Name */}
                   <td className="px-3 sm:px-4 py-3 sm:py-4">
-                    <div className="flex items-center gap-2 cursor-default"
-                      onMouseEnter={e => showTooltip(e, emp)}
-                      onMouseLeave={() => setTooltip(null)}>
+                    <div className="flex items-center gap-2">
                       <div className="w-6 sm:w-7 h-6 sm:h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                         style={{ background: `${G}18`, color: G, border: `1px solid ${G}30` }}>
                         {emp.name.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className={`text-brand-text font-medium text-[12px] sm:text-[13px] ${
-                        emp.recentSummaries?.length ? 'underline decoration-dotted underline-offset-2 decoration-brand-muted' : ''
-                      }`}>
-                        {/* Short name on very small screens */}
+                      <button
+                        onClick={() => onEmployeeClick?.(emp.name)}
+                        onMouseEnter={e => showTooltip(e, emp)}
+                        onMouseLeave={() => setTooltip(null)}
+                        className="text-brand-text font-medium text-[12px] sm:text-[13px] hover:text-brand-green underline decoration-dotted underline-offset-2 decoration-brand-muted text-left transition-colors duration-150"
+                      >
                         <span className="hidden xs:inline">{emp.name}</span>
                         <span className="xs:hidden">{emp.name.split(' ')[0]}</span>
-                      </span>
+                      </button>
                     </div>
                   </td>
 
-                  {/* Calls — hidden on xs */}
+                  {/* Calls */}
                   <td className="px-3 sm:px-4 py-3 sm:py-4 hidden sm:table-cell">
                     <span className="num text-brand-text font-semibold">{emp.calls}</span>
                   </td>
@@ -161,7 +220,7 @@ export default function EmployeeTable({ employees }) {
                     <ScoreBar score={emp.avgScore} />
                   </td>
 
-                  {/* Sparkline — hidden on mobile */}
+                  {/* Sparkline */}
                   <td className="px-3 sm:px-4 py-3 sm:py-4 hidden md:table-cell">
                     <div className="flex items-end h-6"><Sparkline scores={emp.recentScores} /></div>
                   </td>

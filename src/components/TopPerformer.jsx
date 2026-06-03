@@ -11,7 +11,7 @@ const EMPLOYEE_MESSAGES = {
   Carlos:             'Consistent quality across every call.',
 }
 
-export default function TopPerformer({ performer }) {
+export default function TopPerformer({ performer, onEmployeeClick }) {
   if (!performer) {
     return (
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-6 flex flex-col items-center justify-center gap-3 min-h-[200px]"
@@ -58,7 +58,12 @@ export default function TopPerformer({ performer }) {
           <div className="absolute -top-2 -right-2 text-lg">👑</div>
         </div>
         <div className="text-center">
-          <p className="text-brand-text font-bold text-base">{performer.name}</p>
+          <button
+              onClick={() => onEmployeeClick?.(performer.name)}
+              className="text-brand-text font-bold text-base hover:text-brand-green transition-colors duration-150 underline decoration-dotted underline-offset-2 decoration-brand-muted/50"
+            >
+              {performer.name}
+            </button>
           <p className="text-brand-muted text-[11px] mt-0.5">
             {performer.calls} call{performer.calls !== 1 ? 's' : ''} in period
           </p>
