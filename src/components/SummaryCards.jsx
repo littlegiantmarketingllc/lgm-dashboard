@@ -21,7 +21,7 @@ function Card({ label, value, sub, icon, accentBorder, trend, lowerIsBetter, del
 
   return (
     <div
-      className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-6 flex flex-col gap-3"
+      className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2 sm:gap-3"
       style={{
         animationDelay: `${delay}ms`,
         boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
@@ -31,17 +31,18 @@ function Card({ label, value, sub, icon, accentBorder, trend, lowerIsBetter, del
       {/* Label + icon */}
       <div className="flex items-start justify-between">
         <span className="text-brand-muted text-[10px] font-bold uppercase tracking-[0.18em]">{label}</span>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base border border-brand-border bg-brand-bg">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base border border-brand-border bg-brand-bg flex-shrink-0">
           {icon}
         </div>
       </div>
 
-      {/* Big number + trend */}
-      <div className="flex items-end gap-2.5">
-        <span className="num text-[52px] font-bold leading-none text-brand-text tracking-tight">
+      {/* Number + trend */}
+      <div className="flex items-end gap-2">
+        {/* Scale number down on mobile: 40px → 52px on sm */}
+        <span className="num text-[40px] sm:text-[52px] font-bold leading-none text-brand-text tracking-tight">
           {decimals > 0 ? displayed.toFixed(decimals) : displayed}
         </span>
-        <div className="mb-1.5">
+        <div className="mb-1">
           <TrendPill value={trend} lowerIsBetter={lowerIsBetter} />
         </div>
       </div>
@@ -56,7 +57,7 @@ export default function SummaryCards({ summary, trends }) {
   const posRate = total > 0 ? Math.round((positive / total) * 100) : 0
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
       <Card
         label="Total Meetings"
         value={total}

@@ -229,9 +229,9 @@ export default function App() {
         dataError={error}
       />
 
-      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {error && calls.length > 0 && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+          <div className="mb-4 sm:mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
             <span>⚠️</span>
             <span>Auto-refresh failed — showing last known data.{' '}
               <button onClick={refetch} className="underline font-medium">Retry</button>
@@ -239,8 +239,8 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex gap-7 items-start">
-          <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex gap-6 xl:gap-7 items-start">
+          <div className="flex-1 min-w-0 space-y-4 sm:space-y-6">
             <SummaryCards summary={summary} trends={trends} />
             <QuickStats stats={quickStats} />
 
@@ -256,7 +256,7 @@ export default function App() {
             <FrustratedTable calls={frustratedCalls} statuses={statuses} setStatus={setStatus} />
           </div>
 
-          <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
+          <aside className="hidden xl:flex flex-col w-[300px] 2xl:w-[320px] flex-shrink-0 sticky top-[105px]">
             <ActivityFeed calls={recentActivity} />
           </aside>
         </div>
