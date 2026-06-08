@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { useHealthSheet }      from '../../hooks/useHealthSheet'
 import { useAccountStatus }    from '../../hooks/useAccountStatus'
 import {
@@ -6,7 +7,7 @@ import {
   recommendAction, dmVsAgent, avgSubscription,
   concentrationRisk, revenueAtRisk, potentialUpsellMRR,
 } from '../../lib/healthEngine'
-import { COLORS } from '../../lib/healthConfig'
+import HealthFilterBar         from './HealthFilterBar'
 import HealthSummaryCards      from './HealthSummaryCards'
 import DmAgentBreakdown        from './DmAgentBreakdown'
 import ResolutionTrackerHealth from './ResolutionTrackerHealth'
@@ -18,6 +19,36 @@ import QuickWins               from './QuickWins'
 import AccountModal            from './AccountModal'
 
 const G = '#8CC63F'
+
+// ── Date window helper ────────────────────────────────────────────────────────
+function getDateWindow(dateRange) {
+  if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
+  const today = new Date()
+  if (dateRange.type === 'this_month') return {
+    from: format(startOfMonth(today), 'yyyy-MM-dd'),
+    to:   format(endOfMonth(today),   'yyyy-MM-dd'),
+  }
+  if (dateRange.type === 'last_month') {
+    const prev = subMonths(today, 1)
+    return {
+      from: format(startOfMonth(prev), 'yyyy-MM-dd'),
+      to:   format(endOfMonth(prev),   'yyyy-MM-dd'),
+    }
+  }
+  if (dateRange.type === 'last_30') return {
+    from: format(subDays(today, 30), 'yyyy-MM-dd'),
+    to:   format(today, 'yyyy-MM-dd'),
+  }
+  if (dateRange.type === 'last_90') return {
+    from: format(subDays(today, 90), 'yyyy-MM-dd'),
+    to:   format(today, 'yyyy-MM-dd'),
+  }
+  if (dateRange.type === 'custom') return {
+    from: dateRange.from || '0000-01-01',
+    to:   dateRange.to   || format(today, 'yyyy-MM-dd'),
+  }
+  return { from: '0000-01-01', to: '9999-12-31' }
+}
 
 function timeAgo(date) {
   if (!date) return '—'
@@ -72,9 +103,10 @@ function ErrorBanner({ message, onRetry }) {
   )
 }
 
-export default function HealthDashboard() {
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function HealthDashboard({ filters, setFilters }) {
   const { accounts: raw, loading, error, lastUpdated, refetch, retrying } = useHealthSheet()
-  const { statuses, setStatus, getResolvedAt, isContacted, toggleContacted, getContactedAt } = useAccountStatus()
+  const { statuses, setStatus, isContacted, toggleContacted, getContactedAt } = useAccountStatus()
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
 
@@ -91,11 +123,8 @@ export default function HealthDashboard() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  // ── Enrich all accounts with health scores ──────────────────────────────────
-  const maxRev = useMemo(() =>
-    Math.max(...raw.map(a => a.totalRev || 0), 1),
-    [raw]
-  )
+  // ── Enrich raw accounts with health scores (uses full dataset for revenue scaling) ──
+  const maxRev = useMemo(() => Math.max(...raw.map(a => a.totalRev || 0), 1), [raw])
 
   const accounts = useMemo(() =>
     raw.map(a => {
@@ -107,39 +136,56 @@ export default function HealthDashboard() {
     [raw, maxRev]
   )
 
-  // ── Derived lists ────────────────────────────────────────────────────────────
-  const atRiskAccounts  = useMemo(() => accounts.filter(isAtRisk).sort((a, b)  => (a._health.score) - (b._health.score)), [accounts])
-  const upsellAccounts  = useMemo(() => accounts.filter(isUpsellReady),                                                    [accounts])
-  const healthyAccounts = useMemo(() => accounts.filter(a => a._health.band === 'healthy'),                                [accounts])
+  // Available types for the filter dropdown (always from the full list)
+  const accountTypes = useMemo(() =>
+    [...new Set(accounts.map(a => a.accountType).filter(Boolean))].sort(),
+    [accounts]
+  )
 
-  // ── Aggregate stats ──────────────────────────────────────────────────────────
-  const breakdown       = useMemo(() => dmVsAgent(accounts),        [accounts])
-  const subStats        = useMemo(() => avgSubscription(accounts),   [accounts])
-  const riskRevenue     = useMemo(() => revenueAtRisk(atRiskAccounts),  [atRiskAccounts])
-  const upsellMRR       = useMemo(() => potentialUpsellMRR(upsellAccounts), [upsellAccounts])
-  const concRisk        = useMemo(() => concentrationRisk(accounts), [accounts])
+  // ── Apply all global filters ───────────────────────────────────────────────
+  const filteredAccounts = useMemo(() => {
+    const { from, to } = getDateWindow(filters.dateRange)
+    const srch  = filters.search.toLowerCase().trim()
+    const typeF = filters.typeFilter
+    const bandF = filters.bandFilter
 
-  const avgHealthDm     = useMemo(() => {
-    const dm = accounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
+    return accounts.filter(a => {
+      if (srch && !a.accountName.toLowerCase().includes(srch)) return false
+      if (typeF !== 'all' && (a.accountType || '').toLowerCase() !== typeF.toLowerCase()) return false
+      if (bandF !== 'all' && a._health?.band !== bandF) return false
+      if (filters.dateRange.type !== 'all') {
+        const d = a.stripeStartDate || ''
+        if (!d || d < from || d > to) return false
+      }
+      return true
+    })
+  }, [accounts, filters])
+
+  // ── All derived data from filteredAccounts — everything reacts together ───
+  const atRiskAccounts  = useMemo(() =>
+    filteredAccounts.filter(isAtRisk).sort((a, b) => a._health.score - b._health.score),
+    [filteredAccounts]
+  )
+  const upsellAccounts  = useMemo(() => filteredAccounts.filter(isUpsellReady),                           [filteredAccounts])
+  const healthyAccounts = useMemo(() => filteredAccounts.filter(a => a._health.band === 'healthy'),       [filteredAccounts])
+  const breakdown       = useMemo(() => dmVsAgent(filteredAccounts),                                      [filteredAccounts])
+  const subStats        = useMemo(() => avgSubscription(filteredAccounts),                                [filteredAccounts])
+  const riskRevenue     = useMemo(() => revenueAtRisk(atRiskAccounts),                                    [atRiskAccounts])
+  const upsellMRR       = useMemo(() => potentialUpsellMRR(upsellAccounts),                               [upsellAccounts])
+  const concRisk        = useMemo(() => concentrationRisk(filteredAccounts),                              [filteredAccounts])
+
+  const avgHealthDm    = useMemo(() => {
+    const dm = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
     return dm.length ? Math.round(dm.reduce((s, a) => s + a._health.score, 0) / dm.length) : null
-  }, [accounts])
+  }, [filteredAccounts])
 
-  const avgHealthAgent  = useMemo(() => {
-    const ag = accounts.filter(a => (a.accountType || '').toLowerCase() !== 'dm')
+  const avgHealthAgent = useMemo(() => {
+    const ag = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() !== 'dm')
     return ag.length ? Math.round(ag.reduce((s, a) => s + a._health.score, 0) / ag.length) : null
-  }, [accounts])
+  }, [filteredAccounts])
 
-  // Early-warning: WATCH-band accounts with below-median txns AND tenure > 90 days
-  const medianTxns = useMemo(() => {
-    const txns = [...accounts].map(a => a.transactions).sort((a, b) => a - b)
-    if (!txns.length) return 0
-    const mid = Math.floor(txns.length / 2)
-    return txns.length % 2 === 0 ? (txns[mid - 1] + txns[mid]) / 2 : txns[mid]
-  }, [accounts])
-
-  // Quick wins: top 3 upsell by estExtra, top 3 at-risk by lowest health
   const top3Upsell  = useMemo(() => [...upsellAccounts].slice(0, 3), [upsellAccounts])
-  const top3AtRisk  = useMemo(() => atRiskAccounts.slice(0, 3), [atRiskAccounts])
+  const top3AtRisk  = useMemo(() => atRiskAccounts.slice(0, 3),      [atRiskAccounts])
 
   const dmCount    = breakdown.dm.count
   const agentCount = breakdown.agent.count
@@ -150,7 +196,7 @@ export default function HealthDashboard() {
   return (
     <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
-      {/* Sub-header: refresh + live dot */}
+      {/* Sub-header: refresh + live dot + concentration risk */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-[11px]">
@@ -170,7 +216,6 @@ export default function HealthDashboard() {
           </button>
         </div>
 
-        {/* Concentration risk badge */}
         {concRisk > 0 && (
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
             concRisk > 40 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-brand-muted bg-brand-bg border-brand-border'
@@ -185,13 +230,36 @@ export default function HealthDashboard() {
       {error && raw.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
           <span>⚠️</span>
-          <span>Auto-refresh failed — showing last known data. <button onClick={refetch} className="underline font-medium">Retry</button></span>
+          <span>Auto-refresh failed — showing last known data.{' '}
+            <button onClick={refetch} className="underline font-medium">Retry</button>
+          </span>
         </div>
       )}
 
-      {/* 1. Summary cards */}
+      {/* Global filter bar */}
+      <HealthFilterBar
+        filters={filters}
+        setFilters={setFilters}
+        accountTypes={accountTypes}
+        totalShowing={filteredAccounts.length}
+        totalAll={accounts.length}
+      />
+
+      {/* Active-filter context banner */}
+      {filters.dateRange.type !== 'all' && (
+        <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-[11px] text-brand-heading flex items-center gap-2"
+          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <span>📅</span>
+          <span>
+            Showing <strong>{filteredAccounts.length}</strong> accounts with Stripe Start Date in the selected range.
+            {' '}Numbers update live as the range changes.
+          </span>
+        </div>
+      )}
+
+      {/* 1. Summary cards — always visible, always current */}
       <HealthSummaryCards
-        accounts={accounts}
+        accounts={filteredAccounts}
         atRisk={atRiskAccounts.length}
         healthy={healthyAccounts.length}
         upsellReady={upsellAccounts.length}
@@ -236,11 +304,11 @@ export default function HealthDashboard() {
         potentialMRR={upsellMRR}
       />
 
-      {/* 6. Charts */}
-      <HealthCharts accounts={accounts} />
+      {/* 6. Charts — fed filtered accounts so they update with filters */}
+      <HealthCharts accounts={filteredAccounts} />
 
       {/* 7. Master accounts table */}
-      <MasterAccountsTable accounts={accounts} onAccountClick={setSelectedAccount} />
+      <MasterAccountsTable accounts={filteredAccounts} onAccountClick={setSelectedAccount} />
 
       {/* Account detail modal */}
       {selectedAccount && (

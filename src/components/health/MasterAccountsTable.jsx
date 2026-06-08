@@ -4,8 +4,8 @@ const G   = '#8CC63F'
 const AMB = '#EAB308'
 const RED = '#EF4444'
 
-function fmt(n)  { return '$' + Math.round(n).toLocaleString() }
-function fmtGP(n){ return n ? `${(n * 100).toFixed(0)}%` : '—' }
+function fmt(n)   { return '$' + Math.round(n).toLocaleString() }
+function fmtGP(n) { return n ? `${(n * 100).toFixed(0)}%` : '—' }
 
 function bandColor(band) {
   if (band === 'healthy') return G
@@ -29,55 +29,41 @@ function SortIcon({ col, sortCol, sortDir }) {
 }
 
 const COLUMNS = [
-  { key: 'accountName',  label: 'Account Name',    align: 'left'  },
-  { key: 'accountType',  label: 'Type',             align: 'left'  },
-  { key: 'totalRev',     label: 'Total Rev',        align: 'right' },
-  { key: 'planPrice',    label: 'Plan Price',       align: 'right' },
-  { key: 'users',        label: 'Users',            align: 'right' },
-  { key: 'transactions', label: 'Transactions',     align: 'right' },
-  { key: 'addOns',       label: 'Add-ons',          align: 'right' },
-  { key: 'annualSubs',   label: 'Annual Subs',      align: 'right' },
-  { key: 'gp',           label: 'GP',               align: 'right' },
-  { key: 'multiLocation',label: 'Multi-Loc',        align: 'center'},
-  { key: '_healthScore', label: 'Health',           align: 'center'},
+  { key: 'accountName',   label: 'Account Name',  align: 'left'   },
+  { key: 'accountType',   label: 'Type',           align: 'left'   },
+  { key: 'totalRev',      label: 'Total Rev',      align: 'right'  },
+  { key: 'planPrice',     label: 'Plan Price',     align: 'right'  },
+  { key: 'users',         label: 'Users',          align: 'right'  },
+  { key: 'transactions',  label: 'Transactions',   align: 'right'  },
+  { key: 'addOns',        label: 'Add-ons',        align: 'right'  },
+  { key: 'annualSubs',    label: 'Annual Subs',    align: 'right'  },
+  { key: 'gp',            label: 'GP',             align: 'right'  },
+  { key: 'multiLocation', label: 'Multi-Loc',      align: 'center' },
+  { key: '_healthScore',  label: 'Health',         align: 'center' },
 ]
 
 const PAGE_SIZE = 25
 
 export default function MasterAccountsTable({ accounts, onAccountClick }) {
-  const [search,  setSearch]  = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [bandFilter, setBandFilter] = useState('all')
   const [sortCol, setSortCol] = useState('totalRev')
   const [sortDir, setSortDir] = useState('desc')
   const [page,    setPage]    = useState(1)
 
-  const filtered = useMemo(() => {
-    let list = accounts
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(a => a.accountName.toLowerCase().includes(q))
-    }
-    if (typeFilter !== 'all') {
-      list = list.filter(a => (a.accountType || '').toLowerCase() === typeFilter.toLowerCase())
-    }
-    if (bandFilter !== 'all') {
-      list = list.filter(a => a._health?.band === bandFilter)
-    }
-    return list
-  }, [accounts, search, typeFilter, bandFilter])
+  // Reset to page 1 whenever the incoming accounts list changes (filters applied upstream)
+  const accountsKey = accounts.length
+  useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
+    return [...accounts].sort((a, b) => {
       let av = sortCol === '_healthScore' ? (a._health?.score ?? 0) : (a[sortCol] ?? 0)
       let bv = sortCol === '_healthScore' ? (b._health?.score ?? 0) : (b[sortCol] ?? 0)
       if (typeof av === 'string') av = av.toLowerCase()
       if (typeof bv === 'string') bv = bv.toLowerCase()
       if (av < bv) return sortDir === 'asc' ? -1 : 1
-      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      if (av > bv) return sortDir === 'asc' ?  1 : -1
       return 0
     })
-  }, [filtered, sortCol, sortDir])
+  }, [accounts, sortCol, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const pageData   = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -88,47 +74,18 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
     setPage(1)
   }
 
-  const types = [...new Set(accounts.map(a => a.accountType).filter(Boolean))].sort()
-
-  const resetPage = () => setPage(1)
-
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{ animationDelay: '600ms', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
     >
       {/* Header */}
-      <div className="px-4 sm:px-6 py-4 border-b border-brand-border">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
-            <p className="text-brand-muted text-[11px] mt-0.5">
-              {filtered.length} of {accounts.length} accounts · click column header to sort
-            </p>
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search by name…"
-              value={search}
-              onChange={e => { setSearch(e.target.value); resetPage() }}
-              className="text-[12px] border border-brand-border rounded-lg px-3 py-1.5 bg-brand-bg focus:outline-none focus:border-brand-green w-[180px]"
-            />
-            <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); resetPage() }}
-              className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer text-brand-muted">
-              <option value="all">All Types</option>
-              {types.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select value={bandFilter} onChange={e => { setBandFilter(e.target.value); resetPage() }}
-              className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer text-brand-muted">
-              <option value="all">All Health</option>
-              <option value="healthy">Healthy (80+)</option>
-              <option value="watch">Watch (50–79)</option>
-              <option value="at_risk">At-Risk (&lt;50)</option>
-            </select>
-          </div>
+      <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
+          <p className="text-brand-muted text-[11px] mt-0.5">
+            {accounts.length} accounts · click any column header to sort
+          </p>
         </div>
       </div>
 
@@ -158,9 +115,10 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
               </tr>
             )}
             {pageData.map((a, i) => (
-              <tr key={a.id}
+              <tr
+                key={a.id}
                 className="border-b border-brand-border/50 hover:bg-brand-bg/50 transition-colors duration-100"
-                style={{ animationDelay: `${i * 20}ms` }}>
+              >
                 <td className="pl-5 pr-3 py-2.5">
                   <button
                     onClick={() => onAccountClick?.(a)}
@@ -199,14 +157,18 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
             Page {page} of {totalPages} · {sorted.length} accounts
           </span>
           <div className="flex items-center gap-1">
-            <button disabled={page === 1}
+            <button
+              disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 transition-colors text-brand-muted border-brand-border hover:bg-brand-bg">
+              className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
+            >
               ← Prev
             </button>
-            <button disabled={page === totalPages}
+            <button
+              disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 transition-colors text-brand-muted border-brand-border hover:bg-brand-bg">
+              className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
+            >
               Next →
             </button>
           </div>

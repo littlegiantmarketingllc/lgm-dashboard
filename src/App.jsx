@@ -119,6 +119,7 @@ export default function App() {
   const [categoryFilter, setCategoryFilter]     = useState('all')
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [selectedAgency, setSelectedAgency]     = useState({ name: null, position: null })
+  const [healthFilters, setHealthFilters]       = useState({ search: '', typeFilter: 'all', bandFilter: 'all', dateRange: { type: 'all', from: '', to: '' } })
 
   const { statuses, setStatus }                           = useCallStatus()
   const { calls, loading, error, lastUpdated, refetch, retrying } = useGoogleSheets()
@@ -296,7 +297,7 @@ export default function App() {
       />
       <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      {activeTab === 'health' && <HealthDashboard />}
+      {activeTab === 'health' && <HealthDashboard filters={healthFilters} setFilters={setHealthFilters} />}
 
       {activeTab === 'qc' && <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {error && calls.length > 0 && (
