@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { subDays, format, eachDayOfInterval } from 'date-fns'
 import Header from './components/Header'
+import TabSwitcher from './components/TabSwitcher'
 import SummaryCards from './components/SummaryCards'
 import QuickStats from './components/QuickStats'
 import TopPerformer from './components/TopPerformer'
@@ -12,8 +13,11 @@ import ActivityFeed from './components/ActivityFeed'
 import TeamInsights from './components/TeamInsights'
 import EmployeeModal from './components/EmployeeModal'
 import AgencyCard from './components/AgencyCard'
+import HealthDashboard from './components/health/HealthDashboard'
 import { useCallStatus } from './hooks/useCallStatus'
 import { useGoogleSheets } from './hooks/useGoogleSheets'
+
+const TAB_KEY = 'lgm-active-tab'
 
 // ─── Filter helpers ───────────────────────────────────────────────────────────
 function todayStr() { return format(new Date(), 'yyyy-MM-dd') }
@@ -102,6 +106,15 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main app ────────────────────────────────────────────────────────────────
 export default function App() {
+  const [activeTab, setActiveTab] = useState(() => {
+    try { return localStorage.getItem(TAB_KEY) || 'qc' } catch { return 'qc' }
+  })
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    try { localStorage.setItem(TAB_KEY, tab) } catch {}
+  }
+
   const [filter, setFilter]                     = useState({ type: '30d', from: '', to: '' })
   const [categoryFilter, setCategoryFilter]     = useState('all')
   const [selectedEmployee, setSelectedEmployee] = useState(null)
@@ -264,8 +277,8 @@ export default function App() {
   const periodLabel        = PERIOD_LABEL[filter.type] || 'this period'
   const prevPeriodLabel    = PREV_LABEL[filter.type]   || 'last period'
 
-  if (loading && calls.length === 0) return <LoadingScreen />
-  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
+  if (loading && calls.length === 0 && activeTab === 'qc') return <LoadingScreen />
+  if (error   && calls.length === 0 && activeTab === 'qc') return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -281,8 +294,11 @@ export default function App() {
         retrying={retrying}
         dataError={error}
       />
+      <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      {activeTab === 'health' && <HealthDashboard />}
+
+      {activeTab === 'qc' && <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {error && calls.length > 0 && (
           <div className="mb-4 sm:mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
             <span>⚠️</span>
@@ -351,10 +367,10 @@ export default function App() {
             />
           </aside>
         </div>
-      </div>
+      </div>}
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; Quality Control Dashboard
+        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health Dashboard' : 'Quality Control Dashboard'}
       </footer>
 
       {selectedEmployee && (
