@@ -1,71 +1,38 @@
-import { useState, useMemo, useEffect } from 'react'
-import { subDays, format, eachDayOfInterval } from 'date-fns'
-import Header from './components/Header'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { format, subDays } from 'date-fns'
+
+// Data hook
+import { useQCSheet }     from './hooks/useQCSheet'
+
+// Utilities
+import { applyAllFilters, uniqueMeetingIds } from './lib/qcUtils'
+
+// Layout
+import Header      from './components/Header'
 import TabSwitcher from './components/TabSwitcher'
-import SummaryCards from './components/SummaryCards'
-import QuickStats from './components/QuickStats'
-import TopPerformer from './components/TopPerformer'
-import EmployeeTable from './components/EmployeeTable'
-import MeetingsChart from './components/MeetingsChart'
-import ResolutionTracker from './components/ResolutionTracker'
-import FrustratedTable from './components/FrustratedTable'
-import ActivityFeed from './components/ActivityFeed'
-import TeamInsights from './components/TeamInsights'
-import EmployeeModal from './components/EmployeeModal'
-import AgencyCard from './components/AgencyCard'
-import HealthDashboard from './components/health/HealthDashboard'
-import { useCallStatus } from './hooks/useCallStatus'
-import { useGoogleSheets } from './hooks/useGoogleSheets'
 
-const TAB_KEY = 'lgm-active-tab'
+// QC components
+import KPICards                  from './components/qc/KPICards'
+import NeedsAttentionPanel       from './components/qc/NeedsAttentionPanel'
+import EmployeePerformanceTable  from './components/qc/EmployeePerformanceTable'
+import VerdictDistributionChart  from './components/qc/VerdictDistributionChart'
+import CategoryPerformanceChart  from './components/qc/CategoryPerformanceChart'
+import ScoreTrendsChart          from './components/qc/ScoreTrendsChart'
+import RecentCallsFeed           from './components/qc/RecentCallsFeed'
+import BehaviorInsightsChart     from './components/qc/BehaviorInsightsChart'
 
-// ─── Filter helpers ───────────────────────────────────────────────────────────
-function todayStr() { return format(new Date(), 'yyyy-MM-dd') }
+// Modals
+import CallDetailModal      from './components/modals/CallDetailModal'
+import EmployeeProfileModal from './components/modals/EmployeeProfileModal'
+import CustomerProfileModal from './components/modals/CustomerProfileModal'
 
-function getDateWindow(filter) {
-  const today = todayStr()
-  if (filter.type === 'all')    return { from: '0000-01-01', to: '9999-12-31' }
-  if (filter.type === 'today')  return { from: today, to: today }
-  if (filter.type === 'custom') return { from: filter.from || today, to: filter.to || today }
-  const days = parseInt(filter.type)
-  return { from: format(subDays(new Date(), days), 'yyyy-MM-dd'), to: today }
-}
+// Customer Health tab
+import CustomerHealthPage from './components/health/CustomerHealthPage'
 
-function filterCalls(calls, filter) {
-  const { from, to } = getDateWindow(filter)
-  return calls.filter(c => c.date >= from && c.date <= to)
-}
+const TAB_KEY      = 'lgm-active-tab'
+const HANDLED_KEY  = 'lgm-handled-items'
 
-function getPrevCalls(calls, filter) {
-  if (['all', 'today', 'custom'].includes(filter.type)) return []
-  const days = parseInt(filter.type)
-  const to   = format(subDays(new Date(), days + 1), 'yyyy-MM-dd')
-  const from = format(subDays(new Date(), days * 2),  'yyyy-MM-dd')
-  return calls.filter(c => c.date >= from && c.date <= to)
-}
-
-function pctChange(curr, prev) {
-  if (prev === 0) return null
-  return Math.round((curr - prev) / prev * 100)
-}
-
-const PERIOD_LABEL = { '2d': 'the last 2 days', '7d': 'this week', '14d': 'the last 2 weeks', '30d': 'this month' }
-const PREV_LABEL   = { '2d': 'previous 2 days', '7d': 'last week', '14d': 'previous 2 weeks', '30d': 'last month' }
-
-function getModalPeriodLabel(filter, categoryFilter) {
-  let base
-  if (filter.type === 'today')  base = 'Today'
-  else if (filter.type === 'all') base = 'All time'
-  else if (filter.type === 'custom') {
-    base = filter.from && filter.to ? `${filter.from} → ${filter.to}` : 'Custom range'
-  } else {
-    const map = { '2d': 'Last 2 days', '7d': 'Last 7 days', '14d': 'Last 14 days', '30d': 'Last 30 days' }
-    base = map[filter.type] || `Last ${filter.type}`
-  }
-  return categoryFilter !== 'all' ? `${base} · ${categoryFilter}` : base
-}
-
-// ─── Loading / Error screens ─────────────────────────────────────────────────
+// ─── Loading / Error screens ──────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center gap-5">
@@ -91,7 +58,7 @@ function ErrorScreen({ message, onRetry }) {
         <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
         <div className="bg-brand-bg rounded-xl p-4 text-left mb-6 text-xs text-brand-muted space-y-1.5">
           <p className="font-semibold text-brand-heading text-[11px] uppercase tracking-wider mb-2">Quick checklist</p>
-          <p>1. Open the sheet → <strong>File → Share → Publish to web</strong></p>
+          <p>1. Open the QA sheet → <strong>File → Share → Publish to web</strong></p>
           <p>2. Choose <strong>Entire Document</strong> + <strong>CSV</strong> → Publish</p>
           <p>3. Also set sharing to <strong>Anyone with the link can view</strong></p>
         </div>
@@ -104,191 +71,92 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-// ─── Main app ────────────────────────────────────────────────────────────────
+// ─── Main app ─────────────────────────────────────────────────────────────────
 export default function App() {
+  // Tab persistence
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem(TAB_KEY) || 'qc' } catch { return 'qc' }
   })
-
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     try { localStorage.setItem(TAB_KEY, tab) } catch {}
   }
 
-  const [filter, setFilter]                     = useState({ type: '30d', from: '', to: '' })
-  const [categoryFilter, setCategoryFilter]     = useState('all')
-  const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const [selectedAgency, setSelectedAgency]     = useState({ name: null, position: null })
-  const [healthFilters, setHealthFilters]       = useState({ search: '', typeFilter: 'all', bandFilter: 'all', dateRange: { type: 'all', from: '', to: '' } })
+  // Filters
+  const [dateFilter, setDateFilter]         = useState({ type: '30d', from: '', to: '' })
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [employeeFilter, setEmployeeFilter] = useState('all')
+  const [searchQuery, setSearchQuery]       = useState('')
 
-  const { statuses, setStatus }                           = useCallStatus()
-  const { calls, loading, error, lastUpdated, refetch, retrying } = useGoogleSheets()
+  // Modal state: null | { type: 'call'|'employee'|'customer', id: string }
+  const [modal, setModal] = useState(null)
 
-  // Close modals on Escape
+  // Handled items (client-side "Mark as handled")
+  const [handledIds, setHandledIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(HANDLED_KEY) || '[]')) }
+    catch { return new Set() }
+  })
+
+  const handleToggleHandled = useCallback((id) => {
+    setHandledIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      try { localStorage.setItem(HANDLED_KEY, JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }, [])
+
+  // Modal openers
+  const openCall     = useCallback((meetingId)   => setModal({ type: 'call',     id: meetingId }),   [])
+  const openEmployee = useCallback((name)         => setModal({ type: 'employee', id: name }),        [])
+  const openCustomer = useCallback((name)         => setModal({ type: 'customer', id: name }),        [])
+  const closeModal   = useCallback(()             => setModal(null),                                   [])
+
+  // Escape key closes modal
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== 'Escape') return
-      setSelectedEmployee(null)
-      setSelectedAgency({ name: null, position: null })
-    }
+    const onKey = (e) => { if (e.key === 'Escape') setModal(null) }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  // Dynamic categories extracted from all loaded calls
+  // Data
+  const { calls, loading, error, lastUpdated, refetch, retrying } = useQCSheet()
+
+  // Derived filter options
   const allCategories = useMemo(() => {
     const cats = new Set(calls.map(c => c.category).filter(Boolean))
     return [...cats].sort()
   }, [calls])
 
-  // ── All useMemo hooks MUST come before any conditional return ────────────
-  const filteredCalls = useMemo(() => {
-    let c = filterCalls(calls, filter)
-    if (categoryFilter !== 'all') c = c.filter(x => x.category === categoryFilter)
-    return c
-  }, [calls, filter, categoryFilter])
+  const allEmployees = useMemo(() => {
+    const emps = new Set(calls.map(c => c.employee).filter(Boolean))
+    return [...emps].sort()
+  }, [calls])
 
-  const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
-
-  const summary = useMemo(() => {
-    const total      = filteredCalls.length
-    const frustrated = filteredCalls.filter(c => c.frustrated).length
-    const positive   = total - frustrated
-    return { total, positive, frustrated }
-  }, [filteredCalls])
-
-  const prevSummary = useMemo(() => {
-    const total      = prevCalls.length
-    const frustrated = prevCalls.filter(c => c.frustrated).length
-    const positive   = total - frustrated
-    return { total, positive, frustrated }
-  }, [prevCalls])
-
-  const trends = useMemo(() => {
-    const canCompare = prevCalls.length >= 5 &&
-      !['all', 'today', 'custom'].includes(filter.type)
-    return {
-      total:      canCompare ? pctChange(summary.total,     prevSummary.total)    : null,
-      positive:   canCompare ? pctChange(summary.positive,  prevSummary.positive) : null,
-      frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated)      : null,
-    }
-  }, [summary, prevSummary, prevCalls, filter])
-
-  const employeeStats = useMemo(() => {
-    const map = {}
-    const sorted = [...filteredCalls].sort((a, b) => (a.date > b.date ? 1 : -1))
-    for (const call of sorted) {
-      if (!map[call.employee]) {
-        map[call.employee] = { name: call.employee, calls: 0, totalScore: 0, frustrated: 0, scores: [], callLog: [] }
-      }
-      map[call.employee].calls++
-      map[call.employee].totalScore += call.score
-      if (call.frustrated) map[call.employee].frustrated++
-      map[call.employee].scores.push(call.score)
-      if (call.summary) {
-        map[call.employee].callLog.push({ date: call.date, customer: call.customer, summary: call.summary })
-      }
-    }
-    return Object.values(map)
-      .map(e => ({
-        ...e,
-        avgScore:        +(e.totalScore / e.calls).toFixed(1),
-        recentScores:    e.scores.slice(-5),
-        recentSummaries: e.callLog.slice(-3).reverse(),
-      }))
-      .sort((a, b) => b.avgScore - a.avgScore)
-  }, [filteredCalls])
-
-  const chartData = useMemo(() => {
-    const days  = ['all', 'today', 'custom'].includes(filter.type) ? 30 : Math.min(parseInt(filter.type), 30)
-    const today = new Date()
-    const start = subDays(today, days - 1)
-    return eachDayOfInterval({ start, end: today }).map(day => {
-      const dateStr  = format(day, 'yyyy-MM-dd')
-      const dayCalls = filteredCalls.filter(c => c.date === dateStr)
-      return {
-        date:       format(day, 'MMM d'),
-        positive:   dayCalls.filter(c => !c.frustrated).length,
-        frustrated: dayCalls.filter(c =>  c.frustrated).length,
-      }
-    })
-  }, [filteredCalls, filter])
-
-  const frustratedCalls = useMemo(() =>
-    filteredCalls
-      .filter(c => c.frustrated)
-      .sort((a, b) => {
-        if (b.date !== a.date) return b.date > a.date ? 1 : -1
-        return (b.time || '') > (a.time || '') ? 1 : -1
-      }),
-    [filteredCalls]
+  // Filtered calls (respect ALL filters)
+  const filteredCalls = useMemo(() =>
+    applyAllFilters(calls, { dateFilter, categoryFilter, employeeFilter, searchQuery }),
+    [calls, dateFilter, categoryFilter, employeeFilter, searchQuery]
   )
 
-  const topPerformerData = useMemo(() => {
-    const map = {}
-    for (const call of filteredCalls) {
-      if (!map[call.employee]) map[call.employee] = { name: call.employee, calls: 0, totalScore: 0 }
-      map[call.employee].calls++
-      map[call.employee].totalScore += call.score
-    }
-    const top = Object.values(map)
-      .filter(e => e.calls >= 2)
-      .map(e => ({ ...e, avgScore: +(e.totalScore / e.calls).toFixed(1) }))
-      .sort((a, b) => b.avgScore - a.avgScore)[0] ?? null
-    if (!top) return null
-    const latestCall = [...filteredCalls]
-      .filter(c => c.employee === top.name && c.summary)
-      .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : (b.time > a.time ? 1 : -1)))[0]
-    return { ...top, latestSummary: latestCall?.summary || '', latestCustomer: latestCall?.customer || '' }
-  }, [filteredCalls])
-
-  const quickStats = useMemo(() => {
-    const total       = filteredCalls.length
-    const avgScore    = total
-      ? +(filteredCalls.reduce((s, c) => s + c.score, 0) / total).toFixed(1) : 0
-    const totalMins   = filteredCalls.reduce((s, c) => s + (c.duration || 0), 0)
-    const avgDuration = total ? Math.round(totalMins / total) : 0
-    const withScore   = filteredCalls.filter(c => c.score > 0).length
-    const responseRate = total ? Math.round((withScore / total) * 100) : 0
-    const prevCount   = prevCalls.length
-    const callsDelta  = prevCount >= 5 ? pctChange(total, prevCount) : null
-    return { avgScore, totalMins: Math.round(totalMins), avgDuration, responseRate, totalCalls: total, callsDelta }
-  }, [filteredCalls, prevCalls])
-
-  const recentActivity = useMemo(() =>
-    [...calls]
-      .sort((a, b) => {
-        if (b.date !== a.date) return b.date > a.date ? 1 : -1
-        return (b.time || '') > (a.time || '') ? 1 : -1
-      })
-      .slice(0, 12),
-    [calls]
-  )
-  // ──────────────────────────────────────────────────────────────────────────
-
-  const handleEmployeeClick = (name) => setSelectedEmployee(name)
-  const handleAgencyClick   = (name, e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setSelectedAgency({ name, position: { x: rect.left + rect.width / 2, y: rect.bottom } })
-  }
-
-  // ── Smart date intelligence ───────────────────────────────────────────────
-  const showTodayEmpty     = filter.type === 'today' && filteredCalls.length === 0 && !loading
-  const showPeriodBanner   = !['all', 'today', 'custom'].includes(filter.type) && prevCalls.length >= 5
-  const periodLabel        = PERIOD_LABEL[filter.type] || 'this period'
-  const prevPeriodLabel    = PREV_LABEL[filter.type]   || 'last period'
-
+  // Show loading/error for initial load on QC tab
   if (loading && calls.length === 0 && activeTab === 'qc') return <LoadingScreen />
   if (error   && calls.length === 0 && activeTab === 'qc') return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <Header
-        filter={filter}
-        setFilter={setFilter}
+        filter={dateFilter}
+        setFilter={setDateFilter}
         categoryFilter={categoryFilter}
         setCategoryFilter={setCategoryFilter}
         allCategories={allCategories}
+        employeeFilter={employeeFilter}
+        setEmployeeFilter={setEmployeeFilter}
+        allEmployees={allEmployees}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
         lastUpdated={lastUpdated}
         onRefresh={refetch}
         isRefreshing={loading}
@@ -297,97 +165,105 @@ export default function App() {
       />
       <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      {activeTab === 'health' && <HealthDashboard filters={healthFilters} setFilters={setHealthFilters} />}
-
-      {activeTab === 'qc' && <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {error && calls.length > 0 && (
-          <div className="mb-4 sm:mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Auto-refresh failed — showing last known data.{' '}
-              <button onClick={refetch} className="underline font-medium">Retry</button>
-            </span>
-          </div>
-        )}
-
-        {showTodayEmpty && (
-          <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
-            <span>📅</span>
-            <span>No calls recorded today yet. Data updates every 60 seconds.</span>
-          </div>
-        )}
-
-        {showPeriodBanner && (
-          <div className="mb-4 rounded-xl border border-brand-border bg-white px-4 py-3 text-sm text-brand-heading flex items-center gap-2"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            <span>📊</span>
-            <span>
-              Team handled{' '}
-              <strong>{summary.total}</strong> calls {periodLabel} vs{' '}
-              <strong>{prevSummary.total}</strong> {prevPeriodLabel}
-              {trends.total !== null && (
-                <> —{' '}
-                  <strong style={{ color: trends.total >= 0 ? '#8CC63F' : '#EF4444' }}>
-                    {trends.total >= 0 ? '+' : ''}{trends.total}%
-                  </strong>
-                </>
-              )}
-            </span>
-          </div>
-        )}
-
-        <div className="flex gap-6 xl:gap-7 items-start">
-          <div className="flex-1 min-w-0 space-y-4 sm:space-y-6">
-            <SummaryCards summary={summary} trends={trends} />
-            <QuickStats stats={quickStats} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <TopPerformer performer={topPerformerData} onEmployeeClick={handleEmployeeClick} />
-              <div className="lg:col-span-2">
-                <EmployeeTable employees={employeeStats} onEmployeeClick={handleEmployeeClick} />
-              </div>
-            </div>
-
-            <TeamInsights calls={filteredCalls} prevCalls={prevCalls} />
-
-            <MeetingsChart data={chartData} />
-            <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
-            <FrustratedTable
-              calls={frustratedCalls}
-              statuses={statuses}
-              setStatus={setStatus}
-              onEmployeeClick={handleEmployeeClick}
-              onAgencyClick={handleAgencyClick}
-            />
-          </div>
-
-          <aside className="hidden xl:flex flex-col w-[300px] 2xl:w-[320px] flex-shrink-0 sticky top-[105px]">
-            <ActivityFeed
-              calls={recentActivity}
-              onEmployeeClick={handleEmployeeClick}
-              onAgencyClick={handleAgencyClick}
-            />
-          </aside>
-        </div>
-      </div>}
-
-      <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health Dashboard' : 'Quality Control Dashboard'}
-      </footer>
-
-      {selectedEmployee && (
-        <EmployeeModal
-          employeeName={selectedEmployee}
-          calls={filteredCalls}
-          periodLabel={getModalPeriodLabel(filter, categoryFilter)}
-          onClose={() => setSelectedEmployee(null)}
+      {/* ── CUSTOMER HEALTH TAB ─────────────────────────────────────── */}
+      {activeTab === 'health' && (
+        <CustomerHealthPage
+          calls={calls}
+          onCustomerClick={openCustomer}
         />
       )}
-      {selectedAgency.name && (
-        <AgencyCard
-          agencyName={selectedAgency.name}
-          calls={calls}
-          position={selectedAgency.position}
-          onClose={() => setSelectedAgency({ name: null, position: null })}
+
+      {/* ── QUALITY CONTROL TAB ────────────────────────────────────── */}
+      {activeTab === 'qc' && (
+        <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+
+          {/* Stale data warning */}
+          {error && calls.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>
+                Auto-refresh failed — showing last known data.{' '}
+                <button onClick={refetch} className="underline font-medium">Retry</button>
+              </span>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && filteredCalls.length === 0 && calls.length > 0 && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
+              <span>📅</span>
+              <span>No calls match the current filters. Try adjusting the date range or clearing filters.</span>
+            </div>
+          )}
+
+          {/* 5 KPI cards */}
+          <KPICards calls={filteredCalls} />
+
+          {/* Needs Attention panel */}
+          <NeedsAttentionPanel
+            calls={filteredCalls}
+            handledIds={handledIds}
+            onToggleHandled={handleToggleHandled}
+            onOpenCall={openCall}
+          />
+
+          {/* Employee Performance Table */}
+          <EmployeePerformanceTable
+            calls={filteredCalls}
+            onEmployeeClick={openEmployee}
+          />
+
+          {/* Verdict Distribution + Category Performance */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <VerdictDistributionChart calls={filteredCalls} />
+            <CategoryPerformanceChart calls={filteredCalls} />
+          </div>
+
+          {/* Score Trends */}
+          <ScoreTrendsChart calls={filteredCalls} dateFilter={dateFilter} />
+
+          {/* Recent Calls + Behavior Insights */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <RecentCallsFeed
+              calls={filteredCalls}
+              onCallClick={openCall}
+              onCustomerClick={openCustomer}
+            />
+            <BehaviorInsightsChart calls={filteredCalls} />
+          </div>
+        </div>
+      )}
+
+      <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
+        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health' : 'Quality Control'} Dashboard
+      </footer>
+
+      {/* ── MODALS ──────────────────────────────────────────────────── */}
+      {modal?.type === 'call' && (
+        <CallDetailModal
+          meetingId={modal.id}
+          allCalls={calls}
+          onClose={closeModal}
+          onEmployeeClick={(name) => { closeModal(); setTimeout(() => openEmployee(name), 50) }}
+          onCustomerClick={(name) => { closeModal(); setTimeout(() => openCustomer(name), 50) }}
+        />
+      )}
+      {modal?.type === 'employee' && (
+        <EmployeeProfileModal
+          employeeName={modal.id}
+          allCalls={calls}
+          onClose={closeModal}
+          onCallClick={(mid)  => { closeModal(); setTimeout(() => openCall(mid), 50) }}
+          onCustomerClick={(name) => { closeModal(); setTimeout(() => openCustomer(name), 50) }}
+        />
+      )}
+      {modal?.type === 'customer' && (
+        <CustomerProfileModal
+          customerName={modal.id}
+          allCalls={calls}
+          onClose={closeModal}
+          onCallClick={(mid) => { closeModal(); setTimeout(() => openCall(mid), 50) }}
+          onEmployeeClick={(name) => { closeModal(); setTimeout(() => openEmployee(name), 50) }}
         />
       )}
     </div>
