@@ -200,7 +200,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderTop: '3px solid #8CC63F' }}>
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── DESKTOP layout (lg+): single row ───────────────────────── */}

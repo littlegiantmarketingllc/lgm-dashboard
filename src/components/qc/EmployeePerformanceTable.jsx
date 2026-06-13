@@ -95,8 +95,9 @@ export default function EmployeePerformanceTable({ calls, onEmployeeClick }) {
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
-      <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between">
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)', borderTop: '4px solid #8CC63F' }}>
+      <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between"
+        style={{ background: 'linear-gradient(to right, rgba(140,198,63,0.07), transparent)' }}>
         <h3 className="font-bold text-brand-heading text-sm">Employee Performance</h3>
         <span className="text-brand-muted text-[11px]">{employees.length} employees</span>
       </div>
@@ -129,14 +130,15 @@ export default function EmployeePerformanceTable({ calls, onEmployeeClick }) {
               return (
                 <tr
                   key={emp.name}
-                  className="border-b border-brand-border/40 hover:bg-brand-bg/60 cursor-pointer transition-colors"
+                  className="border-b border-brand-border/40 hover:bg-[#F0F7E8] cursor-pointer transition-colors"
+                  style={{ borderLeft: `3px solid ${scoreColor(emp.avgOverall)}` }}
                   onClick={() => onEmployeeClick(emp.name)}
                 >
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-                        style={{ background: scoreColor(emp.avgOverall) }}
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0"
+                        style={{ background: scoreColor(emp.avgOverall), boxShadow: `0 2px 8px ${scoreColor(emp.avgOverall)}40` }}
                       >
                         {emp.name.charAt(0).toUpperCase()}
                       </div>
