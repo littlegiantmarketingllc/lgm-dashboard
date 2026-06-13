@@ -142,7 +142,8 @@ function EmployeeSelect({ employees, value, onChange }) {
   )
 }
 
-function SearchBox({ value, onChange }) {
+function SearchBox({ value, onChange, resultCount }) {
+  const hasResults = value && resultCount !== null
   return (
     <div className="relative flex-shrink-0">
       <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-muted pointer-events-none"
@@ -151,20 +152,30 @@ function SearchBox({ value, onChange }) {
       </svg>
       <input
         type="text"
-        placeholder="Search…"
+        placeholder="Search by name, ID, verdict…"
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="text-[11px] pl-6 pr-3 py-1.5 border border-brand-border rounded-lg bg-brand-bg focus:outline-none focus:border-brand-green w-[120px] sm:w-[160px] placeholder-brand-muted text-brand-text"
+        className="text-[11px] pl-6 pr-3 py-1.5 border rounded-lg bg-brand-bg focus:outline-none w-[140px] sm:w-[200px] placeholder-brand-muted text-brand-text transition-all duration-150"
+        style={{
+          borderColor: value ? G : '#E5E7E5',
+          boxShadow: value ? `0 0 0 2px ${G}20` : 'none',
+          paddingRight: value ? '4rem' : '0.75rem',
+        }}
       />
       {value && (
-        <button
-          onClick={() => onChange('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text"
-        >
-          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M18 6 6 18M6 6l12 12"/>
-          </svg>
-        </button>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          {hasResults && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+              style={{ color: G, background: `${G}15` }}>
+              {resultCount}
+            </span>
+          )}
+          <button onClick={() => onChange('')} className="text-brand-muted hover:text-brand-text transition-colors">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
       )}
     </div>
   )
@@ -174,7 +185,7 @@ export default function Header({
   filter, setFilter,
   categoryFilter, setCategoryFilter, allCategories,
   employeeFilter, setEmployeeFilter, allEmployees,
-  searchQuery, setSearchQuery,
+  searchQuery, setSearchQuery, searchResultCount,
   lastUpdated, onRefresh, isRefreshing, retrying, dataError,
 }) {
   const [elapsed, setElapsed]   = useState('—')
@@ -227,7 +238,7 @@ export default function Header({
               <span>{refreshLabel}</span>
             </button>
             {/* Search */}
-            <SearchBox value={searchQuery} onChange={setSearchQuery} />
+            <SearchBox value={searchQuery} onChange={setSearchQuery} resultCount={searchResultCount} />
             {/* Employee filter */}
             <EmployeeSelect employees={allEmployees} value={employeeFilter} onChange={setEmployeeFilter} />
             {/* Category filter */}
@@ -272,7 +283,7 @@ export default function Header({
           {/* Row 2: horizontally scrollable filter strip (category + date pills) */}
           <div className="border-t border-brand-border/40 overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 pb-0.5">
             <div className="flex items-center gap-1.5 py-2 w-max">
-              <SearchBox value={searchQuery} onChange={setSearchQuery} />
+              <SearchBox value={searchQuery} onChange={setSearchQuery} resultCount={searchResultCount} />
               <div className="w-px h-5 bg-brand-border flex-shrink-0" />
               <EmployeeSelect employees={allEmployees} value={employeeFilter} onChange={setEmployeeFilter} />
               <CategorySelect

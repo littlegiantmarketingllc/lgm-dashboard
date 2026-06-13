@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { G, scoreColor } from '../lib/ehUtils'
 
@@ -81,9 +82,17 @@ function ActionButtons({ callId, status, setStatus }) {
 }
 
 export default function FrustratedTable({ calls, statuses, setStatus, onEmployeeClick, onCallClick }) {
+  const [flashKey, setFlashKey] = useState(null)
+
   const getStatus     = (id) => statuses[String(id)]?.status ?? 'action_required'
   const getResolvedAt = (id) => statuses[String(id)]?.resolvedAt ?? null
   const statusKey     = (call) => call.meetingId || String(call._rowIdx)
+
+  const handleSetStatus = (id, newStatus) => {
+    setStatus(id, newStatus)
+    setFlashKey(id)
+    setTimeout(() => setFlashKey(null), 500)
+  }
 
   const actionRequired = calls.filter(c => getStatus(statusKey(c)) === 'action_required').length
   const inProgress     = calls.filter(c => getStatus(statusKey(c)) === 'in_progress').length
@@ -102,8 +111,7 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
         style={{ background: 'linear-gradient(to right, rgba(239,68,68,0.05), transparent)' }}>
         <div>
           <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse-dot inline-block flex-shrink-0"
-              style={{ boxShadow: '0 0 5px rgba(239,68,68,0.5)' }} />
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse-dot glow-pulse-red inline-block flex-shrink-0" />
             Frustrated Calls
           </h2>
           <p className="text-brand-muted text-[11px] mt-0.5">
@@ -166,12 +174,13 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
               const status     = getStatus(key)
               const resolvedAt = getResolvedAt(key)
               const isResolved = status === 'resolved'
+              const isFlashing = flashKey === key
 
               return (
                 <>
                   <tr
                     key={`row-${call.meetingId || call._rowIdx}`}
-                    className={`animate-slide-in-row border-b border-brand-border/60 cursor-pointer transition-all duration-200 ${isResolved ? 'opacity-60' : ''}`}
+                    className={`animate-slide-in-row border-b border-brand-border/60 cursor-pointer transition-all duration-200 ${isResolved ? 'opacity-60' : ''} ${isFlashing ? 'row-flash' : ''}`}
                     style={{ animationDelay: `${680 + i * 50}ms` }}
                     onClick={() => onCallClick?.(call.meetingId)}
                     onMouseEnter={e => { if (!isResolved) e.currentTarget.style.background = '#F0F7E8' }}
@@ -222,7 +231,7 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
                     {/* Actions */}
                     <td className="px-3 sm:px-6 py-3.5">
                       <div className="flex flex-col gap-1 items-start">
-                        <ActionButtons callId={key} status={status} setStatus={setStatus} />
+                        <ActionButtons callId={key} status={status} setStatus={handleSetStatus} />
                         {isResolved && resolvedAt && (
                           <span className="text-[10px] text-brand-muted">Done {resolvedAgo(resolvedAt)}</span>
                         )}

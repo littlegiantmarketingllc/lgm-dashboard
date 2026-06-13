@@ -109,7 +109,12 @@ export default function App() {
       result = result.filter(c =>
         c.employee?.toLowerCase().includes(q) ||
         c.customer?.toLowerCase().includes(q) ||
-        c.category?.toLowerCase().includes(q)
+        c.category?.toLowerCase().includes(q) ||
+        c.meetingId?.toLowerCase().includes(q) ||
+        c.date?.includes(q) ||
+        c.finalVerdict?.toLowerCase().includes(q) ||
+        c.status?.toLowerCase().includes(q) ||
+        c.summary?.toLowerCase().includes(q)
       )
     }
     return result
@@ -151,6 +156,7 @@ export default function App() {
         categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
         employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
         searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
+        searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
         lastUpdated={lastUpdated}  onRefresh={refetch}
         isRefreshing={loading}     retrying={retrying} dataError={error}
       />

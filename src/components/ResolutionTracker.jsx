@@ -29,7 +29,7 @@ export default function ResolutionTracker({ calls, statuses }) {
   // Tally statuses for the current filtered frustrated calls
   let actionRequired = 0, inProgress = 0, resolved = 0
   for (const call of calls) {
-    const s = statuses[String(call.id)]?.status ?? 'action_required'
+    const s = statuses[call.meetingId || String(call._rowIdx)]?.status ?? 'action_required'
     if (s === 'resolved')    resolved++
     else if (s === 'in_progress') inProgress++
     else actionRequired++
