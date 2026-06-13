@@ -122,7 +122,7 @@ export default function CustomerHealthPage({ calls, onCustomerClick }) {
 
       {/* Main customer table */}
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
         <div className="px-5 py-4 border-b border-brand-border flex flex-wrap items-center gap-3">
           <h3 className="font-bold text-brand-heading text-sm">All Customers</h3>
           <span className="text-brand-muted text-[11px]">{customers.length} total</span>

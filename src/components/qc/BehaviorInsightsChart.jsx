@@ -26,7 +26,7 @@ export default function BehaviorInsightsChart({ calls }) {
   if (!insights.length) {
     return (
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5"
-        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
         <h3 className="font-bold text-brand-heading text-sm mb-3">Behavior Insights</h3>
         <p className="text-brand-muted text-sm text-center py-6">No behavior tags in this period</p>
       </div>
@@ -35,7 +35,7 @@ export default function BehaviorInsightsChart({ calls }) {
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
       <h3 className="font-bold text-brand-heading text-sm mb-4">Behavior Insights</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {positive.length > 0 && (

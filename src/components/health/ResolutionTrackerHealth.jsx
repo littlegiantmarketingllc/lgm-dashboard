@@ -29,7 +29,7 @@ export default function ResolutionTrackerHealth({ accounts, statuses }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
-      style={{ animationDelay: '480ms', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ animationDelay: '480ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
       <div className="px-6 py-4 border-b border-brand-border">
         <h2 className="text-brand-heading font-semibold text-sm">At-Risk Resolution Tracker</h2>

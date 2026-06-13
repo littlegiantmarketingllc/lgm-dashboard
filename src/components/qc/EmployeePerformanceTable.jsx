@@ -87,7 +87,7 @@ export default function EmployeePerformanceTable({ calls, onEmployeeClick }) {
   if (!calls.length) {
     return (
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-8 text-center"
-        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
         <p className="text-brand-muted text-sm">No employee data in this period.</p>
       </div>
     )
@@ -95,7 +95,7 @@ export default function EmployeePerformanceTable({ calls, onEmployeeClick }) {
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
       <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between">
         <h3 className="font-bold text-brand-heading text-sm">Employee Performance</h3>
         <span className="text-brand-muted text-[11px]">{employees.length} employees</span>

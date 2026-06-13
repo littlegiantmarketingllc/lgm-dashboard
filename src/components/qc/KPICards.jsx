@@ -5,7 +5,7 @@ function Card({ icon, label, value, sub, accent, pulse }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 flex flex-col gap-2 min-w-0"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
       <div className="flex items-center justify-between">
         <span className="text-brand-muted text-[11px] font-semibold uppercase tracking-wider truncate">

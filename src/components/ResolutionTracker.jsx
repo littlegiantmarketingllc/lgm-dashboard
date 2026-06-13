@@ -43,7 +43,7 @@ export default function ResolutionTracker({ calls, statuses }) {
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{
         animationDelay: '500ms',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
       }}
     >
       <div className="px-6 py-4 border-b border-brand-border">
@@ -90,7 +90,7 @@ export default function ResolutionTracker({ calls, statuses }) {
           </div>
 
           {/* Track */}
-          <div className="h-2 rounded-full bg-brand-border overflow-hidden">
+          <div className="h-3 rounded-full bg-brand-border overflow-hidden">
             {/* Resolved segment */}
             <div className="h-full flex">
               <div

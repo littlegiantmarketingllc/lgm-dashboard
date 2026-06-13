@@ -184,7 +184,7 @@ export default function NeedsAttentionPanel({ calls, handledIds, onToggleHandled
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border">
         <div className="flex items-center gap-2">

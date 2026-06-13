@@ -14,7 +14,7 @@ function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefi
       className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2"
       style={{
         animationDelay: `${delay}ms`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
         borderLeft: accentColor ? `3px solid ${accentColor}` : undefined,
       }}
     >

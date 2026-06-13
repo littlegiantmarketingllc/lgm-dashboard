@@ -16,7 +16,7 @@ function TrendPill({ value, lowerIsBetter = false }) {
   )
 }
 
-function Card({ label, value, sub, icon, accentBorder, trend, lowerIsBetter, delay, decimals = 0 }) {
+function Card({ label, value, sub, icon, accentBorder, iconBg, iconColor, trend, lowerIsBetter, delay, decimals = 0 }) {
   const displayed = useCountUp(value, { duration: 1200, delay, decimals })
 
   return (
@@ -24,21 +24,26 @@ function Card({ label, value, sub, icon, accentBorder, trend, lowerIsBetter, del
       className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2 sm:gap-3"
       style={{
         animationDelay: `${delay}ms`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
         borderLeft: accentBorder ? `3px solid ${accentBorder}` : undefined,
       }}
     >
       {/* Label + icon */}
       <div className="flex items-start justify-between">
         <span className="text-brand-muted text-[10px] font-bold uppercase tracking-[0.18em]">{label}</span>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base border border-brand-border bg-brand-bg flex-shrink-0">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+          style={{
+            background: iconBg || '#F4F6F4',
+            border: `1px solid ${iconColor ? iconColor + '30' : '#E5E7E5'}`,
+          }}
+        >
           {icon}
         </div>
       </div>
 
       {/* Number + trend */}
       <div className="flex items-end gap-2">
-        {/* Scale number down on mobile: 40px → 52px on sm */}
         <span className="num text-[40px] sm:text-[52px] font-bold leading-none text-brand-text tracking-tight">
           {decimals > 0 ? displayed.toFixed(decimals) : displayed}
         </span>
@@ -63,6 +68,8 @@ export default function SummaryCards({ summary, trends }) {
         value={total}
         sub="Calls in selected period"
         icon="📞"
+        iconBg="#EFF6FF"
+        iconColor="#3B82F6"
         trend={trends.total}
         delay={0}
       />
@@ -71,6 +78,8 @@ export default function SummaryCards({ summary, trends }) {
         value={positive}
         sub={`${posRate}% satisfaction rate`}
         icon="✅"
+        iconBg={`${G}15`}
+        iconColor={G}
         accentBorder={G}
         trend={trends.positive}
         delay={80}
@@ -80,6 +89,8 @@ export default function SummaryCards({ summary, trends }) {
         value={frustrated}
         sub={frustrated === 0 ? 'All clear this period' : 'Requires immediate follow-up'}
         icon="⚠️"
+        iconBg={frustrated > 0 ? '#FEF2F2' : '#F4F6F4'}
+        iconColor={frustrated > 0 ? '#EF4444' : undefined}
         accentBorder={frustrated > 0 ? '#EF4444' : undefined}
         trend={trends.frustrated}
         lowerIsBetter

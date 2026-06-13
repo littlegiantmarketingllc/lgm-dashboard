@@ -78,8 +78,13 @@
               box-shadow 0.18s ease;
 }
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.05) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.06) !important;
+}
+
+/* Card header band — subtle brand-green tint on card section headings */
+.card-header {
+  background: linear-gradient(to right, rgba(140,198,63,0.04), transparent);
 }
 
 /* Visible focus ring for keyboard navigation — uses brand green */

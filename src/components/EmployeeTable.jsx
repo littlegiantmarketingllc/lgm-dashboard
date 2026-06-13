@@ -18,7 +18,7 @@ function ScorePill({ score }) {
 
 function ScoreBar({ score }) {
   return (
-    <div className="w-full h-[3px] rounded-full bg-brand-border mt-1.5 overflow-hidden">
+    <div className="w-full h-2 rounded-full bg-brand-border mt-2 overflow-hidden">
       <div className="h-full rounded-full score-bar-fill"
         style={{ width: `${(score / 10) * 100}%`, background: scoreColor(score) }} />
     </div>
@@ -93,10 +93,10 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
   return (
     <>
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col h-full"
-        style={{ animationDelay: '360ms', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        style={{ animationDelay: '360ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
 
         {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3">
+        <div className="card-header px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-brand-heading font-semibold text-sm">Employee Performance</h2>
             <p className="text-brand-muted text-[11px] mt-0.5 hidden sm:block">

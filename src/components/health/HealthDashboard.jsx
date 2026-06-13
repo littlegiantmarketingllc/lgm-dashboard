@@ -248,7 +248,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* Active-filter context banner */}
       {filters.dateRange.type !== 'all' && (
         <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-[11px] text-brand-heading flex items-center gap-2"
-          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
           <span>📅</span>
           <span>
             Showing <strong>{filteredAccounts.length}</strong> accounts with Stripe Start Date in the selected range.

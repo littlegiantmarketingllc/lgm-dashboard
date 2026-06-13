@@ -22,7 +22,7 @@ export default function CategoryPerformanceChart({ calls }) {
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
       <h3 className="font-bold text-brand-heading text-sm mb-4">Category Performance</h3>
       {!data.length ? (
         <div className="h-40 flex items-center justify-center text-brand-muted text-sm">No data</div>

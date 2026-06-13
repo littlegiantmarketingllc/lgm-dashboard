@@ -25,7 +25,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
-      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
       <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
 

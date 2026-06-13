@@ -132,7 +132,7 @@ export default function ActivityFeed({ calls, onEmployeeClick, onAgencyClick }) 
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col"
-      style={{ animationDelay: '500ms', maxHeight: 'calc(100vh - 120px)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ animationDelay: '500ms', maxHeight: 'calc(100vh - 120px)', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
       {/* Header */}
       <div className="px-5 py-4 border-b border-brand-border flex-shrink-0">

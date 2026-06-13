@@ -15,7 +15,7 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
   if (!performer) {
     return (
       <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-6 flex flex-col items-center justify-center gap-3 min-h-[200px]"
-        style={{ animationDelay: '300ms', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        style={{ animationDelay: '300ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
         <p className="text-brand-muted text-sm">No data for selected period</p>
       </div>
     )
@@ -31,7 +31,7 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
     <div className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col gap-4 p-6 relative overflow-hidden"
       style={{
         animationDelay: '300ms',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
         borderLeft: `3px solid ${G}`,
       }}>
 
@@ -80,7 +80,7 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
       </div>
 
       {/* Score bar */}
-      <div className="h-1.5 rounded-full bg-brand-border overflow-hidden">
+      <div className="h-2.5 rounded-full bg-brand-border overflow-hidden">
         <div className="h-full rounded-full score-bar-fill"
           style={{ width: `${(performer.avgScore / 10) * 100}%`, background: `linear-gradient(90deg, ${G}, ${GOLD})` }} />
       </div>

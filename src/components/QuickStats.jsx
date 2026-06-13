@@ -35,7 +35,7 @@ export default function QuickStats({ stats }) {
   return (
     <div
       className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white px-4 sm:px-6 py-5"
-      style={{ animationDelay: '240ms', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+      style={{ animationDelay: '240ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
       <p className="text-brand-muted text-[10px] font-bold uppercase tracking-[0.18em] mb-4 sm:mb-5">
         Quick Stats — Selected Period
