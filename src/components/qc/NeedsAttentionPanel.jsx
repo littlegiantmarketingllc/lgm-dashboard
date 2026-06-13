@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { isOverdue, VERDICT_BG, RISK_BG, STATUS_BG } from '../../lib/qcUtils'
 import { format } from 'date-fns'
+import { Zap, CheckCircle2, Clock } from 'lucide-react'
 
 const PRIORITY = {
   'Action Required': 0,
@@ -83,8 +84,9 @@ function AttentionItem({ item, onOpen, handled, onToggleHandled }) {
             <span className="text-[10px] text-brand-muted">Owner: <strong>{item.followupOwner}</strong></span>
           )}
           {item.promisedDeadline && (
-            <span className={`text-[10px] font-semibold ${overdue ? 'text-red-600' : 'text-yellow-700'}`}>
-              {overdue ? '⚠ OVERDUE:' : 'Deadline:'} {item.promisedDeadline}
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${overdue ? 'text-red-600' : 'text-yellow-700'}`}>
+              <Clock size={10} strokeWidth={2.5} />
+              {overdue ? 'OVERDUE:' : 'Deadline:'} {item.promisedDeadline}
             </span>
           )}
         </div>
@@ -169,10 +171,10 @@ export default function NeedsAttentionPanel({ calls, handledIds, onToggleHandled
 
   if (!items.length) {
     return (
-      <div className="animate-fade-in-up rounded-2xl border border-green-200 bg-green-50 p-6 flex items-center gap-4"
+      <div className="animate-fade-in-up rounded-2xl border border-green-200 bg-green-50 p-5 flex items-center gap-4"
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl flex-shrink-0">
-          ✅
+        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0 text-green-600">
+          <CheckCircle2 size={20} strokeWidth={2} />
         </div>
         <div>
           <p className="font-semibold text-green-700 text-sm">All clear — nothing needs attention right now</p>
@@ -184,11 +186,12 @@ export default function NeedsAttentionPanel({ calls, handledIds, onToggleHandled
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)', borderTop: '4px solid #EF4444' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-brand-border"
+        style={{ background: 'linear-gradient(to right, rgba(239,68,68,0.05), transparent)' }}>
         <div className="flex items-center gap-2">
-          <span className="text-base">⚡</span>
+          <span className="text-brand-red"><Zap size={15} strokeWidth={2.5} fill="currentColor" /></span>
           <h3 className="font-bold text-brand-heading text-sm">Needs Attention</h3>
           {activeCount > 0 && (
             <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">

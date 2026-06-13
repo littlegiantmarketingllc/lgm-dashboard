@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { UserX } from 'lucide-react'
 import { VERDICT_BG, SENTIMENT_BG, scoreBg } from '../../lib/qcUtils'
 
 function timeStr(time) {
@@ -19,12 +20,13 @@ export default function RecentCallsFeed({ calls, onCallClick, onCustomerClick })
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
-      <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between">
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)', borderTop: '4px solid #8CC63F' }}>
+      <div className="px-5 py-4 border-b border-brand-border flex items-center justify-between"
+        style={{ background: 'linear-gradient(to right, rgba(140,198,63,0.06), transparent)' }}>
         <h3 className="font-bold text-brand-heading text-sm">Recent Calls</h3>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-          <span className="text-brand-muted text-[11px]">Live</span>
+          <span className="text-brand-muted text-[11px] font-medium">Live</span>
         </div>
       </div>
 
@@ -80,7 +82,10 @@ export default function RecentCallsFeed({ calls, onCallClick, onCustomerClick })
                     </span>
                   )}
                   {call.frustratedFlag && (
-                    <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-red-100 text-red-700">😤 Frustrated</span>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                      <UserX size={9} strokeWidth={2.5} />
+                      Frustrated
+                    </span>
                   )}
                 </div>
               </div>
