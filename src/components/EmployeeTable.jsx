@@ -189,7 +189,7 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
                         onMouseLeave={() => setTooltip(null)}
                         className="text-brand-text font-medium text-[12px] sm:text-[13px] hover:text-brand-green underline decoration-dotted underline-offset-2 decoration-brand-muted text-left transition-colors duration-150"
                       >
-                        <span className="hidden xs:inline">{emp.name}</span>
+                        <span className="hidden xs:inline">{emp.name}{emp.name === 'John Graham' && <span className="text-brand-muted font-normal text-[10px] ml-1">(Founder)</span>}</span>
                         <span className="xs:hidden">{emp.name.split(' ')[0]}</span>
                       </button>
                       {emp.coaching > 0 && (

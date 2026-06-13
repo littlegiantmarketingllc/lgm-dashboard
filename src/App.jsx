@@ -6,17 +6,23 @@ import { useCallStatus }          from './hooks/useCallStatus'
 import {
   filterCalls, getPrevCalls, calcSummary, aggregateEmployees,
   calcTopPerformer, buildChartData, calcQuickStats, getFrustratedCalls,
+  getActionRequired,
 } from './lib/ehUtils'
 
-import Header          from './components/Header'
-import SummaryCards    from './components/SummaryCards'
-import QuickStats      from './components/QuickStats'
-import TopPerformer    from './components/TopPerformer'
-import EmployeeTable   from './components/EmployeeTable'
-import MeetingsChart   from './components/MeetingsChart'
-import ResolutionTracker from './components/ResolutionTracker'
-import FrustratedTable from './components/FrustratedTable'
-import ActivityFeed    from './components/ActivityFeed'
+import Header             from './components/Header'
+import SummaryCards       from './components/SummaryCards'
+import QuickStats         from './components/QuickStats'
+import TopPerformer       from './components/TopPerformer'
+import EmployeeTable      from './components/EmployeeTable'
+import NeedCoaching       from './components/NeedCoaching'
+import MeetingsChart      from './components/MeetingsChart'
+import ActionRequired     from './components/ActionRequired'
+import VerdictDistribution from './components/VerdictDistribution'
+import CategoryPerformance from './components/CategoryPerformance'
+import BehaviorInsights   from './components/BehaviorInsights'
+import ResolutionTracker  from './components/ResolutionTracker'
+import FrustratedTable    from './components/FrustratedTable'
+import ActivityFeed       from './components/ActivityFeed'
 
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
@@ -67,8 +73,7 @@ export default function App() {
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [searchQuery, setSearchQuery]       = useState('')
 
-  // null | { type: 'call'|'employee', id: string }
-  const [modal, setModal] = useState(null)
+  const [modal, setModal] = useState(null) // null | { type: 'call'|'employee', id }
 
   const openCall     = useCallback((meetingId) => setModal({ type: 'call',     id: meetingId }), [])
   const openEmployee = useCallback((name)       => setModal({ type: 'employee', id: name }),      [])
@@ -78,7 +83,7 @@ export default function App() {
 
   const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
-  // ── Derived filters ────────────────────────────────────────────────────────
+  // ── Derived filter options ─────────────────────────────────────────────────
   const allCategories = useMemo(() => {
     const cats = new Set(calls.map(c => c.category).filter(Boolean))
     return [...cats].sort()
@@ -92,10 +97,8 @@ export default function App() {
   // ── Filtered calls ─────────────────────────────────────────────────────────
   const filteredCalls = useMemo(() => {
     let result = filterCalls(calls, filter)
-    if (categoryFilter !== 'all')
-      result = result.filter(c => c.category === categoryFilter)
-    if (employeeFilter !== 'all')
-      result = result.filter(c => c.employee === employeeFilter)
+    if (categoryFilter !== 'all') result = result.filter(c => c.category === categoryFilter)
+    if (employeeFilter !== 'all') result = result.filter(c => c.employee === employeeFilter)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       result = result.filter(c =>
@@ -109,29 +112,27 @@ export default function App() {
 
   const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
 
-  // ── All derived data (all hooks before conditional returns) ────────────────
-  const summary       = useMemo(() => calcSummary(filteredCalls),           [filteredCalls])
-  const prevSummary   = useMemo(() => calcSummary(prevCalls),               [prevCalls])
-  const employees     = useMemo(() => aggregateEmployees(filteredCalls),    [filteredCalls])
-  const topPerformer  = useMemo(() => calcTopPerformer(filteredCalls),      [filteredCalls])
-  const chartData     = useMemo(() => buildChartData(filteredCalls, filter), [filteredCalls, filter])
-  const quickStats    = useMemo(() => calcQuickStats(filteredCalls, prevCalls, filter), [filteredCalls, prevCalls, filter])
-  const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),  [filteredCalls])
+  // ── All derived data (before conditional returns) ──────────────────────────
+  const summary         = useMemo(() => calcSummary(filteredCalls),              [filteredCalls])
+  const prevSummary     = useMemo(() => calcSummary(prevCalls),                  [prevCalls])
+  const employees       = useMemo(() => aggregateEmployees(filteredCalls),       [filteredCalls])
+  const topPerformer    = useMemo(() => calcTopPerformer(filteredCalls),         [filteredCalls])
+  const chartData       = useMemo(() => buildChartData(filteredCalls, filter),   [filteredCalls, filter])
+  const quickStats      = useMemo(() => calcQuickStats(filteredCalls, prevCalls, filter), [filteredCalls, prevCalls, filter])
+  const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),       [filteredCalls])
+  const actionRequired  = useMemo(() => getActionRequired(filteredCalls),        [filteredCalls])
 
   const recentActivity = useMemo(() =>
     [...calls]
-      .sort((a, b) => {
-        if (b.date !== a.date) return b.date > a.date ? 1 : -1
-        return (b.time || '') > (a.time || '') ? 1 : -1
-      })
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''))
       .slice(0, 15),
     [calls]
   )
 
-  const canCompare = prevCalls.length >= 5 && !['all', 'today', 'custom'].includes(filter.type)
+  const canCompare = prevCalls.length >= 3 && !['all', 'today', 'custom'].includes(filter.type)
   const trends = useMemo(() => ({
-    total:      canCompare ? (summary.total - prevSummary.total) : null,
-    positive:   canCompare ? (summary.positive - prevSummary.positive) : null,
+    total:      canCompare ? (summary.total      - prevSummary.total)      : null,
+    positive:   canCompare ? (summary.positive   - prevSummary.positive)   : null,
     frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated) : null,
   }), [summary, prevSummary, canCompare])
 
@@ -142,24 +143,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <Header
-        filter={filter}
-        setFilter={setFilter}
-        categoryFilter={categoryFilter}
-        setCategoryFilter={setCategoryFilter}
-        allCategories={allCategories}
-        employeeFilter={employeeFilter}
-        setEmployeeFilter={setEmployeeFilter}
-        allEmployees={allEmployees}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        lastUpdated={lastUpdated}
-        onRefresh={refetch}
-        isRefreshing={loading}
-        retrying={retrying}
-        dataError={error}
+        filter={filter}           setFilter={setFilter}
+        categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
+        employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
+        searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
+        lastUpdated={lastUpdated}  onRefresh={refetch}
+        isRefreshing={loading}     retrying={retrying} dataError={error}
       />
 
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* Stale data warning */}
         {error && calls.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
             <span>⚠️</span>
@@ -169,6 +163,7 @@ export default function App() {
           </div>
         )}
 
+        {/* No results */}
         {!loading && filteredCalls.length === 0 && calls.length > 0 && (
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
             <span>📅</span>
@@ -177,21 +172,50 @@ export default function App() {
         )}
 
         <div className="flex gap-7 items-start">
-          {/* ── Main column ─────────────────────────────────────────────── */}
+
+          {/* ── Main column ──────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-6">
 
+            {/* 1. KPI cards */}
             <SummaryCards summary={summary} trends={trends} />
+
+            {/* 2. Score breakdown */}
             <QuickStats stats={quickStats} />
 
+            {/* 3. Top Performer + Employee Table */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <TopPerformer performer={topPerformer} onEmployeeClick={openEmployee} />
+              <div className="flex flex-col gap-6">
+                <TopPerformer performer={topPerformer} onEmployeeClick={openEmployee} />
+                <NeedCoaching employees={employees} onEmployeeClick={openEmployee} />
+              </div>
               <div className="lg:col-span-2">
                 <EmployeeTable employees={employees} onEmployeeClick={openEmployee} />
               </div>
             </div>
 
+            {/* 4. Meetings over time */}
             <MeetingsChart data={chartData} />
+
+            {/* 5. Action Required */}
+            <ActionRequired
+              calls={actionRequired}
+              onCallClick={openCall}
+              onEmployeeClick={openEmployee}
+            />
+
+            {/* 6. Verdict + Category (side by side) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <VerdictDistribution calls={filteredCalls} />
+              <CategoryPerformance calls={filteredCalls} />
+            </div>
+
+            {/* 7. Team Behavior Insights */}
+            <BehaviorInsights calls={filteredCalls} />
+
+            {/* 8. Resolution Tracker */}
             <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
+
+            {/* 9. Frustrated Calls table */}
             <FrustratedTable
               calls={frustratedCalls}
               statuses={statuses}
@@ -201,7 +225,7 @@ export default function App() {
             />
           </div>
 
-          {/* ── Sidebar ─────────────────────────────────────────────────── */}
+          {/* ── Sidebar ──────────────────────────────────────────────────── */}
           <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
             <ActivityFeed
               calls={recentActivity}
@@ -216,7 +240,7 @@ export default function App() {
         Little Giant Marketing &mdash; Employee Health Dashboard
       </footer>
 
-      {/* ── Modals ──────────────────────────────────────────────────────── */}
+      {/* ── Modals ────────────────────────────────────────────────────────── */}
       {modal?.type === 'call' && (
         <CallDetailModal
           meetingId={modal.id}
