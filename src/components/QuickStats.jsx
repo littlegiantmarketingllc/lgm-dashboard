@@ -1,75 +1,78 @@
-const G = '#8CC63F'
+import { useCountUp } from '../hooks/useCountUp'
+import { scoreColor, fmtMins, G } from '../lib/ehUtils'
 
-function fmtTime(totalMins) {
-  if (!totalMins) return '0m'
-  const h = Math.floor(totalMins / 60)
-  const m = totalMins % 60
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
+function ScoreCell({ label, value, delay, isMain = false, noBorder = false }) {
+  const displayed = useCountUp(value || 0, { duration: 1000, delay, decimals: 1 })
+  const c = scoreColor(value || 0)
+  const borderClass = noBorder ? '' : 'sm:border-l border-brand-border'
+  if (!value) return (
+    <div className={`flex flex-col items-center justify-center gap-1.5 ${borderClass} px-3 py-4`}>
+      <span className="text-brand-muted text-[13px] font-semibold">—</span>
+      <span className="text-[9px] text-brand-muted/70 uppercase tracking-wider font-bold text-center leading-tight">{label}</span>
+    </div>
+  )
+  return (
+    <div className={`flex flex-col items-center justify-center gap-1.5 ${borderClass} px-3 py-4`}>
+      <span className={`num font-bold leading-none ${isMain ? 'text-3xl' : 'text-xl'}`} style={{ color: c }}>
+        {displayed.toFixed(1)}
+      </span>
+      <span className="text-[9px] text-brand-muted uppercase tracking-wider font-bold text-center leading-tight">{label}</span>
+    </div>
+  )
 }
 
-function Stat({ icon, label, value, sub, delta, delay, padLeft }) {
+function TalkTimeCell({ totalMins }) {
+  const formatted = fmtMins(totalMins)
   return (
-    <div
-      className={`animate-fade-in-up flex flex-col gap-1 ${padLeft ? 'sm:pl-8' : ''}`}
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-center gap-1.5 text-brand-muted text-[10px] font-bold uppercase tracking-[0.15em]">
-        <span>{icon}</span> {label}
-      </div>
-      <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className="num text-xl sm:text-2xl font-bold text-brand-text">{value}</span>
-        {delta !== undefined && delta !== null && (
-          <span className="text-[11px] font-bold" style={{ color: delta >= 0 ? G : '#EF4444' }}>
-            {delta >= 0 ? '+' : ''}{delta}%
+    <div className="flex flex-col items-center justify-center gap-1.5 sm:border-l border-brand-border px-3 py-4">
+      <span className="num text-xl font-bold leading-none text-brand-heading">{formatted || '—'}</span>
+      <span className="text-[9px] text-brand-muted uppercase tracking-wider font-bold">Talk Time</span>
+    </div>
+  )
+}
+
+function MeetingsCell({ totalCalls, callsDelta }) {
+  const displayed = useCountUp(totalCalls || 0, { duration: 900, delay: 360 })
+  return (
+    <div className="flex flex-col items-center justify-center gap-1.5 sm:border-l border-brand-border px-3 py-4">
+      <div className="flex items-center gap-1">
+        <span className="num text-xl font-bold leading-none text-blue-500">{displayed}</span>
+        {callsDelta !== null && (
+          <span className="text-[10px] font-bold" style={{ color: callsDelta >= 0 ? '#8CC63F' : '#EF4444' }}>
+            {callsDelta >= 0 ? '↑' : '↓'}{Math.abs(callsDelta)}%
           </span>
         )}
       </div>
-      <span className="text-brand-muted text-[11px] leading-snug">{sub}</span>
+      <span className="text-[9px] text-brand-muted uppercase tracking-wider font-bold">Meetings</span>
     </div>
   )
 }
 
 export default function QuickStats({ stats }) {
-  const { avgScore, totalMins, avgDuration, responseRate, totalCalls, callsDelta } = stats
+  const { avgScore, avgComm, avgProf, avgProd, avgCX, totalMins, totalCalls, callsDelta } = stats
 
   return (
     <div
-      className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white px-4 sm:px-6 py-5"
-      style={{ animationDelay: '240ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
+      className="animate-fade-in-up rounded-2xl border border-brand-border bg-white overflow-hidden"
+      style={{
+        animationDelay: '120ms',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
+      }}
     >
-      <p className="text-brand-muted text-[10px] font-bold uppercase tracking-[0.18em] mb-4 sm:mb-5">
-        Quick Stats — Selected Period
-      </p>
+      <div className="px-5 pt-3 pb-1 border-b border-brand-border/50">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-muted">Score Breakdown · Selected Period</p>
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-5 sm:divide-x divide-brand-border">
-        <Stat
-          icon="⭐" label="Avg Score"
-          value={avgScore.toFixed(1)}
-          sub="Selected period average"
-          delay={260}
-        />
-        <Stat
-          icon="🕐" label="Total Talk Time"
-          value={fmtTime(totalMins)}
-          sub={`Avg ${avgDuration > 0 ? `${avgDuration} min` : '—'} / call`}
-          delay={300}
-          padLeft
-        />
-        <Stat
-          icon="📡" label="Response Rate"
-          value={<><span>{responseRate}</span><span className="text-base font-bold" style={{ color: G }}>%</span></>}
-          sub="Calls scored / total"
-          delay={340}
-          padLeft
-        />
-        <Stat
-          icon="📊" label="Total Calls"
-          value={totalCalls}
-          sub={callsDelta !== null ? 'vs previous period' : 'in selected period'}
-          delta={callsDelta}
-          delay={380}
-          padLeft
-        />
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="col-span-1" style={{ background: `${scoreColor(avgScore || 0)}08` }}>
+          <ScoreCell label="Overall Score" value={avgScore} delay={0} isMain noBorder />
+        </div>
+        <ScoreCell label="Communication"   value={avgComm}  delay={60}  />
+        <ScoreCell label="Professionalism" value={avgProf}  delay={120} />
+        <ScoreCell label="Product Know."   value={avgProd}  delay={180} />
+        <ScoreCell label="Cx Experience"   value={avgCX}    delay={240} />
+        <TalkTimeCell totalMins={totalMins} />
+        <MeetingsCell totalCalls={totalCalls} callsDelta={callsDelta} />
       </div>
     </div>
   )
