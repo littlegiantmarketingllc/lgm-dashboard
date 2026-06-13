@@ -11,7 +11,7 @@ function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefi
 
   return (
     <div
-      className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2"
+      className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2"
       style={{
         animationDelay: `${delay}ms`,
         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',

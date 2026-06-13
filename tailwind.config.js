@@ -35,6 +35,9 @@ export default {
         'shimmer':      'shimmer 2.8s linear infinite',
         'pulse-dot':    'pulseDot 1.8s ease-in-out infinite',
         'spin-slow':    'spin 2s linear infinite',
+        'modal-enter':  'modalEnter 0.22s cubic-bezier(0.16,1,0.3,1) both',
+        'backdrop-in':  'backdropIn 0.18s ease-out both',
+        'scale-in':     'scaleIn 0.18s cubic-bezier(0.16,1,0.3,1) both',
       },
       keyframes: {
         fadeInUp: {
@@ -52,6 +55,18 @@ export default {
         pulseDot: {
           '0%, 100%': { opacity: '1',   transform: 'scale(1)' },
           '50%':      { opacity: '0.2', transform: 'scale(0.65)' },
+        },
+        modalEnter: {
+          '0%':   { opacity: '0', transform: 'scale(0.96) translateY(8px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
+        backdropIn: {
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        scaleIn: {
+          '0%':   { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
         },
       },
     },

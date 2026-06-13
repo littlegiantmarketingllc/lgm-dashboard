@@ -15,15 +15,15 @@ export default function TabSwitcher({ activeTab, setActiveTab }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative px-4 py-3 text-[13px] font-semibold transition-colors duration-150 whitespace-nowrap ${
+                className={`relative px-4 py-3 text-[13px] font-semibold transition-all duration-200 whitespace-nowrap ${
                   active ? 'text-brand-text' : 'text-brand-muted hover:text-brand-heading'
                 }`}
               >
                 {tab.label}
                 {active && (
                   <span
-                    className="absolute bottom-0 left-0 right-0 h-[2px] rounded-t-full"
-                    style={{ background: G }}
+                    className="animate-scale-in absolute bottom-0 left-0 right-0 h-[2px] rounded-t-full"
+                    style={{ background: G, transformOrigin: 'left center' }}
                   />
                 )}
               </button>

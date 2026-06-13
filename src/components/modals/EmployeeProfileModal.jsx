@@ -102,8 +102,8 @@ export default function EmployeeProfileModal({ employeeName, allCalls, onClose, 
   if (!empCalls.length) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl p-8 text-center max-w-sm w-full">
+        <div className="animate-backdrop-in absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="animate-modal-enter relative bg-white rounded-2xl p-8 text-center max-w-sm w-full">
           <p className="text-brand-muted text-sm">No data for {employeeName}.</p>
           <button onClick={onClose} className="mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg" style={{ background: '#8CC63F' }}>Close</button>
         </div>
@@ -113,9 +113,9 @@ export default function EmployeeProfileModal({ employeeName, allCalls, onClose, 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="animate-backdrop-in absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-fade-in-up"
+        className="animate-modal-enter relative bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
         style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
       >
         {/* Header */}

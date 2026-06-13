@@ -77,10 +77,10 @@ export default function AccountModal({ account, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="animate-backdrop-in absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
       <div
-        className="relative bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
+        className="animate-modal-enter relative bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"
         style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.20)' }}
         onClick={e => e.stopPropagation()}
       >

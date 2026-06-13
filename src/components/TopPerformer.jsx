@@ -28,7 +28,7 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
   const barColor  = performer.avgScore >= 8 ? G : '#EAB308'
 
   return (
-    <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col gap-4 p-6 relative overflow-hidden"
+    <div className="card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white flex flex-col gap-4 p-6 relative overflow-hidden"
       style={{
         animationDelay: '300ms',
         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
