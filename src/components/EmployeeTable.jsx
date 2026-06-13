@@ -1,10 +1,5 @@
 import { useState } from 'react'
-
-const G = '#8CC63F'
-
-function scoreColor(s) {
-  return s >= 8 ? G : s >= 6 ? '#EAB308' : '#EF4444'
-}
+import { G, scoreColor } from '../lib/ehUtils'
 
 function ScorePill({ score }) {
   const c = scoreColor(score)
@@ -96,7 +91,8 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
         style={{ animationDelay: '360ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
 
         {/* Header */}
-        <div className="card-header px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between gap-3"
+          style={{ background: 'linear-gradient(to right, rgba(140,198,63,0.05), transparent)' }}>
           <div className="min-w-0">
             <h2 className="text-brand-heading font-semibold text-sm">Employee Performance</h2>
             <p className="text-brand-muted text-[11px] mt-0.5 hidden sm:block">
@@ -105,24 +101,16 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
             <p className="text-brand-muted text-[11px] mt-0.5 sm:hidden">Tap name for profile</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Search bar */}
             <div className="relative hidden sm:flex items-center">
-              <span className="absolute left-2.5 pointer-events-none">
-                <SearchIcon />
-              </span>
+              <span className="absolute left-2.5 pointer-events-none"><SearchIcon /></span>
               <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
+                type="text" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search…"
                 className="pl-8 pr-3 py-1.5 text-[12px] border border-brand-border rounded-lg bg-brand-bg focus:outline-none focus:border-brand-green w-28 focus:w-36 transition-all duration-200 placeholder:text-brand-muted/60"
               />
               {search && (
-                <button onClick={() => setSearch('')}
-                  className="absolute right-2 text-brand-muted hover:text-brand-text">
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                  </svg>
+                <button onClick={() => setSearch('')} className="absolute right-2 text-brand-muted hover:text-brand-text">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
               )}
             </div>
@@ -136,22 +124,15 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
         {/* Mobile search */}
         <div className="sm:hidden px-4 py-2.5 border-b border-brand-border/60">
           <div className="relative flex items-center">
-            <span className="absolute left-2.5 pointer-events-none">
-              <SearchIcon />
-            </span>
+            <span className="absolute left-2.5 pointer-events-none"><SearchIcon /></span>
             <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by name…"
               className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-brand-border rounded-lg bg-brand-bg focus:outline-none focus:border-brand-green placeholder:text-brand-muted/60"
             />
             {search && (
-              <button onClick={() => setSearch('')}
-                className="absolute right-2.5 text-brand-muted hover:text-brand-text">
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
+              <button onClick={() => setSearch('')} className="absolute right-2.5 text-brand-muted hover:text-brand-text">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             )}
           </div>
@@ -180,8 +161,13 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
               )}
               {displayed.map((emp, i) => (
                 <tr key={emp.name}
-                  className="animate-slide-in-row border-b border-brand-border/60 transition-colors duration-150"
-                  style={{ animationDelay: `${400 + i * 60}ms`, background: i % 2 === 0 ? '#FFFFFF' : '#F9FAF9' }}
+                  className="animate-slide-in-row border-b border-brand-border/60 cursor-pointer transition-colors duration-150"
+                  style={{
+                    animationDelay: `${400 + i * 60}ms`,
+                    background: i % 2 === 0 ? '#FFFFFF' : '#F9FAF9',
+                    borderLeft: `3px solid ${scoreColor(emp.avgScore)}`,
+                  }}
+                  onClick={() => onEmployeeClick?.(emp.name)}
                   onMouseEnter={e => e.currentTarget.style.background = '#F0F7E8'}
                   onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? '#FFFFFF' : '#F9FAF9'; setTooltip(null) }}
                 >
@@ -191,9 +177,9 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
                   </td>
 
                   {/* Name */}
-                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                  <td className="px-3 sm:px-4 py-3 sm:py-4" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
-                      <div className="w-6 sm:w-7 h-6 sm:h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                         style={{ background: `${G}18`, color: G, border: `1px solid ${G}30` }}>
                         {emp.name.slice(0, 2).toUpperCase()}
                       </div>
@@ -206,6 +192,9 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
                         <span className="hidden xs:inline">{emp.name}</span>
                         <span className="xs:hidden">{emp.name.split(' ')[0]}</span>
                       </button>
+                      {emp.coaching > 0 && (
+                        <span className="text-[9px] bg-yellow-50 border border-yellow-200 text-yellow-700 px-1 py-0.5 rounded hidden sm:inline">Coach</span>
+                      )}
                     </div>
                   </td>
 

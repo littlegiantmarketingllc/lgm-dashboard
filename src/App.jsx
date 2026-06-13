@@ -1,36 +1,25 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { format, subDays } from 'date-fns'
+import { useState, useMemo, useCallback } from 'react'
 
-// Data hook
-import { useQCSheet }     from './hooks/useQCSheet'
+import { useEmployeeHealthSheet } from './hooks/useEmployeeHealthSheet'
+import { useCallStatus }          from './hooks/useCallStatus'
 
-// Utilities
-import { applyAllFilters, uniqueMeetingIds } from './lib/qcUtils'
+import {
+  filterCalls, getPrevCalls, calcSummary, aggregateEmployees,
+  calcTopPerformer, buildChartData, calcQuickStats, getFrustratedCalls,
+} from './lib/ehUtils'
 
-// Layout
-import Header      from './components/Header'
-import TabSwitcher from './components/TabSwitcher'
+import Header          from './components/Header'
+import SummaryCards    from './components/SummaryCards'
+import QuickStats      from './components/QuickStats'
+import TopPerformer    from './components/TopPerformer'
+import EmployeeTable   from './components/EmployeeTable'
+import MeetingsChart   from './components/MeetingsChart'
+import ResolutionTracker from './components/ResolutionTracker'
+import FrustratedTable from './components/FrustratedTable'
+import ActivityFeed    from './components/ActivityFeed'
 
-// QC components
-import KPICards                  from './components/qc/KPICards'
-import NeedsAttentionPanel       from './components/qc/NeedsAttentionPanel'
-import EmployeePerformanceTable  from './components/qc/EmployeePerformanceTable'
-import VerdictDistributionChart  from './components/qc/VerdictDistributionChart'
-import CategoryPerformanceChart  from './components/qc/CategoryPerformanceChart'
-import ScoreTrendsChart          from './components/qc/ScoreTrendsChart'
-import RecentCallsFeed           from './components/qc/RecentCallsFeed'
-import BehaviorInsightsChart     from './components/qc/BehaviorInsightsChart'
-
-// Modals
-import CallDetailModal      from './components/modals/CallDetailModal'
-import EmployeeProfileModal from './components/modals/EmployeeProfileModal'
-import CustomerProfileModal from './components/modals/CustomerProfileModal'
-
-// Customer Health tab
-import CustomerHealthPage from './components/health/CustomerHealthPage'
-
-const TAB_KEY      = 'lgm-active-tab'
-const HANDLED_KEY  = 'lgm-handled-items'
+import CallDetailModal     from './components/modals/CallDetailModal'
+import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
 
 // ─── Loading / Error screens ──────────────────────────────────────────────────
 function LoadingScreen() {
@@ -58,7 +47,7 @@ function ErrorScreen({ message, onRetry }) {
         <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
         <div className="bg-brand-bg rounded-xl p-4 text-left mb-6 text-xs text-brand-muted space-y-1.5">
           <p className="font-semibold text-brand-heading text-[11px] uppercase tracking-wider mb-2">Quick checklist</p>
-          <p>1. Open the QA sheet → <strong>File → Share → Publish to web</strong></p>
+          <p>1. Open the sheet → <strong>File → Share → Publish to web</strong></p>
           <p>2. Choose <strong>Entire Document</strong> + <strong>CSV</strong> → Publish</p>
           <p>3. Also set sharing to <strong>Anyone with the link can view</strong></p>
         </div>
@@ -71,59 +60,25 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-// ─── Main app ─────────────────────────────────────────────────────────────────
+// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  // Tab persistence
-  const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem(TAB_KEY) || 'qc' } catch { return 'qc' }
-  })
-  const handleTabChange = (tab) => {
-    setActiveTab(tab)
-    try { localStorage.setItem(TAB_KEY, tab) } catch {}
-  }
-
-  // Filters
-  const [dateFilter, setDateFilter]         = useState({ type: '30d', from: '', to: '' })
+  const [filter, setFilter]                 = useState({ type: '30d', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [searchQuery, setSearchQuery]       = useState('')
 
-  // Modal state: null | { type: 'call'|'employee'|'customer', id: string }
+  // null | { type: 'call'|'employee', id: string }
   const [modal, setModal] = useState(null)
 
-  // Handled items (client-side "Mark as handled")
-  const [handledIds, setHandledIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(HANDLED_KEY) || '[]')) }
-    catch { return new Set() }
-  })
+  const openCall     = useCallback((meetingId) => setModal({ type: 'call',     id: meetingId }), [])
+  const openEmployee = useCallback((name)       => setModal({ type: 'employee', id: name }),      [])
+  const closeModal   = useCallback(()           => setModal(null),                                 [])
 
-  const handleToggleHandled = useCallback((id) => {
-    setHandledIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      try { localStorage.setItem(HANDLED_KEY, JSON.stringify([...next])) } catch {}
-      return next
-    })
-  }, [])
+  const { statuses, setStatus } = useCallStatus()
 
-  // Modal openers
-  const openCall     = useCallback((meetingId)   => setModal({ type: 'call',     id: meetingId }),   [])
-  const openEmployee = useCallback((name)         => setModal({ type: 'employee', id: name }),        [])
-  const openCustomer = useCallback((name)         => setModal({ type: 'customer', id: name }),        [])
-  const closeModal   = useCallback(()             => setModal(null),                                   [])
+  const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
-  // Escape key closes modal
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') setModal(null) }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
-
-  // Data
-  const { calls, loading, error, lastUpdated, refetch, retrying } = useQCSheet()
-
-  // Derived filter options
+  // ── Derived filters ────────────────────────────────────────────────────────
   const allCategories = useMemo(() => {
     const cats = new Set(calls.map(c => c.category).filter(Boolean))
     return [...cats].sort()
@@ -134,21 +89,61 @@ export default function App() {
     return [...emps].sort()
   }, [calls])
 
-  // Filtered calls (respect ALL filters)
-  const filteredCalls = useMemo(() =>
-    applyAllFilters(calls, { dateFilter, categoryFilter, employeeFilter, searchQuery }),
-    [calls, dateFilter, categoryFilter, employeeFilter, searchQuery]
+  // ── Filtered calls ─────────────────────────────────────────────────────────
+  const filteredCalls = useMemo(() => {
+    let result = filterCalls(calls, filter)
+    if (categoryFilter !== 'all')
+      result = result.filter(c => c.category === categoryFilter)
+    if (employeeFilter !== 'all')
+      result = result.filter(c => c.employee === employeeFilter)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(c =>
+        c.employee?.toLowerCase().includes(q) ||
+        c.customer?.toLowerCase().includes(q) ||
+        c.category?.toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [calls, filter, categoryFilter, employeeFilter, searchQuery])
+
+  const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
+
+  // ── All derived data (all hooks before conditional returns) ────────────────
+  const summary       = useMemo(() => calcSummary(filteredCalls),           [filteredCalls])
+  const prevSummary   = useMemo(() => calcSummary(prevCalls),               [prevCalls])
+  const employees     = useMemo(() => aggregateEmployees(filteredCalls),    [filteredCalls])
+  const topPerformer  = useMemo(() => calcTopPerformer(filteredCalls),      [filteredCalls])
+  const chartData     = useMemo(() => buildChartData(filteredCalls, filter), [filteredCalls, filter])
+  const quickStats    = useMemo(() => calcQuickStats(filteredCalls, prevCalls, filter), [filteredCalls, prevCalls, filter])
+  const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),  [filteredCalls])
+
+  const recentActivity = useMemo(() =>
+    [...calls]
+      .sort((a, b) => {
+        if (b.date !== a.date) return b.date > a.date ? 1 : -1
+        return (b.time || '') > (a.time || '') ? 1 : -1
+      })
+      .slice(0, 15),
+    [calls]
   )
 
-  // Show loading/error for initial load on QC tab
-  if (loading && calls.length === 0 && activeTab === 'qc') return <LoadingScreen />
-  if (error   && calls.length === 0 && activeTab === 'qc') return <ErrorScreen message={error} onRetry={refetch} />
+  const canCompare = prevCalls.length >= 5 && !['all', 'today', 'custom'].includes(filter.type)
+  const trends = useMemo(() => ({
+    total:      canCompare ? (summary.total - prevSummary.total) : null,
+    positive:   canCompare ? (summary.positive - prevSummary.positive) : null,
+    frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated) : null,
+  }), [summary, prevSummary, canCompare])
+
+  // ── Early returns ──────────────────────────────────────────────────────────
+  if (loading && calls.length === 0) return <LoadingScreen />
+  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <Header
-        filter={dateFilter}
-        setFilter={setDateFilter}
+        filter={filter}
+        setFilter={setFilter}
         categoryFilter={categoryFilter}
         setCategoryFilter={setCategoryFilter}
         allCategories={allCategories}
@@ -163,107 +158,79 @@ export default function App() {
         retrying={retrying}
         dataError={error}
       />
-      <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      {/* ── CUSTOMER HEALTH TAB ─────────────────────────────────────── */}
-      {activeTab === 'health' && (
-        <CustomerHealthPage
-          calls={calls}
-          onCustomerClick={openCustomer}
-        />
-      )}
-
-      {/* ── QUALITY CONTROL TAB ────────────────────────────────────── */}
-      {activeTab === 'qc' && (
-        <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
-
-          {/* Stale data warning */}
-          {error && calls.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
-              <span>⚠️</span>
-              <span>
-                Auto-refresh failed — showing last known data.{' '}
-                <button onClick={refetch} className="underline font-medium">Retry</button>
-              </span>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {!loading && filteredCalls.length === 0 && calls.length > 0 && (
-            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
-              <span>📅</span>
-              <span>No calls match the current filters. Try adjusting the date range or clearing filters.</span>
-            </div>
-          )}
-
-          {/* 5 KPI cards */}
-          <KPICards calls={filteredCalls} />
-
-          {/* Needs Attention panel */}
-          <NeedsAttentionPanel
-            calls={filteredCalls}
-            handledIds={handledIds}
-            onToggleHandled={handleToggleHandled}
-            onOpenCall={openCall}
-          />
-
-          {/* Employee Performance Table */}
-          <EmployeePerformanceTable
-            calls={filteredCalls}
-            onEmployeeClick={openEmployee}
-          />
-
-          {/* Verdict Distribution + Category Performance */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <VerdictDistributionChart calls={filteredCalls} />
-            <CategoryPerformanceChart calls={filteredCalls} />
+      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && calls.length > 0 && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Auto-refresh failed — showing last known data.{' '}
+              <button onClick={refetch} className="underline font-medium">Retry</button>
+            </span>
           </div>
+        )}
 
-          {/* Score Trends */}
-          <ScoreTrendsChart calls={filteredCalls} dateFilter={dateFilter} />
+        {!loading && filteredCalls.length === 0 && calls.length > 0 && (
+          <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
+            <span>📅</span>
+            <span>No calls match the current filters. Try adjusting the date range or clearing filters.</span>
+          </div>
+        )}
 
-          {/* Recent Calls + Behavior Insights */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <RecentCallsFeed
-              calls={filteredCalls}
+        <div className="flex gap-7 items-start">
+          {/* ── Main column ─────────────────────────────────────────────── */}
+          <div className="flex-1 min-w-0 space-y-6">
+
+            <SummaryCards summary={summary} trends={trends} />
+            <QuickStats stats={quickStats} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <TopPerformer performer={topPerformer} onEmployeeClick={openEmployee} />
+              <div className="lg:col-span-2">
+                <EmployeeTable employees={employees} onEmployeeClick={openEmployee} />
+              </div>
+            </div>
+
+            <MeetingsChart data={chartData} />
+            <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
+            <FrustratedTable
+              calls={frustratedCalls}
+              statuses={statuses}
+              setStatus={setStatus}
+              onEmployeeClick={openEmployee}
               onCallClick={openCall}
-              onCustomerClick={openCustomer}
             />
-            <BehaviorInsightsChart calls={filteredCalls} />
           </div>
+
+          {/* ── Sidebar ─────────────────────────────────────────────────── */}
+          <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
+            <ActivityFeed
+              calls={recentActivity}
+              onEmployeeClick={openEmployee}
+              onCallClick={openCall}
+            />
+          </aside>
         </div>
-      )}
+      </div>
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health' : 'Quality Control'} Dashboard
+        Little Giant Marketing &mdash; Employee Health Dashboard
       </footer>
 
-      {/* ── MODALS ──────────────────────────────────────────────────── */}
+      {/* ── Modals ──────────────────────────────────────────────────────── */}
       {modal?.type === 'call' && (
         <CallDetailModal
           meetingId={modal.id}
           allCalls={calls}
           onClose={closeModal}
           onEmployeeClick={(name) => { closeModal(); setTimeout(() => openEmployee(name), 50) }}
-          onCustomerClick={(name) => { closeModal(); setTimeout(() => openCustomer(name), 50) }}
         />
       )}
       {modal?.type === 'employee' && (
-        <EmployeeProfileModal
+        <EmployeeDetailModal
           employeeName={modal.id}
           allCalls={calls}
           onClose={closeModal}
-          onCallClick={(mid)  => { closeModal(); setTimeout(() => openCall(mid), 50) }}
-          onCustomerClick={(name) => { closeModal(); setTimeout(() => openCustomer(name), 50) }}
-        />
-      )}
-      {modal?.type === 'customer' && (
-        <CustomerProfileModal
-          customerName={modal.id}
-          allCalls={calls}
-          onClose={closeModal}
           onCallClick={(mid) => { closeModal(); setTimeout(() => openCall(mid), 50) }}
-          onEmployeeClick={(name) => { closeModal(); setTimeout(() => openEmployee(name), 50) }}
         />
       )}
     </div>

@@ -1,17 +1,12 @@
 import { format, parseISO } from 'date-fns'
-
-const G = '#8CC63F'
-
-function scoreColor(s) {
-  return s >= 8 ? G : s >= 6 ? '#EAB308' : '#EF4444'
-}
+import { G, scoreColor } from '../lib/ehUtils'
 
 function ScorePill({ score }) {
   const c = scoreColor(score)
   return (
     <span className="num inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border"
       style={{ color: c, background: `${c}12`, borderColor: `${c}28` }}>
-      {score.toFixed(1)}
+      {score > 0 ? score.toFixed(1) : '—'}
     </span>
   )
 }
@@ -52,7 +47,6 @@ function ActionButtons({ callId, status, setStatus }) {
       Undo
     </button>
   )
-
   if (status === 'in_progress') return (
     <div className="flex flex-wrap items-center gap-1.5">
       <button onClick={() => setStatus(callId, 'resolved')}
@@ -62,12 +56,9 @@ function ActionButtons({ callId, status, setStatus }) {
       </button>
       <button onClick={() => setStatus(callId, null)}
         className="text-[11px] font-semibold px-2 py-1.5 rounded-lg border transition-all duration-200 whitespace-nowrap"
-        style={{ color: '#6B7280', borderColor: '#E5E7E5' }} title="Reset">
-        ↩
-      </button>
+        style={{ color: '#6B7280', borderColor: '#E5E7E5' }} title="Reset">↩</button>
     </div>
   )
-
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-1.5">
       <button onClick={() => setStatus(callId, 'in_progress')}
@@ -84,20 +75,28 @@ function ActionButtons({ callId, status, setStatus }) {
   )
 }
 
-export default function FrustratedTable({ calls, statuses, setStatus, onEmployeeClick, onAgencyClick }) {
+export default function FrustratedTable({ calls, statuses, setStatus, onEmployeeClick, onCallClick }) {
   const getStatus     = (id) => statuses[String(id)]?.status ?? 'action_required'
   const getResolvedAt = (id) => statuses[String(id)]?.resolvedAt ?? null
 
-  const actionRequired = calls.filter(c => getStatus(c.id) === 'action_required').length
-  const inProgress     = calls.filter(c => getStatus(c.id) === 'in_progress').length
-  const resolved       = calls.filter(c => getStatus(c.id) === 'resolved').length
+  // Use meetingId as the status key
+  const statusKey = (call) => call.meetingId || String(call._rowIdx)
+
+  const actionRequired = calls.filter(c => getStatus(statusKey(c)) === 'action_required').length
+  const inProgress     = calls.filter(c => getStatus(statusKey(c)) === 'in_progress').length
+  const resolved       = calls.filter(c => getStatus(statusKey(c)) === 'resolved').length
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
-      style={{ animationDelay: '560ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
+      style={{
+        animationDelay: '560ms',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
+        borderTop: '3px solid #EF4444',
+      }}>
 
       {/* Header */}
-      <div className="card-header px-4 sm:px-6 py-4 border-b border-brand-border flex items-start sm:items-center justify-between flex-wrap gap-3">
+      <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-start sm:items-center justify-between flex-wrap gap-3"
+        style={{ background: 'linear-gradient(to right, rgba(239,68,68,0.05), transparent)' }}>
         <div>
           <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse-dot inline-block flex-shrink-0"
@@ -140,7 +139,7 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
               <th className="px-3 sm:px-5 py-3 pl-4 sm:pl-6 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Customer</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Date</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Employee</th>
-              <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden lg:table-cell">Category</th>
+              <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden lg:table-cell">Verdict</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Score</th>
               <th className="px-3 sm:px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Status</th>
               <th className="px-3 sm:px-5 py-3 pr-4 sm:pr-6 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Actions</th>
@@ -151,7 +150,9 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
               <tr>
                 <td colSpan={7} className="py-14 text-center">
                   <div className="flex flex-col items-center gap-3">
-                    <span className="text-4xl">✅</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke={G} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 text-brand-green">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
                     <p className="text-brand-muted text-sm">All clear — no frustrated clients this period</p>
                   </div>
                 </td>
@@ -159,40 +160,34 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
             )}
 
             {calls.map((call, i) => {
-              const status     = getStatus(call.id)
-              const resolvedAt = getResolvedAt(call.id)
+              const key        = statusKey(call)
+              const status     = getStatus(key)
+              const resolvedAt = getResolvedAt(key)
               const isResolved = status === 'resolved'
 
               return (
-                <>
-                  {/* Main data row */}
-                  <tr key={`row-${call.id}`}
-                    className={`animate-slide-in-row frustrated-row transition-all duration-200 ${isResolved ? 'reviewed' : ''}`}
-                    style={{ animationDelay: `${600 + i * 50}ms` }}>
-
-                    {/* Customer — clickable */}
-                    <td className="pl-4 sm:pl-6 pr-3 sm:pr-5 py-3">
-                      <button
-                        onClick={e => onAgencyClick?.(call.customer, e)}
-                        className="text-brand-text font-medium text-[12px] sm:text-[13px] hover:text-brand-green transition-colors duration-150 text-left underline decoration-dotted underline-offset-2 decoration-brand-muted/50"
-                        title={`View ${call.customer} profile`}
-                      >
+                <tbody key={call.meetingId || call._rowIdx}>
+                  {/* Main row */}
+                  <tr
+                    className={`animate-slide-in-row frustrated-row transition-all duration-200 cursor-pointer ${isResolved ? 'reviewed' : ''}`}
+                    style={{ animationDelay: `${600 + i * 50}ms` }}
+                  >
+                    {/* Customer */}
+                    <td className="pl-4 sm:pl-6 pr-3 sm:pr-5 py-3" onClick={() => onCallClick?.(call.meetingId)}>
+                      <span className="text-brand-text font-medium text-[12px] sm:text-[13px] hover:text-brand-green transition-colors duration-150 cursor-pointer">
                         {call.customer}
-                      </button>
+                      </span>
                     </td>
 
                     {/* Date */}
                     <td className="px-3 sm:px-5 py-3 text-brand-muted text-[11px] sm:text-[12px] hidden sm:table-cell whitespace-nowrap">
-                      {format(parseISO(call.date), 'MMM d, yyyy')}
+                      {call.date ? (() => { try { return format(parseISO(call.date), 'MMM d, yyyy') } catch { return call.date } })() : '—'}
                     </td>
 
-                    {/* Employee — clickable */}
+                    {/* Employee */}
                     <td className="px-3 sm:px-5 py-3">
-                      <button
-                        onClick={() => onEmployeeClick?.(call.employee)}
-                        className="flex items-center gap-1.5 sm:gap-2 group"
-                        title={`View ${call.employee}'s profile`}
-                      >
+                      <button onClick={e => { e.stopPropagation(); onEmployeeClick?.(call.employee) }}
+                        className="flex items-center gap-1.5 sm:gap-2 group" title={`View ${call.employee}'s profile`}>
                         <div className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold flex-shrink-0"
                           style={{ background: `${G}15`, color: G, border: `1px solid ${G}28` }}>
                           {call.employee.slice(0, 2).toUpperCase()}
@@ -204,16 +199,18 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
                       </button>
                     </td>
 
-                    {/* Category */}
-                    <td className="px-3 sm:px-5 py-3 hidden lg:table-cell">
-                      <span className="text-brand-muted text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap">
-                        {call.category}
-                      </span>
+                    {/* Verdict */}
+                    <td className="px-3 sm:px-5 py-3 hidden lg:table-cell" onClick={() => onCallClick?.(call.meetingId)}>
+                      {call.finalVerdict ? (
+                        <span className="text-[10px] font-semibold text-brand-muted bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap">
+                          {call.finalVerdict}
+                        </span>
+                      ) : <span className="text-brand-muted text-[11px]">—</span>}
                     </td>
 
                     {/* Score */}
-                    <td className="px-3 sm:px-5 py-3">
-                      <ScorePill score={call.score} />
+                    <td className="px-3 sm:px-5 py-3" onClick={() => onCallClick?.(call.meetingId)}>
+                      <ScorePill score={call.overallScore} />
                     </td>
 
                     {/* Status */}
@@ -224,11 +221,9 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
                     {/* Actions */}
                     <td className="px-3 sm:px-5 py-3 pr-4 sm:pr-6">
                       <div className="flex flex-col gap-1 items-start">
-                        <ActionButtons callId={call.id} status={status} setStatus={setStatus} />
+                        <ActionButtons callId={key} status={status} setStatus={setStatus} />
                         {isResolved && resolvedAt && (
-                          <span className="text-[10px] text-brand-muted">
-                            Resolved {resolvedAgo(resolvedAt)}
-                          </span>
+                          <span className="text-[10px] text-brand-muted">Resolved {resolvedAgo(resolvedAt)}</span>
                         )}
                       </div>
                     </td>
@@ -236,17 +231,18 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
 
                   {/* Summary sub-row */}
                   {call.summary && (
-                    <tr key={`summary-${call.id}`}
+                    <tr
                       className={`border-b border-brand-border/60 transition-opacity duration-200 ${isResolved ? 'opacity-50' : ''}`}
-                      style={{ background: '#F9FAF9', borderLeft: '2px solid #EF4444' }}>
+                      style={{ background: '#F9FAF9', borderLeft: '2px solid #EF4444' }}
+                    >
                       <td colSpan={7} className="pl-8 sm:pl-10 pr-4 sm:pr-6 py-2.5">
                         <p className="text-[11px] text-brand-muted italic leading-relaxed">
-                          📋 {call.summary}
+                          {call.summary}
                         </p>
                       </td>
                     </tr>
                   )}
-                </>
+                </tbody>
               )
             })}
           </tbody>

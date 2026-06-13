@@ -110,11 +110,11 @@ function LogoMark() {
           Little Giant Marketing
         </p>
         <p className="text-brand-heading font-semibold text-[14px] leading-tight mt-0.5 truncate">
-          Quality Control Dashboard
+          Employee Health
         </p>
       </div>
       <p className="sm:hidden text-brand-heading font-semibold text-[13px] whitespace-nowrap">
-        QC Dashboard
+        Employee Health
       </p>
     </div>
   )
