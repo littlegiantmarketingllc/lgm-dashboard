@@ -131,10 +131,16 @@ export function aggregateEmployees(calls) {
   }).sort((a, b) => b.avgScore - a.avgScore)
 }
 
-// ─── Top performer ────────────────────────────────────────────────────────────
+// ─── Top performer (weighted: 70% quality, 30% volume) ───────────────────────
 export function calcTopPerformer(calls) {
   const employees = aggregateEmployees(calls)
-  const top = employees.filter(e => e.calls >= 2)[0] ?? employees[0] ?? null
+  if (!employees.length) return null
+  const maxCalls = Math.max(...employees.map(e => e.calls), 1)
+  // Composite = avgScore (0–10) × 0.7 + normalised call volume (0–10) × 0.3
+  const ranked = employees
+    .map(e => ({ ...e, composite: e.avgScore * 0.7 + (e.calls / maxCalls * 10) * 0.3 }))
+    .sort((a, b) => b.composite - a.composite)
+  const top = ranked[0]
   if (!top) return null
   const latestCall = [...calls]
     .filter(c => c.employee === top.name && c.summary)

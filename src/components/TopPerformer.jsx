@@ -1,4 +1,5 @@
 import { G, scoreColor } from '../lib/ehUtils'
+import EmployeeAvatar from './EmployeeAvatar'
 
 const GOLD = '#F59E0B'
 
@@ -28,10 +29,6 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
     )
   }
 
-  const initials = performer.name.includes(' ')
-    ? performer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    : performer.name.slice(0, 2).toUpperCase()
-
   const barColor = scoreColor(performer.avgScore)
 
   return (
@@ -58,13 +55,10 @@ export default function TopPerformer({ performer, onEmployeeClick }) {
         <span className="text-2xl">🥇</span>
       </div>
 
-      {/* Avatar */}
+      {/* Avatar — photo-ready via EmployeeAvatar */}
       <div className="flex flex-col items-center gap-3">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white"
-            style={{ background: G }}>
-            {initials}
-          </div>
+          <EmployeeAvatar name={performer.name} size={64} variant="solid" />
           <div className="absolute -top-2 -right-2 text-lg">👑</div>
         </div>
         <div className="text-center">

@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
-  scoreColor, G, filterCalls, getDateWindow, fmtMins,
+  scoreColor, G, filterCalls, fmtMins,
   getFrustratedCalls, getActionRequired, buildBehaviorInsights,
 } from '../../lib/ehUtils'
+import { useActionStatus } from '../../hooks/useActionStatus'
+import EmployeeAvatar from '../EmployeeAvatar'
 
 const RED  = '#EF4444'
 const GOLD = '#F59E0B'
@@ -18,7 +20,7 @@ const RANGE_OPTIONS = [
 ]
 
 function ScoreRing({ value, size = 72 }) {
-  const r = (size / 2) - 6
+  const r    = (size / 2) - 6
   const circ = 2 * Math.PI * r
   const pct  = Math.min(Math.max((value || 0) / 10, 0), 1)
   const c    = scoreColor(value || 0)
@@ -51,6 +53,35 @@ function SubBar({ label, value }) {
   )
 }
 
+function ProgressBar({ done, total, color = G }) {
+  if (!total) return null
+  const pct = Math.round((done / total) * 100)
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-brand-border rounded-full overflow-hidden">
+        <div className="h-full rounded-full score-bar-fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-[10px] font-bold text-brand-muted num">{done}/{total}</span>
+    </div>
+  )
+}
+
+function Checkbox({ checked, onClick }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      className="w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 focus:outline-none"
+      style={{ borderColor: checked ? G : '#D1D5DB', background: checked ? G : 'white' }}
+    >
+      {checked && (
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
 function Tag({ text, color, bg, border }) {
   return (
     <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border"
@@ -60,8 +91,13 @@ function Tag({ text, color, bg, border }) {
   )
 }
 
-function SectionHead({ title }) {
-  return <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">{title}</p>
+function SectionHead({ title, badge }) {
+  return (
+    <div className="flex items-center justify-between mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">{title}</p>
+      {badge}
+    </div>
+  )
 }
 
 function fmtDate(str) {
@@ -74,8 +110,12 @@ function avg(arr) {
   return valid.length ? +(valid.reduce((s, v) => s + v, 0) / valid.length).toFixed(1) : 0
 }
 
-export default function EmployeeDetailModal({ employeeName, allCalls, onClose, onCallClick }) {
+export default function EmployeeDetailModal({
+  employeeName, allCalls, onClose, onBack, onCallClick,
+  statuses: callStatuses, setStatus: setCallStatus,
+}) {
   const [dateFilter, setDateFilter] = useState({ type: 'all', from: '', to: '' })
+  const { toggleAction, isDone } = useActionStatus()
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -88,19 +128,16 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
     return () => document.removeEventListener('keydown', fn)
   }, [onClose])
 
-  // All calls for this employee
   const empCalls = useMemo(() =>
     allCalls.filter(c => c.employee === employeeName),
     [allCalls, employeeName]
   )
 
-  // Date-filtered
   const filteredCalls = useMemo(() =>
     filterCalls(empCalls, dateFilter),
     [empCalls, dateFilter]
   )
 
-  // Aggregated stats
   const stats = useMemo(() => {
     if (!filteredCalls.length) return null
     return {
@@ -116,39 +153,36 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
     }
   }, [filteredCalls])
 
-  // Coaching recommendations (unique)
   const coachingRecs = useMemo(() => {
     const seen = new Set()
     const recs = []
-    for (const c of filteredCalls) {
-      for (const r of (c.coachingRecs || [])) {
+    for (const c of filteredCalls)
+      for (const r of (c.coachingRecs || []))
         if (r && !seen.has(r)) { seen.add(r); recs.push(r) }
-      }
-    }
     return recs
   }, [filteredCalls])
 
-  // Behavior tags
   const behaviorInsights = useMemo(() => buildBehaviorInsights(filteredCalls), [filteredCalls])
   const posTags = behaviorInsights.filter(t => !t.negative).slice(0, 6)
   const negTags = behaviorInsights.filter(t =>  t.negative).slice(0, 6)
 
-  // Frustrated calls
   const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls), [filteredCalls])
+  const actionItems     = useMemo(() => getActionRequired(filteredCalls),   [filteredCalls])
 
-  // Action required
-  const actionItems = useMemo(() => getActionRequired(filteredCalls), [filteredCalls])
-
-  // Sorted call history
   const sortedCalls = useMemo(() =>
     [...filteredCalls].sort((a, b) =>
       (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || '')
     ), [filteredCalls]
   )
 
-  const initials = employeeName.includes(' ')
-    ? employeeName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    : employeeName.slice(0, 2).toUpperCase()
+  // Action items progress
+  const actionDone  = actionItems.filter(c => isDone(c.meetingId || `__row_${c._rowIdx}`)).length
+  const actionTotal = actionItems.length
+
+  // Frustrated calls progress (using the shared callStatuses prop)
+  const getCallStatus = (c) => callStatuses?.[String(c.meetingId || c._rowIdx)]?.status ?? 'action_required'
+  const frustDone  = frustratedCalls.filter(c => getCallStatus(c) === 'resolved').length
+  const frustTotal = frustratedCalls.length
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -160,12 +194,20 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
         {/* ── Header ── */}
         <div className="px-6 py-5 border-b border-brand-border flex-shrink-0"
           style={{ background: 'linear-gradient(135deg, rgba(140,198,63,0.07) 0%, white 60%)' }}>
+
+          {/* Back button */}
+          {onBack && (
+            <button onClick={onBack}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-muted hover:text-brand-heading transition-colors mb-3 -mt-1 group">
+              <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>
+              Back
+            </button>
+          )}
+
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0"
-                style={{ background: G }}>
-                {initials}
-              </div>
+              {/* Photo-ready avatar */}
+              <EmployeeAvatar name={employeeName} size={56} variant="solid" />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-0.5">Employee Profile</p>
                 <h2 className="text-lg font-bold text-brand-heading truncate">
@@ -212,19 +254,16 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
             <div className="px-6 py-5 bg-brand-bg/30">
               <SectionHead title="Performance Overview" />
               <div className="flex flex-wrap items-start gap-5">
-                {/* Ring */}
                 <div className="flex flex-col items-center gap-1.5">
                   <ScoreRing value={stats.avgScore} size={72} />
                   <span className="text-[10px] text-brand-muted">Overall</span>
                 </div>
-                {/* Sub scores */}
                 <div className="flex-1 min-w-[180px] space-y-1.5">
                   <SubBar label="Communication"   value={stats.avgComm} />
                   <SubBar label="Professionalism" value={stats.avgProf} />
                   <SubBar label="Product Know."   value={stats.avgProd} />
                   <SubBar label="Cx Experience"   value={stats.avgCX}   />
                 </div>
-                {/* Quick stats */}
                 <div className="flex flex-col gap-2 flex-shrink-0">
                   <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-center min-w-[80px]">
                     <p className="num text-2xl font-bold text-brand-heading">{stats.calls}</p>
@@ -249,35 +288,135 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
             </div>
           )}
 
-          {/* Action Required */}
-          {actionItems.length > 0 && (
+          {/* ── Action Required Checklist ── */}
+          {actionTotal > 0 && (
             <div className="px-6 py-5">
-              <SectionHead title={`Action Required (${actionItems.length})`} />
-              <div className="space-y-2">
-                {actionItems.map((item, i) => (
-                  <div key={i}
-                    className="rounded-xl border p-3 cursor-pointer transition-colors duration-150"
-                    style={{ borderColor: item.overdue ? '#FECACA' : '#E5E7E5', background: item.overdue ? '#FEF2F2' : '#F9FAF9' }}
-                    onClick={() => onCallClick?.(item.meetingId)}>
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-brand-heading truncate">
-                          {item.customer || '—'}
-                          {item.overdue && <span className="ml-2 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">Overdue</span>}
-                        </p>
-                        {item.actionItems && (
-                          <p className="text-[11px] text-brand-muted mt-0.5 leading-relaxed">{item.actionItems}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0 text-[10px] text-brand-muted">
-                        <span className={`font-semibold ${item.overdue ? 'text-red-600' : ''}`}>
-                          {item.promisedDeadline ? `Due ${fmtDate(item.promisedDeadline)}` : 'No deadline'}
-                        </span>
-                        <span>{item.status}</span>
+              <SectionHead
+                title={`My Action Items`}
+                badge={
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                    style={actionDone === actionTotal
+                      ? { color: G,   background: `${G}12`,     borderColor: `${G}28` }
+                      : { color: RED, background: `${RED}12`, borderColor: `${RED}28` }}>
+                    {actionDone}/{actionTotal} done
+                  </span>
+                }
+              />
+              <ProgressBar done={actionDone} total={actionTotal} color={actionDone === actionTotal ? G : RED} />
+              <div className="mt-3 space-y-2">
+                {actionItems.map(item => {
+                  const key    = item.meetingId || `__row_${item._rowIdx}`
+                  const done   = isDone(key)
+                  return (
+                    <div key={key}
+                      className="rounded-xl border p-3 transition-all duration-200"
+                      style={{
+                        borderColor: done ? '#BBF7D0' : item.overdue ? '#FECACA' : '#E5E7E5',
+                        background:  done ? '#F0FDF4' : item.overdue ? '#FEF2F2' : '#F9FAF9',
+                        opacity: done ? 0.75 : 1,
+                      }}>
+                      <div className="flex items-start gap-3">
+                        <Checkbox checked={done} onClick={() => toggleAction(key)} />
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onCallClick?.(item.meetingId)}>
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <p className={`text-[12px] font-semibold truncate ${done ? 'line-through text-brand-muted' : 'text-brand-heading'}`}>
+                              {item.customer || '—'}
+                              {item.overdue && !done && (
+                                <span className="ml-2 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full not-italic">Overdue</span>
+                              )}
+                            </p>
+                            <span className="text-[10px] text-brand-muted flex-shrink-0">
+                              {item.promisedDeadline ? `Due ${fmtDate(item.promisedDeadline)}` : 'No deadline'}
+                            </span>
+                          </div>
+                          {item.actionItems && (
+                            <p className={`text-[11px] mt-0.5 leading-relaxed ${done ? 'line-through text-brand-muted/60' : 'text-brand-muted'}`}>
+                              {item.actionItems}
+                            </p>
+                          )}
+                          {item.followupOwner && (
+                            <p className="text-[10px] text-brand-muted mt-1">Owner: {item.followupOwner}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
+              </div>
+              {actionDone === actionTotal && actionTotal > 0 && (
+                <p className="text-[11px] font-semibold text-center mt-3" style={{ color: G }}>
+                  ✓ All action items completed!
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Frustrated Calls (with resolution tracking) ── */}
+          {frustTotal > 0 && (
+            <div className="px-6 py-5">
+              <SectionHead
+                title={`Frustrated Calls`}
+                badge={
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                    style={frustDone === frustTotal
+                      ? { color: G,   background: `${G}12`,     borderColor: `${G}28` }
+                      : { color: RED, background: `${RED}12`, borderColor: `${RED}28` }}>
+                    {frustDone}/{frustTotal} handled
+                  </span>
+                }
+              />
+              <ProgressBar done={frustDone} total={frustTotal} color={frustDone === frustTotal ? G : RED} />
+              <div className="mt-3 space-y-1.5">
+                {frustratedCalls.map(c => {
+                  const key       = String(c.meetingId || c._rowIdx)
+                  const callStatus = callStatuses?.[key]?.status ?? 'action_required'
+                  const resolved   = callStatus === 'resolved'
+                  const inProgress = callStatus === 'in_progress'
+                  return (
+                    <div key={c._rowIdx}
+                      className="flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-200"
+                      style={{
+                        borderColor: resolved ? '#BBF7D0' : '#FECACA',
+                        background:  resolved ? '#F0FDF4' : '#FEF2F2',
+                        opacity: resolved ? 0.75 : 1,
+                      }}>
+                      {/* Resolution checkbox */}
+                      <Checkbox
+                        checked={resolved}
+                        onClick={() => setCallStatus?.(key, resolved ? null : 'resolved')}
+                      />
+                      {/* Call info */}
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onCallClick?.(c.meetingId)}>
+                        <p className={`text-[12px] font-semibold truncate ${resolved ? 'line-through text-brand-muted' : 'text-brand-heading'}`}>
+                          {c.customer || '—'}
+                        </p>
+                        <p className="text-[10px] text-brand-muted">
+                          {fmtDate(c.date)}{c.finalVerdict && ` · ${c.finalVerdict}`}
+                        </p>
+                      </div>
+                      {/* Status badge */}
+                      <div className="flex-shrink-0">
+                        {resolved ? (
+                          <span className="text-[10px] font-bold text-green-600">✓ Resolved</span>
+                        ) : inProgress ? (
+                          <button onClick={() => setCallStatus?.(key, 'resolved')}
+                            className="text-[10px] font-semibold px-2 py-1 rounded-lg border text-amber-700 bg-amber-50 border-amber-200 whitespace-nowrap">
+                            ✓ Mark done
+                          </button>
+                        ) : (
+                          <button onClick={e => { e.stopPropagation(); setCallStatus?.(key, 'in_progress') }}
+                            className="text-[10px] font-semibold px-2 py-1 rounded-lg border text-red-600 bg-red-50 border-red-200 whitespace-nowrap">
+                            Working on it
+                          </button>
+                        )}
+                      </div>
+                      {/* Score */}
+                      <span className="num text-[11px] font-bold flex-shrink-0" style={{ color: scoreColor(c.overallScore || 0) }}>
+                        {(c.overallScore || 0) > 0 ? c.overallScore.toFixed(1) : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -328,28 +467,6 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
             </div>
           )}
 
-          {/* Frustrated calls */}
-          {frustratedCalls.length > 0 && (
-            <div className="px-6 py-5">
-              <SectionHead title={`Frustrated Calls (${frustratedCalls.length})`} />
-              <div className="space-y-1.5">
-                {frustratedCalls.map(c => (
-                  <div key={c._rowIdx}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 cursor-pointer hover:bg-red-100 transition-colors"
-                    onClick={() => onCallClick?.(c.meetingId)}>
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-semibold text-brand-heading truncate">{c.customer || '—'}</p>
-                      <p className="text-[10px] text-brand-muted">{fmtDate(c.date)}{c.finalVerdict && ` · ${c.finalVerdict}`}</p>
-                    </div>
-                    <span className="num text-[11px] font-bold flex-shrink-0" style={{ color: scoreColor(c.overallScore) }}>
-                      {c.overallScore > 0 ? c.overallScore.toFixed(1) : '—'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Call History */}
           <div className="px-6 py-5">
             <SectionHead title={`Call History (${sortedCalls.length})`} />
@@ -368,42 +485,39 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedCalls.map((call, i) => {
-                      const sc = scoreColor(call.overallScore || 0)
-                      return (
-                        <tr key={call._rowIdx}
-                          className="border-b border-brand-border/60 cursor-pointer transition-colors duration-150 hover:bg-brand-bg"
-                          style={{ background: call.frustratedFlag ? '#fff5f5' : '' }}
-                          onClick={() => onCallClick?.(call.meetingId)}>
-                          <td className="py-2.5 pr-3 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(call.date)}</td>
-                          <td className="py-2.5 pr-3">
-                            <div className="flex items-center gap-1.5">
-                              {call.frustratedFlag && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Frustrated" />
-                              )}
-                              <span className="text-[12px] font-medium text-brand-text hover:text-brand-green transition-colors truncate max-w-[120px]">
-                                {call.customer || '—'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 pr-3 hidden sm:table-cell">
-                            {call.finalVerdict
-                              ? <span className="text-[10px] text-brand-muted bg-brand-bg border border-brand-border px-1.5 py-0.5 rounded whitespace-nowrap">{call.finalVerdict}</span>
-                              : <span className="text-brand-muted text-[11px]">—</span>}
-                          </td>
-                          <td className="py-2.5 pr-3">
-                            <span className="num text-[11px] font-bold" style={{ color: sc }}>
-                              {(call.overallScore || 0) > 0 ? call.overallScore.toFixed(1) : '—'}
+                    {sortedCalls.map(call => (
+                      <tr key={call._rowIdx}
+                        className="border-b border-brand-border/60 cursor-pointer transition-colors duration-150 hover:bg-brand-bg"
+                        style={{ background: call.frustratedFlag ? '#fff5f5' : '' }}
+                        onClick={() => onCallClick?.(call.meetingId)}>
+                        <td className="py-2.5 pr-3 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(call.date)}</td>
+                        <td className="py-2.5 pr-3">
+                          <div className="flex items-center gap-1.5">
+                            {call.frustratedFlag && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Frustrated" />
+                            )}
+                            <span className="text-[12px] font-medium text-brand-text hover:text-brand-green transition-colors truncate max-w-[120px]">
+                              {call.customer || '—'}
                             </span>
-                          </td>
-                          <td className="py-2.5 hidden sm:table-cell">
-                            {call.status
-                              ? <span className="text-[10px] text-brand-muted">{call.status}</span>
-                              : <span className="text-brand-muted text-[11px]">—</span>}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3 hidden sm:table-cell">
+                          {call.finalVerdict
+                            ? <span className="text-[10px] text-brand-muted bg-brand-bg border border-brand-border px-1.5 py-0.5 rounded whitespace-nowrap">{call.finalVerdict}</span>
+                            : <span className="text-brand-muted text-[11px]">—</span>}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <span className="num text-[11px] font-bold" style={{ color: scoreColor(call.overallScore || 0) }}>
+                            {(call.overallScore || 0) > 0 ? call.overallScore.toFixed(1) : '—'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 hidden sm:table-cell">
+                          {call.status
+                            ? <span className="text-[10px] text-brand-muted">{call.status}</span>
+                            : <span className="text-brand-muted text-[11px]">—</span>}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -414,8 +528,15 @@ export default function EmployeeDetailModal({ employeeName, allCalls, onClose, o
         {/* ── Footer ── */}
         <div className="flex-shrink-0 px-6 py-3 border-t border-brand-border bg-brand-bg flex items-center justify-between">
           <span className="text-[10px] text-brand-muted">{filteredCalls.length} calls in selected period</span>
-          <button onClick={onClose} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg text-white"
-            style={{ background: G }}>Close</button>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button onClick={onBack} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg border border-brand-border text-brand-muted hover:text-brand-heading transition-colors">
+                ← Back
+              </button>
+            )}
+            <button onClick={onClose} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg text-white"
+              style={{ background: G }}>Close</button>
+          </div>
         </div>
       </div>
     </div>

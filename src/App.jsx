@@ -6,23 +6,21 @@ import { useCallStatus }          from './hooks/useCallStatus'
 import {
   filterCalls, getPrevCalls, calcSummary, aggregateEmployees,
   calcTopPerformer, buildChartData, calcQuickStats, getFrustratedCalls,
-  getActionRequired,
 } from './lib/ehUtils'
 
-import Header             from './components/Header'
-import SummaryCards       from './components/SummaryCards'
-import QuickStats         from './components/QuickStats'
-import TopPerformer       from './components/TopPerformer'
-import EmployeeTable      from './components/EmployeeTable'
-import NeedCoaching       from './components/NeedCoaching'
-import MeetingsChart      from './components/MeetingsChart'
-import ActionRequired     from './components/ActionRequired'
+import Header              from './components/Header'
+import SummaryCards        from './components/SummaryCards'
+import QuickStats          from './components/QuickStats'
+import TopPerformer        from './components/TopPerformer'
+import EmployeeTable       from './components/EmployeeTable'
+import NeedCoaching        from './components/NeedCoaching'
+import MeetingsChart       from './components/MeetingsChart'
 import VerdictDistribution from './components/VerdictDistribution'
 import CategoryPerformance from './components/CategoryPerformance'
-import BehaviorInsights   from './components/BehaviorInsights'
-import ResolutionTracker  from './components/ResolutionTracker'
-import FrustratedTable    from './components/FrustratedTable'
-import ActivityFeed       from './components/ActivityFeed'
+import BehaviorInsights    from './components/BehaviorInsights'
+import ResolutionTracker   from './components/ResolutionTracker'
+import FrustratedTable     from './components/FrustratedTable'
+import ActivityFeed        from './components/ActivityFeed'
 
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
@@ -73,11 +71,18 @@ export default function App() {
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [searchQuery, setSearchQuery]       = useState('')
 
-  const [modal, setModal] = useState(null) // null | { type: 'call'|'employee', id }
+  // ── Navigation stack: each entry is { type: 'call'|'employee', id } ─────────
+  const [modalStack, setModalStack] = useState([])
 
-  const openCall     = useCallback((meetingId) => setModal({ type: 'call',     id: meetingId }), [])
-  const openEmployee = useCallback((name)       => setModal({ type: 'employee', id: name }),      [])
-  const closeModal   = useCallback(()           => setModal(null),                                 [])
+  const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null
+  const canGoBack    = modalStack.length > 1
+
+  const pushModal  = useCallback((m) => setModalStack(s => [...s, m]), [])
+  const popModal   = useCallback(()  => setModalStack(s => s.slice(0, -1)), [])
+  const closeAll   = useCallback(()  => setModalStack([]), [])
+
+  // Escape closes the entire stack
+  // (handled inside each modal component via onClose = closeAll)
 
   const { statuses, setStatus } = useCallStatus()
 
@@ -113,14 +118,13 @@ export default function App() {
   const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
 
   // ── All derived data (before conditional returns) ──────────────────────────
-  const summary         = useMemo(() => calcSummary(filteredCalls),              [filteredCalls])
-  const prevSummary     = useMemo(() => calcSummary(prevCalls),                  [prevCalls])
-  const employees       = useMemo(() => aggregateEmployees(filteredCalls),       [filteredCalls])
-  const topPerformer    = useMemo(() => calcTopPerformer(filteredCalls),         [filteredCalls])
-  const chartData       = useMemo(() => buildChartData(filteredCalls, filter),   [filteredCalls, filter])
+  const summary         = useMemo(() => calcSummary(filteredCalls),             [filteredCalls])
+  const prevSummary     = useMemo(() => calcSummary(prevCalls),                 [prevCalls])
+  const employees       = useMemo(() => aggregateEmployees(filteredCalls),      [filteredCalls])
+  const topPerformer    = useMemo(() => calcTopPerformer(filteredCalls),        [filteredCalls])
+  const chartData       = useMemo(() => buildChartData(filteredCalls, filter),  [filteredCalls, filter])
   const quickStats      = useMemo(() => calcQuickStats(filteredCalls, prevCalls, filter), [filteredCalls, prevCalls, filter])
-  const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),       [filteredCalls])
-  const actionRequired  = useMemo(() => getActionRequired(filteredCalls),        [filteredCalls])
+  const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),      [filteredCalls])
 
   const recentActivity = useMemo(() =>
     [...calls]
@@ -153,7 +157,6 @@ export default function App() {
 
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* Stale data warning */}
         {error && calls.length > 0 && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
             <span>⚠️</span>
@@ -163,7 +166,6 @@ export default function App() {
           </div>
         )}
 
-        {/* No results */}
         {!loading && filteredCalls.length === 0 && calls.length > 0 && (
           <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
             <span>📅</span>
@@ -176,52 +178,36 @@ export default function App() {
           {/* ── Main column ──────────────────────────────────────────────── */}
           <div className="flex-1 min-w-0 space-y-6">
 
-            {/* 1. KPI cards */}
             <SummaryCards summary={summary} trends={trends} />
-
-            {/* 2. Score breakdown */}
             <QuickStats stats={quickStats} />
 
-            {/* 3. Top Performer + Employee Table */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="flex flex-col gap-6">
-                <TopPerformer performer={topPerformer} onEmployeeClick={openEmployee} />
-                <NeedCoaching employees={employees} onEmployeeClick={openEmployee} />
+                <TopPerformer performer={topPerformer} onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
+                <NeedCoaching employees={employees}    onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
               </div>
               <div className="lg:col-span-2">
-                <EmployeeTable employees={employees} onEmployeeClick={openEmployee} />
+                <EmployeeTable employees={employees}  onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
               </div>
             </div>
 
-            {/* 4. Meetings over time */}
             <MeetingsChart data={chartData} />
 
-            {/* 5. Action Required */}
-            <ActionRequired
-              calls={actionRequired}
-              onCallClick={openCall}
-              onEmployeeClick={openEmployee}
-            />
-
-            {/* 6. Verdict + Category (side by side) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <VerdictDistribution calls={filteredCalls} />
               <CategoryPerformance calls={filteredCalls} />
             </div>
 
-            {/* 7. Team Behavior Insights */}
             <BehaviorInsights calls={filteredCalls} />
 
-            {/* 8. Resolution Tracker */}
             <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
 
-            {/* 9. Frustrated Calls table */}
             <FrustratedTable
               calls={frustratedCalls}
               statuses={statuses}
               setStatus={setStatus}
-              onEmployeeClick={openEmployee}
-              onCallClick={openCall}
+              onEmployeeClick={(n)   => pushModal({ type: 'employee', id: n })}
+              onCallClick={(mid)     => pushModal({ type: 'call',     id: mid })}
             />
           </div>
 
@@ -229,8 +215,8 @@ export default function App() {
           <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
             <ActivityFeed
               calls={recentActivity}
-              onEmployeeClick={openEmployee}
-              onCallClick={openCall}
+              onEmployeeClick={(n)   => pushModal({ type: 'employee', id: n })}
+              onCallClick={(mid)     => pushModal({ type: 'call',     id: mid })}
             />
           </aside>
         </div>
@@ -240,21 +226,27 @@ export default function App() {
         Little Giant Marketing &mdash; Employee Health Dashboard
       </footer>
 
-      {/* ── Modals ────────────────────────────────────────────────────────── */}
-      {modal?.type === 'call' && (
-        <CallDetailModal
-          meetingId={modal.id}
+      {/* ── Modal stack — only render the top of the stack ────────────────── */}
+      {currentModal?.type === 'employee' && (
+        <EmployeeDetailModal
+          key={currentModal.id}
+          employeeName={currentModal.id}
           allCalls={calls}
-          onClose={closeModal}
-          onEmployeeClick={(name) => { closeModal(); setTimeout(() => openEmployee(name), 50) }}
+          onClose={closeAll}
+          onBack={canGoBack ? popModal : null}
+          onCallClick={(mid) => pushModal({ type: 'call', id: mid })}
+          statuses={statuses}
+          setStatus={setStatus}
         />
       )}
-      {modal?.type === 'employee' && (
-        <EmployeeDetailModal
-          employeeName={modal.id}
+      {currentModal?.type === 'call' && (
+        <CallDetailModal
+          key={currentModal.id}
+          meetingId={currentModal.id}
           allCalls={calls}
-          onClose={closeModal}
-          onCallClick={(mid) => { closeModal(); setTimeout(() => openCall(mid), 50) }}
+          onClose={closeAll}
+          onBack={canGoBack ? popModal : null}
+          onEmployeeClick={(name) => pushModal({ type: 'employee', id: name })}
         />
       )}
     </div>

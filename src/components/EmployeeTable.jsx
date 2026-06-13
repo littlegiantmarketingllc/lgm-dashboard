@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { G, scoreColor } from '../lib/ehUtils'
+import EmployeeAvatar from './EmployeeAvatar'
 
 function ScorePill({ score }) {
   const c = scoreColor(score)
@@ -179,10 +180,7 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
                   {/* Name */}
                   <td className="px-3 sm:px-4 py-3 sm:py-4" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                        style={{ background: `${G}18`, color: G, border: `1px solid ${G}30` }}>
-                        {emp.name.slice(0, 2).toUpperCase()}
-                      </div>
+                      <EmployeeAvatar name={emp.name} size={28} variant="light" />
                       <button
                         onClick={() => onEmployeeClick?.(emp.name)}
                         onMouseEnter={e => showTooltip(e, emp)}

@@ -43,7 +43,7 @@ function Section({ title, children }) {
   )
 }
 
-export default function CallDetailModal({ meetingId, allCalls, onClose, onEmployeeClick }) {
+export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, onEmployeeClick }) {
   const rows = useMemo(() =>
     allCalls.filter(c => c.meetingId === meetingId),
     [allCalls, meetingId]
@@ -87,6 +87,14 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onEmploy
         {/* Header */}
         <div className="px-6 py-5 border-b border-brand-border flex-shrink-0"
           style={{ background: 'linear-gradient(135deg, rgba(140,198,63,0.06) 0%, white 60%)' }}>
+          {/* Back navigation */}
+          {onBack && (
+            <button onClick={onBack}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-muted hover:text-brand-heading transition-colors mb-3 -mt-1 group">
+              <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>
+              Back
+            </button>
+          )}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">Call Detail</p>
@@ -221,8 +229,15 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onEmploy
         {/* Footer */}
         <div className="flex-shrink-0 px-6 py-3 border-t border-brand-border bg-brand-bg flex items-center justify-between">
           <span className="text-[10px] text-brand-muted font-mono">Meeting ID: {primary.meetingId}</span>
-          <button onClick={onClose} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg text-white"
-            style={{ background: G }}>Close</button>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button onClick={onBack} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg border border-brand-border text-brand-muted hover:text-brand-heading transition-colors">
+                ← Back
+              </button>
+            )}
+            <button onClick={onClose} className="text-[11px] font-semibold px-4 py-1.5 rounded-lg text-white"
+              style={{ background: G }}>Close</button>
+          </div>
         </div>
       </div>
     </div>
