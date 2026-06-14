@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 
 import { useEmployeeHealthSheet } from './hooks/useEmployeeHealthSheet'
 import { useCallStatus }          from './hooks/useCallStatus'
+import { useCoachingStatus }      from './hooks/useCoachingStatus'
 
 import {
   filterCalls, getPrevCalls, calcSummary, aggregateEmployees,
@@ -24,6 +25,7 @@ import ActivityFeed        from './components/ActivityFeed'
 
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
+import CoachingModal       from './components/modals/CoachingModal'
 
 // ─── Loading / Error screens ──────────────────────────────────────────────────
 function LoadingScreen() {
@@ -85,6 +87,7 @@ export default function App() {
   // (handled inside each modal component via onClose = closeAll)
 
   const { statuses, setStatus } = useCallStatus()
+  const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching } = useCoachingStatus()
 
   const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
@@ -130,6 +133,10 @@ export default function App() {
   const chartData       = useMemo(() => buildChartData(filteredCalls, filter),  [filteredCalls, filter])
   const quickStats      = useMemo(() => calcQuickStats(filteredCalls, prevCalls, filter), [filteredCalls, prevCalls, filter])
   const frustratedCalls = useMemo(() => getFrustratedCalls(filteredCalls),      [filteredCalls])
+
+  const coachingNeeded = useMemo(() =>
+    employees.filter(e => e.coaching > 0 && !isCoachingComplete(e.name, e.coachingRecs?.length)).length
+  , [employees, isCoachingComplete])
 
   const recentActivity = useMemo(() =>
     [...calls]
@@ -185,15 +192,24 @@ export default function App() {
           <div className="flex-1 min-w-0 space-y-6">
 
             <SummaryCards summary={summary} trends={trends} />
-            <QuickStats stats={quickStats} />
+            <QuickStats stats={quickStats} coachingNeeded={coachingNeeded} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="flex flex-col gap-6">
                 <TopPerformer performer={topPerformer} onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
-                <NeedCoaching employees={employees}    onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
+                <NeedCoaching
+                  employees={employees}
+                  onEmployeeClick={(n) => pushModal({ type: 'employee',  id: n })}
+                  onCoachingClick={(n) => pushModal({ type: 'coaching',  id: n })}
+                  isComplete={isCoachingComplete}
+                />
               </div>
               <div className="lg:col-span-2">
-                <EmployeeTable employees={employees}  onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
+                <EmployeeTable
+                  employees={employees}
+                  onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })}
+                  onCoachingClick={(n) => pushModal({ type: 'coaching', id: n })}
+                />
               </div>
             </div>
 
@@ -240,9 +256,12 @@ export default function App() {
           allCalls={calls}
           onClose={closeAll}
           onBack={canGoBack ? popModal : null}
-          onCallClick={(mid) => pushModal({ type: 'call', id: mid })}
+          onCallClick={(mid) => pushModal({ type: 'call',     id: mid })}
+          onCoachingClick={(n)  => pushModal({ type: 'coaching', id: n })}
           statuses={statuses}
           setStatus={setStatus}
+          coachingStatuses={coachingStatuses}
+          onToggleRec={toggleCoachingRec}
         />
       )}
       {currentModal?.type === 'call' && (
@@ -250,6 +269,19 @@ export default function App() {
           key={currentModal.id}
           meetingId={currentModal.id}
           allCalls={calls}
+          onClose={closeAll}
+          onBack={canGoBack ? popModal : null}
+          onEmployeeClick={(name) => pushModal({ type: 'employee', id: name })}
+        />
+      )}
+      {currentModal?.type === 'coaching' && (
+        <CoachingModal
+          key={currentModal.id}
+          employeeName={currentModal.id}
+          allCalls={calls}
+          coachingStatuses={coachingStatuses}
+          onToggleRec={toggleCoachingRec}
+          onResetCoaching={resetCoaching}
           onClose={closeAll}
           onBack={canGoBack ? popModal : null}
           onEmployeeClick={(name) => pushModal({ type: 'employee', id: name })}

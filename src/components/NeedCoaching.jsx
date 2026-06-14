@@ -2,8 +2,11 @@ import { G, scoreColor } from '../lib/ehUtils'
 
 const GOLD = '#F59E0B'
 
-export default function NeedCoaching({ employees, onEmployeeClick }) {
-  const needsCoaching = employees.filter(e => e.coaching > 0)
+export default function NeedCoaching({ employees, onCoachingClick, onEmployeeClick, isComplete }) {
+  const needsCoaching = employees.filter(e =>
+    e.coaching > 0 && !isComplete?.(e.name, e.coachingRecs?.length)
+  )
+
   if (!needsCoaching.length) return null
 
   return (
@@ -25,7 +28,9 @@ export default function NeedCoaching({ employees, onEmployeeClick }) {
             </svg>
             Need Coaching
           </h3>
-          <p className="text-brand-muted text-[10px] mt-0.5">{needsCoaching.length} employee{needsCoaching.length !== 1 ? 's' : ''} flagged · click to view details</p>
+          <p className="text-brand-muted text-[10px] mt-0.5">
+            {needsCoaching.length} employee{needsCoaching.length !== 1 ? 's' : ''} flagged · click flag to review
+          </p>
         </div>
         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border"
           style={{ color: GOLD, background: `${GOLD}12`, borderColor: `${GOLD}30` }}>
@@ -33,32 +38,52 @@ export default function NeedCoaching({ employees, onEmployeeClick }) {
         </span>
       </div>
 
-      {/* Employee chips */}
+      {/* Employee chips — two clickable zones: avatar/name → profile, flag badge → coaching modal */}
       <div className="px-5 py-3.5 flex flex-wrap gap-2">
         {needsCoaching.map(emp => {
           const sc = scoreColor(emp.avgScore)
           const initials = emp.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
           return (
-            <button
+            <div
               key={emp.name}
-              onClick={() => onEmployeeClick?.(emp.name)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border transition-all duration-200 hover:shadow-sm group"
-              style={{ borderColor: `${GOLD}30`, background: `${GOLD}08` }}
-              onMouseEnter={e => e.currentTarget.style.background = `${GOLD}18`}
-              onMouseLeave={e => e.currentTarget.style.background = `${GOLD}08`}
+              className="flex items-center gap-0 rounded-xl border overflow-hidden transition-all duration-200"
+              style={{ borderColor: `${GOLD}35`, background: `${GOLD}08` }}
             >
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                style={{ background: sc }}>
-                {initials}
-              </div>
-              <div className="text-left">
-                <p className="text-[12px] font-semibold text-brand-heading group-hover:text-yellow-700 transition-colors">{emp.name}</p>
-                <p className="text-[10px] text-brand-muted">{emp.coaching} flag{emp.coaching !== 1 ? 's' : ''} · avg {emp.avgScore}</p>
-              </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" className="w-3 h-3 ml-1 flex-shrink-0">
-                <path d="m9 18 6-6-6-6"/>
-              </svg>
-            </button>
+              {/* Left: avatar + name → opens employee profile */}
+              <button
+                onClick={() => onEmployeeClick?.(emp.name)}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-amber-50 transition-colors group"
+                title={`View ${emp.name}'s full profile`}
+              >
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                  style={{ background: sc }}>
+                  {initials}
+                </div>
+                <div className="text-left">
+                  <p className="text-[12px] font-semibold text-brand-heading group-hover:text-yellow-700 transition-colors whitespace-nowrap">
+                    {emp.name}
+                  </p>
+                  <p className="text-[10px] text-brand-muted">avg {emp.avgScore}</p>
+                </div>
+              </button>
+
+              {/* Right: coaching flag badge → opens CoachingModal */}
+              <button
+                onClick={() => onCoachingClick?.(emp.name)}
+                className="flex items-center gap-1 px-2.5 py-2 border-l transition-all duration-200 group"
+                style={{ borderColor: `${GOLD}30` }}
+                onMouseEnter={e => e.currentTarget.style.background = `${GOLD}22`}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
+                title="Review coaching recommendations"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5" strokeLinecap="round" className="w-3 h-3 flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                </svg>
+                <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: GOLD }}>
+                  {emp.coaching} flag{emp.coaching !== 1 ? 's' : ''}
+                </span>
+              </button>
+            </div>
           )
         })}
       </div>

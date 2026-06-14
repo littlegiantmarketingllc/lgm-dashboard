@@ -72,7 +72,7 @@ function SearchIcon() {
   )
 }
 
-export default function EmployeeTable({ employees, onEmployeeClick }) {
+export default function EmployeeTable({ employees, onEmployeeClick, onCoachingClick }) {
   const [tooltip, setTooltip] = useState(null)
   const [search, setSearch]   = useState('')
 
@@ -191,7 +191,13 @@ export default function EmployeeTable({ employees, onEmployeeClick }) {
                         <span className="xs:hidden">{emp.name.split(' ')[0]}</span>
                       </button>
                       {emp.coaching > 0 && (
-                        <span className="text-[9px] bg-yellow-50 border border-yellow-200 text-yellow-700 px-1 py-0.5 rounded hidden sm:inline">Coach</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); onCoachingClick?.(emp.name) }}
+                          className="text-[9px] bg-yellow-50 border border-yellow-200 text-yellow-700 px-1 py-0.5 rounded hidden sm:inline hover:bg-yellow-100 transition-colors"
+                          title="Review coaching recommendations"
+                        >
+                          Coach
+                        </button>
                       )}
                     </div>
                   </td>

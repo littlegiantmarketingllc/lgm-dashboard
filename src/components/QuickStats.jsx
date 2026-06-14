@@ -31,25 +31,23 @@ function TalkTimeCell({ totalMins }) {
   )
 }
 
-function MeetingsCell({ totalCalls, callsDelta }) {
-  const displayed = useCountUp(totalCalls || 0, { duration: 900, delay: 360 })
+function CoachingNeededCell({ count }) {
+  const displayed = useCountUp(count || 0, { duration: 900, delay: 360 })
+  const GOLD = '#F59E0B'
   return (
     <div className="flex flex-col items-center justify-center gap-1.5 sm:border-l border-brand-border px-3 py-4">
-      <div className="flex items-center gap-1">
-        <span className="num text-xl font-bold leading-none text-blue-500">{displayed}</span>
-        {callsDelta !== null && (
-          <span className="text-[10px] font-bold" style={{ color: callsDelta >= 0 ? '#8CC63F' : '#EF4444' }}>
-            {callsDelta >= 0 ? '↑' : '↓'}{Math.abs(callsDelta)}%
-          </span>
-        )}
-      </div>
-      <span className="text-[9px] text-brand-muted uppercase tracking-wider font-bold">Meetings</span>
+      <span className="num text-xl font-bold leading-none" style={{ color: count > 0 ? GOLD : '#6B7280' }}>
+        {displayed}
+      </span>
+      <span className="text-[9px] text-brand-muted uppercase tracking-wider font-bold text-center leading-tight">
+        Coaching Needed
+      </span>
     </div>
   )
 }
 
-export default function QuickStats({ stats }) {
-  const { avgScore, avgComm, avgProf, avgProd, avgCX, totalMins, totalCalls, callsDelta } = stats
+export default function QuickStats({ stats, coachingNeeded }) {
+  const { avgScore, avgComm, avgProf, avgProd, avgCX, totalMins } = stats
 
   return (
     <div
@@ -72,7 +70,7 @@ export default function QuickStats({ stats }) {
         <ScoreCell label="Product Know."   value={avgProd}  delay={180} />
         <ScoreCell label="Cx Experience"   value={avgCX}    delay={240} />
         <TalkTimeCell totalMins={totalMins} />
-        <MeetingsCell totalCalls={totalCalls} callsDelta={callsDelta} />
+        <CoachingNeededCell count={coachingNeeded ?? 0} />
       </div>
     </div>
   )
