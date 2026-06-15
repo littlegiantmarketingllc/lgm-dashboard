@@ -140,7 +140,7 @@ export default function App() {
 
   const recentActivity = useMemo(() =>
     [...calls]
-      .sort((a, b) => (b._sortTs ?? 0) - (a._sortTs ?? 0))
+      .sort((a, b) => b._rowIdx - a._rowIdx)
       .slice(0, 15),
     [calls]
   )
