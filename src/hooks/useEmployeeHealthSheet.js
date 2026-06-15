@@ -62,6 +62,24 @@ function parseDate(raw) {
   return s
 }
 
+// ─── Time parser: handles 24h ("21:58"), 12h+seconds ("9:58:00 PM"),
+//     12h no-seconds ("9:58 PM"), decimal fraction-of-day ─────────────────────
+function parseTimeMins(t) {
+  const s = (t || '').trim()
+  if (!s) return 0
+  // Decimal fraction of day (Sheets raw number export)
+  if (/^\d*\.\d+$/.test(s)) return Math.round(parseFloat(s) * 1440)
+  // H:MM or H:MM:SS, with optional trailing AM/PM
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?(?:\s*(AM|PM))?$/i)
+  if (!m) return 0
+  let h = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  const p = (m[3] || '').toUpperCase()
+  if (p === 'PM' && h !== 12) h += 12
+  else if (p === 'AM' && h === 12) h = 0
+  return h * 60 + min
+}
+
 // ─── Field helpers ────────────────────────────────────────────────────────────
 function parseScore(raw) {
   const n = parseFloat((raw ?? '').replace(',', '.'))
@@ -153,14 +171,22 @@ function buildRow(header, row, rowIdx) {
   const dt  = parseDate(obj.date ?? '')
   if (!emp || !dt) return null
 
-  const overallScore = parseScore(obj.overallScore)
+  const overallScore   = parseScore(obj.overallScore)
   const frustratedFlag = parseBool(obj.frustratedFlag)
+  const rawTime        = (obj.time ?? '').trim()
+
+  // Pre-compute a single sortable number: YYYYMMDD * 1440 + minutes-since-midnight
+  // Used for correct chronological sort regardless of time format in the sheet
+  const [y, mo, d] = dt.split('-').map(Number)
+  const dateNum = (y * 10000 + mo * 100 + d) * 1440
+  const _sortTs = dateNum + parseTimeMins(rawTime)
 
   return {
     _rowIdx:    rowIdx,
+    _sortTs,
     employee:   emp,
     date:       dt,
-    time:       (obj.time ?? '').trim(),
+    time:       rawTime,
     customer:   (obj.customer ?? '').trim(),
     category:   (obj.category ?? '').trim() || 'General',
     duration:   parseDuration(obj.duration),

@@ -66,18 +66,6 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-// ─── Parse "H:MM AM/PM" → minutes since midnight for correct time sorting ─────
-function parseTimeMins(t) {
-  const m = (t || '').trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i)
-  if (!m) return -1
-  let h = parseInt(m[1], 10)
-  const min = parseInt(m[2], 10)
-  const p = (m[3] || '').toUpperCase()
-  if (p === 'PM' && h !== 12) h += 12
-  else if (p === 'AM' && h === 12) h = 0
-  return h * 60 + min
-}
-
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [filter, setFilter]                 = useState({ type: '30d', from: '', to: '' })
@@ -152,11 +140,7 @@ export default function App() {
 
   const recentActivity = useMemo(() =>
     [...calls]
-      .sort((a, b) => {
-        const dateCmp = (b.date || '').localeCompare(a.date || '')
-        if (dateCmp !== 0) return dateCmp
-        return parseTimeMins(b.time) - parseTimeMins(a.time)
-      })
+      .sort((a, b) => (b._sortTs ?? 0) - (a._sortTs ?? 0))
       .slice(0, 15),
     [calls]
   )
