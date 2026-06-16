@@ -63,6 +63,22 @@ function SummaryTooltip({ emp, pos }) {
   )
 }
 
+// Picks a positive growth label from score level + trend — never a critical/negative tag.
+// null = no badge (performance is already strong and stable, nothing to call out).
+function growthLabel(emp) {
+  if (!emp.coaching) return null
+  const scores = emp.recentScores || []
+  let trend = 0
+  if (scores.length >= 4) {
+    const mid = Math.floor(scores.length / 2)
+    const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length
+    trend = avg(scores.slice(mid)) - avg(scores.slice(0, mid))
+  }
+  if (emp.avgScore >= 8 && trend >= 0) return null
+  if (trend > 0.3 || emp.avgScore >= 6) return 'Growing'
+  return 'Learning'
+}
+
 function SearchIcon() {
   return (
     <svg className="w-3.5 h-3.5 text-brand-muted flex-shrink-0" viewBox="0 0 24 24"
@@ -190,15 +206,24 @@ export default function EmployeeTable({ employees, onEmployeeClick, onCoachingCl
                         <span className="hidden xs:inline">{emp.name}{emp.name === 'John Graham' && <span className="text-brand-muted font-normal text-[10px] ml-1">(Founder)</span>}</span>
                         <span className="xs:hidden">{emp.name.split(' ')[0]}</span>
                       </button>
-                      {emp.coaching > 0 && (
-                        <button
-                          onClick={e => { e.stopPropagation(); onCoachingClick?.(emp.name) }}
-                          className="text-[9px] bg-green-50 border border-green-200 text-green-700 px-1 py-0.5 rounded hidden sm:inline hover:bg-green-100 transition-colors"
-                          title="View growth opportunities"
-                        >
-                          Growing
-                        </button>
-                      )}
+                      {(() => {
+                        const label = growthLabel(emp)
+                        if (!label) return null
+                        const isGrowing = label === 'Growing'
+                        return (
+                          <button
+                            onClick={e => { e.stopPropagation(); onCoachingClick?.(emp.name) }}
+                            className={`text-[9px] px-1 py-0.5 rounded hidden sm:inline transition-colors border ${
+                              isGrowing
+                                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                                : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                            }`}
+                            title="View growth opportunities"
+                          >
+                            {label}
+                          </button>
+                        )
+                      })()}
                     </div>
                   </td>
 
