@@ -551,9 +551,14 @@ export default function EmployeeDetailModal({
                             {call.frustratedFlag && (
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Priority" />
                             )}
-                            <span className="text-[12px] font-medium text-brand-text hover:text-brand-green transition-colors truncate max-w-[120px]">
-                              {call.customer || '—'}
-                            </span>
+                            <div className="min-w-0">
+                              <span className="text-[12px] font-medium text-brand-text hover:text-brand-green transition-colors truncate max-w-[120px] block">
+                                {call.customer || '—'}
+                              </span>
+                              {call.category && (
+                                <span className="text-[9px] font-semibold text-brand-muted uppercase tracking-wide">{call.category}</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="py-2.5 pr-3 hidden sm:table-cell">
