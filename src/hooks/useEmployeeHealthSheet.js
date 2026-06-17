@@ -63,32 +63,25 @@ function parseDate(raw) {
 }
 
 // ─── ET display formatter ─────────────────────────────────────────────────────
-// Claude extracts times from TLDV transcripts in Eastern Time.
-// Google Sheets stores them but strips the AM/PM indicator on CSV export,
-// turning "4:07 PM" into "04:07". We detect which bucket each value falls in:
-//   • Has AM/PM  ("4:07 PM", "9:58:00 PM") → already labelled, just normalise
-//   • Hour ≥ 13  ("17:06")                 → unambiguous 24-h PM, convert to 12-h
-//   • Hour 1-7   ("04:07", "06:02")        → business calls don't happen 1-7 AM ET,
-//                                             so PM is lost — restore it
-//   • Hour 8-12                            → ambiguous, show as-is
+// Claude converts UTC→ET and returns 24-hour format (e.g. "07:32" = 7:32 AM ET,
+// "16:07" = 4:07 PM ET). We just convert 24-hour to 12-hour and label with "ET".
 function toEasternDisplayTime(rawTime) {
   const s = (rawTime || '').trim()
   if (!s) return s
 
-  // Already has AM/PM label (e.g. "4:07 PM" or "9:58:00 PM")
+  // Already has AM/PM (legacy data) — normalise and label
   const ampm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i)
   if (ampm) return `${parseInt(ampm[1], 10)}:${ampm[2]} ${ampm[3].toUpperCase()} ET`
 
-  // H:MM or HH:MM without AM/PM
+  // 24-hour H:MM or HH:MM — straightforward 24→12 conversion, no heuristics
   const h24 = s.match(/^(\d{1,2}):(\d{2})$/)
   if (h24) {
-    let h = parseInt(h24[1], 10)
+    const h = parseInt(h24[1], 10)
     const min = h24[2]
-    if (h >= 13) return `${h - 12}:${min} PM ET`          // unambiguous 24-h PM
-    if (h === 0)  return `12:${min} AM ET`                 // midnight
-    if (h === 12) return `12:${min} PM ET`                 // noon
-    if (h >= 1 && h <= 7) return `${h}:${min} PM ET`      // business hours — PM lost by Sheets
-    return `${h}:${min} ET`                                // 8-11: show as-is
+    if (h === 0)  return `12:${min} AM ET`
+    if (h < 12)   return `${h}:${min} AM ET`
+    if (h === 12) return `12:${min} PM ET`
+    return `${h - 12}:${min} PM ET`
   }
 
   return s
