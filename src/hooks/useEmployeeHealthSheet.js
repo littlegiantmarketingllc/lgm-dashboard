@@ -63,31 +63,34 @@ function parseDate(raw) {
 }
 
 // ─── ET display formatter ─────────────────────────────────────────────────────
-// Two flavours exist in the sheet:
-//   Old (pre-fix n8n): 24-hour UTC — "18:09" → needs UTC→ET conversion
-//   New (post-fix n8n): 12-hour ET — "6:09 PM" → already ET, just label it
-const ET_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  hour:     'numeric',
-  minute:   '2-digit',
-  hour12:   true,
-})
-
-function toEasternDisplayTime(dateISO, rawTime) {
+// Claude extracts times from TLDV transcripts in Eastern Time.
+// Google Sheets stores them but strips the AM/PM indicator on CSV export,
+// turning "4:07 PM" into "04:07". We detect which bucket each value falls in:
+//   • Has AM/PM  ("4:07 PM", "9:58:00 PM") → already labelled, just normalise
+//   • Hour ≥ 13  ("17:06")                 → unambiguous 24-h PM, convert to 12-h
+//   • Hour 1-7   ("04:07", "06:02")        → business calls don't happen 1-7 AM ET,
+//                                             so PM is lost — restore it
+//   • Hour 8-12                            → ambiguous, show as-is
+function toEasternDisplayTime(rawTime) {
   const s = (rawTime || '').trim()
-  if (!s || !dateISO) return s
-  // 12-hour AM/PM → already Eastern Time written by updated n8n
+  if (!s) return s
+
+  // Already has AM/PM label (e.g. "4:07 PM" or "9:58:00 PM")
   const ampm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i)
-  if (ampm) return `${ampm[1]}:${ampm[2]} ${ampm[3].toUpperCase()} ET`
-  // 24-hour H:MM → treat as UTC and convert to ET
+  if (ampm) return `${parseInt(ampm[1], 10)}:${ampm[2]} ${ampm[3].toUpperCase()} ET`
+
+  // H:MM or HH:MM without AM/PM
   const h24 = s.match(/^(\d{1,2}):(\d{2})$/)
   if (h24) {
-    const [y, mo, d] = dateISO.split('-').map(Number)
-    if (!y) return s
-    const utcDate = new Date(Date.UTC(y, mo - 1, d, parseInt(h24[1], 10), parseInt(h24[2], 10), 0))
-    if (isNaN(utcDate.getTime())) return s
-    return ET_FORMATTER.format(utcDate) + ' ET'
+    let h = parseInt(h24[1], 10)
+    const min = h24[2]
+    if (h >= 13) return `${h - 12}:${min} PM ET`          // unambiguous 24-h PM
+    if (h === 0)  return `12:${min} AM ET`                 // midnight
+    if (h === 12) return `12:${min} PM ET`                 // noon
+    if (h >= 1 && h <= 7) return `${h}:${min} PM ET`      // business hours — PM lost by Sheets
+    return `${h}:${min} ET`                                // 8-11: show as-is
   }
+
   return s
 }
 
@@ -209,8 +212,8 @@ function buildRow(header, row, rowIdx) {
   const dateNum = (y * 10000 + mo * 100 + d) * 1440
   const _sortTs = dateNum + parseTimeMins(rawTime)
 
-  // Convert time to Eastern Time for display (24-hour UTC → ET; 12-hour already ET)
-  const displayTime = toEasternDisplayTime(dt, rawTime)
+  // Format time for display — restore PM label lost by Google Sheets CSV export
+  const displayTime = toEasternDisplayTime(rawTime)
 
   return {
     _rowIdx:    rowIdx,
