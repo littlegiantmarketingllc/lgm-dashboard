@@ -62,30 +62,6 @@ function parseDate(raw) {
   return s
 }
 
-// ─── ET display formatter ─────────────────────────────────────────────────────
-// Claude converts UTC→ET and returns 24-hour format (e.g. "07:32" = 7:32 AM ET,
-// "16:07" = 4:07 PM ET). We just convert 24-hour to 12-hour and label with "ET".
-function toEasternDisplayTime(rawTime) {
-  const s = (rawTime || '').trim()
-  if (!s) return s
-
-  // Already has AM/PM (legacy data) — normalise and label
-  const ampm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i)
-  if (ampm) return `${parseInt(ampm[1], 10)}:${ampm[2]} ${ampm[3].toUpperCase()} ET`
-
-  // 24-hour H:MM or HH:MM — straightforward 24→12 conversion, no heuristics
-  const h24 = s.match(/^(\d{1,2}):(\d{2})$/)
-  if (h24) {
-    const h = parseInt(h24[1], 10)
-    const min = h24[2]
-    if (h === 0)  return `12:${min} AM ET`
-    if (h < 12)   return `${h}:${min} AM ET`
-    if (h === 12) return `12:${min} PM ET`
-    return `${h - 12}:${min} PM ET`
-  }
-
-  return s
-}
 
 // ─── Time parser: handles 24h ("21:58"), 12h+seconds ("9:58:00 PM"),
 //     12h no-seconds ("9:58 PM"), decimal fraction-of-day ─────────────────────
@@ -205,15 +181,12 @@ function buildRow(header, row, rowIdx) {
   const dateNum = (y * 10000 + mo * 100 + d) * 1440
   const _sortTs = dateNum + parseTimeMins(rawTime)
 
-  // Format time for display — restore PM label lost by Google Sheets CSV export
-  const displayTime = toEasternDisplayTime(rawTime)
-
   return {
     _rowIdx:    rowIdx,
     _sortTs,
     employee:   emp,
     date:       dt,
-    time:       displayTime,
+    time:       rawTime,
     customer:   (obj.customer ?? '').trim(),
     category:   (obj.category ?? '').trim() || 'General',
     duration:   parseDuration(obj.duration),
