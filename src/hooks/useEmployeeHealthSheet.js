@@ -62,6 +62,35 @@ function parseDate(raw) {
   return s
 }
 
+// ─── ET display formatter ─────────────────────────────────────────────────────
+// Two flavours exist in the sheet:
+//   Old (pre-fix n8n): 24-hour UTC — "18:09" → needs UTC→ET conversion
+//   New (post-fix n8n): 12-hour ET — "6:09 PM" → already ET, just label it
+const ET_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour:     'numeric',
+  minute:   '2-digit',
+  hour12:   true,
+})
+
+function toEasternDisplayTime(dateISO, rawTime) {
+  const s = (rawTime || '').trim()
+  if (!s || !dateISO) return s
+  // 12-hour AM/PM → already Eastern Time written by updated n8n
+  const ampm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i)
+  if (ampm) return `${ampm[1]}:${ampm[2]} ${ampm[3].toUpperCase()} ET`
+  // 24-hour H:MM → treat as UTC and convert to ET
+  const h24 = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (h24) {
+    const [y, mo, d] = dateISO.split('-').map(Number)
+    if (!y) return s
+    const utcDate = new Date(Date.UTC(y, mo - 1, d, parseInt(h24[1], 10), parseInt(h24[2], 10), 0))
+    if (isNaN(utcDate.getTime())) return s
+    return ET_FORMATTER.format(utcDate) + ' ET'
+  }
+  return s
+}
+
 // ─── Time parser: handles 24h ("21:58"), 12h+seconds ("9:58:00 PM"),
 //     12h no-seconds ("9:58 PM"), decimal fraction-of-day ─────────────────────
 function parseTimeMins(t) {
@@ -176,17 +205,19 @@ function buildRow(header, row, rowIdx) {
   const rawTime        = (obj.time ?? '').trim()
 
   // Pre-compute a single sortable number: YYYYMMDD * 1440 + minutes-since-midnight
-  // Used for correct chronological sort regardless of time format in the sheet
   const [y, mo, d] = dt.split('-').map(Number)
   const dateNum = (y * 10000 + mo * 100 + d) * 1440
   const _sortTs = dateNum + parseTimeMins(rawTime)
+
+  // Convert time to Eastern Time for display (24-hour UTC → ET; 12-hour already ET)
+  const displayTime = toEasternDisplayTime(dt, rawTime)
 
   return {
     _rowIdx:    rowIdx,
     _sortTs,
     employee:   emp,
     date:       dt,
-    time:       rawTime,
+    time:       displayTime,
     customer:   (obj.customer ?? '').trim(),
     category:   (obj.category ?? '').trim() || 'General',
     duration:   parseDuration(obj.duration),
