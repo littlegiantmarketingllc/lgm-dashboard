@@ -39,7 +39,7 @@ export default function MeetingsChart({ data }) {
       <div className="px-6 py-4 border-b border-brand-border flex items-center justify-between">
         <div>
           <h2 className="text-brand-heading font-semibold text-sm">Meetings Over Time</h2>
-          <p className="text-brand-muted text-[11px] mt-0.5">Daily positive vs frustrated calls</p>
+          <p className="text-brand-muted text-[11px] mt-0.5">Daily positive vs priority calls</p>
         </div>
         <div className="flex items-center gap-5 text-[11px]">
           <span className="flex items-center gap-1.5">
@@ -48,7 +48,7 @@ export default function MeetingsChart({ data }) {
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-6 h-0.5 rounded bg-brand-red inline-block" />
-            <span className="text-brand-muted">Frustrated</span>
+            <span className="text-brand-muted">Priority</span>
           </span>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function MeetingsChart({ data }) {
             <Area
               type="monotone"
               dataKey="frustrated"
-              name="Frustrated"
+              name="Priority"
               stroke="#EF4444"
               strokeWidth={2.5}
               fill="url(#gFrustrated)"

@@ -149,9 +149,9 @@ export default function KPICards({ calls }) {
       />
       <Card
         Icon={UserX}
-        label="Frustrated Customers"
+        label="Priority Calls"
         value={stats.frustrated}
-        sub="Frustrated flag = true"
+        sub="Flagged for review"
         accent={stats.frustrated > 0 ? '#EF4444' : '#8CC63F'}
         pulse={stats.frustrated > 0}
         delay={180}

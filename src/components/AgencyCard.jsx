@@ -50,7 +50,7 @@ export default function AgencyCard({ agencyName, calls, position, onClose }) {
             {[
               { label: 'Total Calls', value: total     },
               { label: 'Avg Score',   value: `${avgScore}` },
-              { label: 'Frustrated',  value: frustrated },
+              { label: 'Priority',    value: frustrated },
             ].map(({ label, value }) => (
               <div key={label} className="bg-brand-bg rounded-lg p-2 text-center border border-brand-border">
                 <p className="num text-base font-bold text-brand-text">{value}</p>
@@ -63,7 +63,7 @@ export default function AgencyCard({ agencyName, calls, position, onClose }) {
           {frustrated > 0 && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
               <p className="text-[11px] text-red-600 font-semibold">
-                ⚠ {frustrated} frustrated call{frustrated > 1 ? 's' : ''} flagged
+                ⚠ {frustrated} priority call{frustrated > 1 ? 's' : ''} flagged
               </p>
             </div>
           )}

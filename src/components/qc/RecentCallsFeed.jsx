@@ -84,7 +84,7 @@ export default function RecentCallsFeed({ calls, onCallClick, onCustomerClick })
                   {call.frustratedFlag && (
                     <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">
                       <UserX size={9} strokeWidth={2.5} />
-                      Frustrated
+                      Priority
                     </span>
                   )}
                 </div>

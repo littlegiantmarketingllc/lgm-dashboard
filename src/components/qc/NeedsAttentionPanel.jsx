@@ -142,8 +142,8 @@ export default function NeedsAttentionPanel({ calls, handledIds, onToggleHandled
           c.actionItems || `Call escalated — ${c.customer}.`, PRIORITY['Escalated'])
       }
       if (c.frustratedFlag) {
-        add(c, 'frustrated', 'Frustrated Customer',
-          `${c.customer} was frustrated during the call. ${c.redFlags ? `Red flags: ${c.redFlags}` : ''}`.trim(),
+        add(c, 'frustrated', 'Priority Call',
+          `${c.customer} — call flagged for review. ${c.redFlags ? `Red flags: ${c.redFlags}` : ''}`.trim(),
           PRIORITY['frustrated'])
       }
       if (c.finalVerdict === 'Immediate Attention') {
@@ -178,7 +178,7 @@ export default function NeedsAttentionPanel({ calls, handledIds, onToggleHandled
         </div>
         <div>
           <p className="font-semibold text-green-700 text-sm">All clear — nothing needs attention right now</p>
-          <p className="text-green-600 text-[12px] mt-0.5">No escalated calls, frustrated customers, or overdue follow-ups in this period.</p>
+          <p className="text-green-600 text-[12px] mt-0.5">No escalated calls, priority calls, or overdue follow-ups in this period.</p>
         </div>
       </div>
     )

@@ -140,7 +140,7 @@ export default function EmployeeModal({ employeeName, calls, periodLabel, onClos
             {[
               { label: 'Total Calls',   value: total             },
               { label: 'Avg Score',     value: `${avgScore}/10`  },
-              { label: 'Frustrated',    value: frustrated         },
+              { label: 'Priority',      value: frustrated         },
               { label: 'Satisfaction',  value: `${satisfactionRate}%` },
             ].map(({ label, value }) => (
               <div key={label} className="bg-brand-bg rounded-xl p-3 text-center border border-brand-border">
@@ -237,7 +237,7 @@ export default function EmployeeModal({ employeeName, calls, periodLabel, onClos
                         </td>
                         <td className="px-3 py-2">
                           {call.frustrated
-                            ? <span className="text-red-500 text-[11px] font-bold">⚠ Frustrated</span>
+                            ? <span className="text-red-500 text-[11px] font-bold">⚠ Priority</span>
                             : <span className="text-brand-muted text-[11px]">Positive</span>}
                         </td>
                       </tr>

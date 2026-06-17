@@ -49,7 +49,7 @@ export default function ResolutionTracker({ calls, statuses }) {
       <div className="px-6 py-4 border-b border-brand-border">
         <h2 className="text-brand-heading font-semibold text-sm">Issue Resolution Tracker</h2>
         <p className="text-brand-muted text-[11px] mt-0.5">
-          Track follow-up progress on frustrated calls
+          Track follow-up progress on priority calls
         </p>
       </div>
 
@@ -84,7 +84,7 @@ export default function ResolutionTracker({ calls, statuses }) {
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-brand-muted">
               <span className="font-semibold text-brand-text">{resolved}</span> of{' '}
-              <span className="font-semibold text-brand-text">{total}</span> frustrated calls resolved
+              <span className="font-semibold text-brand-text">{total}</span> priority calls resolved
             </span>
             <span className="font-bold" style={{ color: G }}>{pct}%</span>
           </div>

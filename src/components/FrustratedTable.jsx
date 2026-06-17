@@ -112,11 +112,11 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
         <div>
           <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse-dot glow-pulse-red inline-block flex-shrink-0" />
-            Frustrated Calls
+            Priority Calls
           </h2>
           <p className="text-brand-muted text-[11px] mt-0.5">
             {calls.length === 0
-              ? 'No frustrated calls this period'
+              ? 'No priority calls this period'
               : `${actionRequired} pending · ${inProgress} in progress · ${resolved} resolved`}
           </p>
         </div>
@@ -163,7 +163,7 @@ export default function FrustratedTable({ calls, statuses, setStatus, onEmployee
                     <svg viewBox="0 0 24 24" fill="none" stroke={G} strokeWidth="1.5" strokeLinecap="round" className="w-10 h-10">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
                     </svg>
-                    <p className="text-brand-muted text-sm">All clear — no frustrated calls this period</p>
+                    <p className="text-brand-muted text-sm">All clear — no priority calls this period</p>
                   </div>
                 </td>
               </tr>

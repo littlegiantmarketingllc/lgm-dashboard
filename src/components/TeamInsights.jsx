@@ -39,7 +39,7 @@ function generate(calls, prevCalls) {
   if (worstEmp && worstEmp.rate > 0) {
     insights.push({
       icon: '⚠️', color: '#EF4444',
-      text: `${worstEmp.name} has the highest frustrated call rate at ${worstEmp.rate}% — may need coaching support`,
+      text: `${worstEmp.name} has the highest priority call rate at ${worstEmp.rate}% — may benefit from additional support`,
     })
   }
 

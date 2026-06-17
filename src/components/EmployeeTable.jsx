@@ -165,7 +165,7 @@ export default function EmployeeTable({ employees, onEmployeeClick, onCoachingCl
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden sm:table-cell">Calls</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Score</th>
                 <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted hidden md:table-cell">Trend</th>
-                <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Frustrated</th>
+                <th className="px-3 sm:px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted">Priority</th>
               </tr>
             </thead>
             <tbody>

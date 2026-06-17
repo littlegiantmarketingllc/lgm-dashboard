@@ -285,7 +285,7 @@ export default function EmployeeDetailModal({
                   {stats.frustrated > 0 && (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-center">
                       <p className="num text-2xl font-bold text-red-500">{stats.frustrated}</p>
-                      <p className="text-[10px] text-red-400">Frustrated</p>
+                      <p className="text-[10px] text-red-400">Priority</p>
                     </div>
                   )}
                 </div>
@@ -364,7 +364,7 @@ export default function EmployeeDetailModal({
           {frustTotal > 0 && (
             <div className="px-6 py-5">
               <SectionHead
-                title={`Frustrated Calls`}
+                title={`Priority Calls`}
                 badge={
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
                     style={frustDone === frustTotal
@@ -549,7 +549,7 @@ export default function EmployeeDetailModal({
                         <td className="py-2.5 pr-3">
                           <div className="flex items-center gap-1.5">
                             {call.frustratedFlag && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Frustrated" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Priority" />
                             )}
                             <span className="text-[12px] font-medium text-brand-text hover:text-brand-green transition-colors truncate max-w-[120px]">
                               {call.customer || '—'}
