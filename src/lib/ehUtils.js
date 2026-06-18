@@ -16,7 +16,20 @@ export function scoreBg(s) {
 }
 
 // ─── Date window ──────────────────────────────────────────────────────────────
-export function todayStr() { return format(new Date(), 'yyyy-MM-dd') }
+// Call dates/times are stored in US Eastern Time (see n8n pipeline), so "today"
+// must be computed in ET regardless of the viewer's own browser timezone —
+// otherwise a viewer ahead of ET (e.g. Pakistan) sees "today" roll over hours early.
+function nowET() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(new Date())
+  const get = type => Number(parts.find(p => p.type === type).value)
+  return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+}
+
+export function todayStr() { return format(nowET(), 'yyyy-MM-dd') }
 
 export function getDateWindow(filter) {
   const today = todayStr()
@@ -24,7 +37,7 @@ export function getDateWindow(filter) {
   if (filter.type === 'today')  return { from: today, to: today }
   if (filter.type === 'custom') return { from: filter.from || today, to: filter.to || today }
   const days = parseInt(filter.type)
-  return { from: format(subDays(new Date(), days), 'yyyy-MM-dd'), to: today }
+  return { from: format(subDays(nowET(), days), 'yyyy-MM-dd'), to: today }
 }
 
 export function filterCalls(calls, filter) {
@@ -35,8 +48,8 @@ export function filterCalls(calls, filter) {
 export function getPrevCalls(calls, filter) {
   if (['all', 'today', 'custom'].includes(filter.type)) return []
   const days = parseInt(filter.type)
-  const to   = format(subDays(new Date(), days + 1), 'yyyy-MM-dd')
-  const from = format(subDays(new Date(), days * 2), 'yyyy-MM-dd')
+  const to   = format(subDays(nowET(), days + 1), 'yyyy-MM-dd')
+  const from = format(subDays(nowET(), days * 2), 'yyyy-MM-dd')
   return calls.filter(c => c.date >= from && c.date <= to)
 }
 
@@ -156,7 +169,7 @@ export function calcTopPerformer(calls) {
 export function buildChartData(calls, filter) {
   const days  = ['all', 'custom'].includes(filter.type)
     ? 30 : filter.type === 'today' ? 1 : Math.min(parseInt(filter.type), 30)
-  const today = new Date()
+  const today = nowET()
   return Array.from({ length: days }, (_, i) => {
     const d    = subDays(today, days - 1 - i)
     const dStr = format(d, 'yyyy-MM-dd')
@@ -272,7 +285,7 @@ export function buildBehaviorInsights(calls) {
 export function timeAgo(dateStr) {
   if (!dateStr) return ''
   try {
-    const days = differenceInDays(new Date(), parseISO(dateStr))
+    const days = differenceInDays(nowET(), parseISO(dateStr))
     if (days === 0) return 'Today'
     if (days === 1) return 'Yesterday'
     if (days < 7)  return `${days}d ago`
