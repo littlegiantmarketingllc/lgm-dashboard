@@ -35,6 +35,10 @@ export function getDateWindow(filter) {
   const today = todayStr()
   if (filter.type === 'all')    return { from: '0000-01-01', to: '9999-12-31' }
   if (filter.type === 'today')  return { from: today, to: today }
+  if (filter.type === 'yesterday') {
+    const y = format(subDays(nowET(), 1), 'yyyy-MM-dd')
+    return { from: y, to: y }
+  }
   if (filter.type === 'custom') return { from: filter.from || today, to: filter.to || today }
   const days = parseInt(filter.type)
   return { from: format(subDays(nowET(), days), 'yyyy-MM-dd'), to: today }
@@ -46,7 +50,7 @@ export function filterCalls(calls, filter) {
 }
 
 export function getPrevCalls(calls, filter) {
-  if (['all', 'today', 'custom'].includes(filter.type)) return []
+  if (['all', 'today', 'yesterday', 'custom'].includes(filter.type)) return []
   const days = parseInt(filter.type)
   const to   = format(subDays(nowET(), days + 1), 'yyyy-MM-dd')
   const from = format(subDays(nowET(), days * 2), 'yyyy-MM-dd')
@@ -168,10 +172,10 @@ export function calcTopPerformer(calls) {
 // ─── Chart data (unique meetings per day) ────────────────────────────────────
 export function buildChartData(calls, filter) {
   const days  = ['all', 'custom'].includes(filter.type)
-    ? 30 : filter.type === 'today' ? 1 : Math.min(parseInt(filter.type), 30)
-  const today = nowET()
+    ? 30 : (filter.type === 'today' || filter.type === 'yesterday') ? 1 : Math.min(parseInt(filter.type), 30)
+  const anchor = filter.type === 'yesterday' ? subDays(nowET(), 1) : nowET()
   return Array.from({ length: days }, (_, i) => {
-    const d    = subDays(today, days - 1 - i)
+    const d    = subDays(anchor, days - 1 - i)
     const dStr = format(d, 'yyyy-MM-dd')
     const dayRows = calls.filter(c => c.date === dStr)
     const dayMeetings = new Map()

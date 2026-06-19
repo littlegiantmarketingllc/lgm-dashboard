@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 const G = '#8CC63F'
 
 const RANGE_OPTIONS = [
-  { label: 'Today',  value: 'today' },
+  { label: 'Today',     value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
   { label: '2d',     value: '2d' },
   { label: '7d',     value: '7d' },
   { label: '14d',    value: '14d' },

@@ -11,7 +11,8 @@ const RED  = '#EF4444'
 const GOLD = '#F59E0B'
 
 const RANGE_OPTIONS = [
-  { label: 'Today', value: 'today' },
+  { label: 'Today',     value: 'today'     },
+  { label: 'Yesterday', value: 'yesterday' },
   { label: '2d',    value: '2'     },
   { label: '7d',    value: '7'     },
   { label: '14d',   value: '14'    },

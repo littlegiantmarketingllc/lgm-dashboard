@@ -145,7 +145,7 @@ export default function App() {
     [calls]
   )
 
-  const canCompare = prevCalls.length >= 3 && !['all', 'today', 'custom'].includes(filter.type)
+  const canCompare = prevCalls.length >= 3 && !['all', 'today', 'yesterday', 'custom'].includes(filter.type)
   const trends = useMemo(() => ({
     total:      canCompare ? (summary.total      - prevSummary.total)      : null,
     positive:   canCompare ? (summary.positive   - prevSummary.positive)   : null,
