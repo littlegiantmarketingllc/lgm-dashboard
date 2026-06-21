@@ -6,6 +6,7 @@ import {
   scoreAccount, classify, isAtRisk, isUpsellReady,
   recommendAction, dmVsAgent, avgSubscription,
   concentrationRisk, revenueAtRisk, potentialUpsellMRR,
+  activeAccounts, avgWalletSpend,
 } from '../../lib/healthEngine'
 import HealthFilterBar         from './HealthFilterBar'
 import HealthSummaryCards      from './HealthSummaryCards'
@@ -173,6 +174,8 @@ export default function HealthDashboard({ filters, setFilters }) {
   const riskRevenue     = useMemo(() => revenueAtRisk(atRiskAccounts),                                    [atRiskAccounts])
   const upsellMRR       = useMemo(() => potentialUpsellMRR(upsellAccounts),                               [upsellAccounts])
   const concRisk        = useMemo(() => concentrationRisk(filteredAccounts),                              [filteredAccounts])
+  const activeAccts     = useMemo(() => activeAccounts(filteredAccounts),                                 [filteredAccounts])
+  const walletStats     = useMemo(() => avgWalletSpend(filteredAccounts),                                 [filteredAccounts])
 
   const avgHealthDm    = useMemo(() => {
     const dm = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
@@ -269,6 +272,9 @@ export default function HealthDashboard({ filters, setFilters }) {
         medianSub={subStats.median}
         dmCount={dmCount}
         agentCount={agentCount}
+        activeCount={activeAccts.length}
+        avgWallet={walletStats.mean}
+        medianWallet={walletStats.median}
       />
 
       {/* 2. DM vs Agent breakdown */}

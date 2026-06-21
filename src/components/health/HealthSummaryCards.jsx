@@ -34,18 +34,25 @@ function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefi
   )
 }
 
-export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount }) {
+export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount, activeCount, avgWallet, medianWallet }) {
   const totalMRR   = accounts.reduce((s, a) => s + (a.totalRev || 0), 0)
   const avgPerAcct = accounts.length ? Math.round(totalMRR / accounts.length) : 0
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       <Card
         label="Total Accounts"
         value={accounts.length}
         sub={`${dmCount} DM · ${agentCount} Agent`}
         icon="🏢"
         delay={0}
+      />
+      <Card
+        label="Active Accounts"
+        value={activeCount}
+        sub={`${accounts.length ? Math.round(activeCount / accounts.length * 100) : 0}% of total have transactions`}
+        icon="🟢"
+        delay={30}
       />
       <Card
         label="Total MRR"
@@ -86,6 +93,14 @@ export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellRe
         icon="📊"
         prefix="$"
         delay={300}
+      />
+      <Card
+        label="Avg Wallet Spend"
+        value={Math.round(avgWallet || 0)}
+        sub={`Median ${fmt(medianWallet || 0)}/mo`}
+        icon="💳"
+        prefix="$"
+        delay={360}
       />
     </div>
   )
