@@ -275,6 +275,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         activeCount={activeAccts.length}
         avgWallet={walletStats.mean}
         medianWallet={walletStats.median}
+        walletCount={walletStats.count}
       />
 
       {/* 2. DM vs Agent breakdown */}
