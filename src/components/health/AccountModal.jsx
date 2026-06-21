@@ -150,9 +150,9 @@ export default function AccountModal({ account, onClose }) {
                 { label: 'Plan Price',        value: fmt(account.planPrice)       },
                 { label: 'Monthly User Sub',  value: fmt(account.monthlyUserSub)  },
                 { label: 'Add-ons',           value: account.addOns ? fmt(account.addOns) : '—' },
-                { label: 'LC Wallet',         value: account.lcWalletCharges ? fmt(account.lcWalletCharges) : '—' },
+                { label: 'LC Agent Charges',  value: account.lcWalletCharges ? fmt(account.lcWalletCharges) : '—' },
                 { label: 'Annual Subs',       value: account.annualSubs ? fmt(account.annualSubs) : '—' },
-                { label: 'Gross Profit',      value: fmtGP(account.gp) },
+                { label: 'Agency Gross Profit', value: fmtGP(account.gp) },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-lg bg-brand-bg border border-brand-border px-3 py-2.5">
                   <p className="text-[10px] text-brand-muted uppercase tracking-wider">{label}</p>
@@ -160,6 +160,61 @@ export default function AccountModal({ account, onClose }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* LC cost leakage */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-3">LC Infrastructure Profitability</p>
+            <div className={`rounded-xl border px-4 py-3 flex items-center justify-between ${
+              account.lcAgencyGrossProfit < 0 ? 'border-red-200 bg-red-50' : 'border-brand-border bg-brand-bg'
+            }`}>
+              <div>
+                <p className="text-[11px] text-brand-muted">LC Agency Costs vs. what we charge</p>
+                <p className="num text-[13px] font-semibold mt-0.5" style={{ color: account.lcAgencyGrossProfit < 0 ? RED : undefined }}>
+                  {account.lcAgencyGrossProfit < 0 ? `Losing ${fmt(Math.abs(account.lcAgencyGrossProfit))}/mo` : `+${fmt(account.lcAgencyGrossProfit || 0)}/mo`}
+                </p>
+              </div>
+              <p className="text-[10px] text-brand-muted text-right">Cost: {fmt(account.lcAgencyCosts || 0)}/mo</p>
+            </div>
+          </div>
+
+          {/* Account identity / plan / data health */}
+          <div className="rounded-xl border border-brand-border p-4 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Account Details</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[12px]">
+              <div>
+                <p className="text-[10px] text-brand-muted uppercase tracking-wider">Location ID</p>
+                <p className="font-mono text-[11px] text-brand-text mt-0.5 truncate">{account.locationId || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-brand-muted uppercase tracking-wider">Current Plan</p>
+                <p className="font-medium text-brand-text mt-0.5 truncate" title={account.currentPlanName}>{account.currentPlanName?.split(':')[0] || '—'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-brand-muted uppercase tracking-wider">Term</p>
+                <p className="font-medium text-brand-text mt-0.5">{account.term || '—'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {account.hasDataIssue && (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full" title={account.dataHealthNotes}>
+                  🩹 Data issue flagged
+                </span>
+              )}
+              {account.needsReview && (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  🔍 Needs Review
+                </span>
+              )}
+              {Math.abs(account.whatIfDelta || 0) >= 10 && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{ color: G, background: `${G}10`, borderColor: `${G}28` }}>
+                  💡 Plan change modeled: {account.whatIfDelta > 0 ? '+' : ''}{fmt(account.whatIfDelta)}/mo
+                </span>
+              )}
+            </div>
+            {account.dataHealthNotes && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 whitespace-pre-line">{account.dataHealthNotes}</p>
+            )}
           </div>
 
           {/* Account details */}

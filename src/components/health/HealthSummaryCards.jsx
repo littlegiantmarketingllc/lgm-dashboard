@@ -34,12 +34,12 @@ function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefi
   )
 }
 
-export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount, activeCount, avgWallet, medianWallet, walletCount }) {
+export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount, activeCount, avgWallet, medianWallet, walletCount, lcLeakageCount, lcLeakageTotal }) {
   const totalMRR   = accounts.reduce((s, a) => s + (a.totalRev || 0), 0)
   const avgPerAcct = accounts.length ? Math.round(totalMRR / accounts.length) : 0
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       <Card
         label="Total Accounts"
         value={accounts.length}
@@ -101,6 +101,15 @@ export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellRe
         icon="💳"
         prefix="$"
         delay={360}
+      />
+      <Card
+        label="LC Cost Leakage"
+        value={Math.round(lcLeakageTotal || 0)}
+        sub={`${lcLeakageCount || 0} accounts costing more in LC than we charge`}
+        icon="🩸"
+        accentColor="#EF4444"
+        prefix="$"
+        delay={420}
       />
     </div>
   )

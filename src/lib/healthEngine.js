@@ -180,3 +180,28 @@ export function avgWalletSpend(accounts) {
   const median = vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid]
   return { mean: +mean.toFixed(2), median: +median.toFixed(2), count: withWallet.length }
 }
+
+// LC infrastructure cost pass-through: accounts where what we charge for LC
+// doesn't cover what LC actually costs us. Separate from overall profitability.
+export function isLcLeaking(account) {
+  return (account.lcAgencyGrossProfit ?? 0) < 0
+}
+
+export function lcCostLeakage(accounts) {
+  const leaking = accounts.filter(isLcLeaking)
+  const totalLoss = leaking.reduce((s, a) => s + Math.abs(a.lcAgencyGrossProfit || 0), 0)
+  return { count: leaking.length, totalLoss, accounts: leaking }
+}
+
+// Accounts with a flagged DataHealthStatus discrepancy — still counted in all
+// totals, just surfaced so the team knows which numbers might need a closer look.
+export function dataHealthSummary(accounts) {
+  const flagged = accounts.filter(a => a.hasDataIssue)
+  return { flaggedCount: flagged.length, totalCount: accounts.length, accounts: flagged }
+}
+
+// Accounts where a real plan-change scenario has been modeled with a
+// meaningful $ impact (positive or negative), not just left equal to current.
+export function whatIfOpportunities(accounts, minDelta = 10) {
+  return accounts.filter(a => Math.abs(a.whatIfDelta || 0) >= minDelta)
+}

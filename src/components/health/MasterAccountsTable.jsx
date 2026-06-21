@@ -122,10 +122,11 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
                 <td className="pl-5 pr-3 py-2.5">
                   <button
                     onClick={() => onAccountClick?.(a)}
-                    className="text-[12px] font-medium text-brand-text hover:underline text-left"
+                    className="text-[12px] font-medium text-brand-text hover:underline text-left inline-flex items-center gap-1.5"
                     style={{ color: a._health?.band === 'at_risk' ? RED : undefined }}
                   >
                     {a.accountName}
+                    {a.hasDataIssue && <span title="Flagged data issue — see account detail">🩹</span>}
                   </button>
                 </td>
                 <td className="px-3 py-2.5">

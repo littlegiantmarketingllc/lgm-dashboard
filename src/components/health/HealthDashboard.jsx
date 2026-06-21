@@ -6,7 +6,7 @@ import {
   scoreAccount, classify, isAtRisk, isUpsellReady,
   recommendAction, dmVsAgent, avgSubscription,
   concentrationRisk, revenueAtRisk, potentialUpsellMRR,
-  activeAccounts, avgWalletSpend,
+  activeAccounts, avgWalletSpend, lcCostLeakage, dataHealthSummary,
 } from '../../lib/healthEngine'
 import HealthFilterBar         from './HealthFilterBar'
 import HealthSummaryCards      from './HealthSummaryCards'
@@ -176,6 +176,8 @@ export default function HealthDashboard({ filters, setFilters }) {
   const concRisk        = useMemo(() => concentrationRisk(filteredAccounts),                              [filteredAccounts])
   const activeAccts     = useMemo(() => activeAccounts(filteredAccounts),                                 [filteredAccounts])
   const walletStats     = useMemo(() => avgWalletSpend(filteredAccounts),                                 [filteredAccounts])
+  const lcLeakage       = useMemo(() => lcCostLeakage(filteredAccounts),                                  [filteredAccounts])
+  const dataHealth      = useMemo(() => dataHealthSummary(filteredAccounts),                               [filteredAccounts])
 
   const avgHealthDm    = useMemo(() => {
     const dm = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
@@ -219,14 +221,22 @@ export default function HealthDashboard({ filters, setFilters }) {
           </button>
         </div>
 
-        {concRisk > 0 && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
-            concRisk > 40 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-brand-muted bg-brand-bg border-brand-border'
-          }`}>
-            {concRisk > 40 ? '⚠' : '📊'} Top 10 accounts = {concRisk}% of MRR
-            {concRisk > 40 && ' — concentration risk'}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {dataHealth.flaggedCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold text-amber-700 bg-amber-50 border-amber-200"
+              title="Accounts with a flagged billing record discrepancy — still included in all totals, just worth a closer look">
+              🩹 {dataHealth.flaggedCount} of {dataHealth.totalCount} accounts have a flagged data issue
+            </div>
+          )}
+          {concRisk > 0 && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
+              concRisk > 40 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-brand-muted bg-brand-bg border-brand-border'
+            }`}>
+              {concRisk > 40 ? '⚠' : '📊'} Top 10 accounts = {concRisk}% of MRR
+              {concRisk > 40 && ' — concentration risk'}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stale data warning */}
@@ -276,6 +286,9 @@ export default function HealthDashboard({ filters, setFilters }) {
         avgWallet={walletStats.mean}
         medianWallet={walletStats.median}
         walletCount={walletStats.count}
+        lcLeakageCount={lcLeakage.count}
+        lcLeakageTotal={lcLeakage.totalLoss}
+        dataHealthFlagged={dataHealth.flaggedCount}
       />
 
       {/* 2. DM vs Agent breakdown */}
