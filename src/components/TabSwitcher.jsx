@@ -1,6 +1,6 @@
 const G = '#8CC63F'
 const TABS = [
-  { id: 'qc',     label: 'Quality Control' },
+  { id: 'qc',     label: 'Team AI Assistant' },
   { id: 'health', label: 'Customer Health' },
 ]
 

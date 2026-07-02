@@ -88,7 +88,7 @@ export default function EmployeeProfileModal({ employeeName, allCalls, onClose, 
     const recs = empCalls.map(c => c.coachingRecs).filter(Boolean)
     const freq = {}
     for (const r of recs) freq[r] = (freq[r] || 0) + 1
-    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3)
   }, [empCalls])
 
   const openItems = useMemo(() =>

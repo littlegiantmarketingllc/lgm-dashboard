@@ -107,15 +107,12 @@ function LogoMark() {
         </svg>
       </div>
       <div className="hidden sm:block leading-tight min-w-0">
-        <p className="shimmer-text text-[10px] font-extrabold tracking-[0.2em] uppercase leading-none">
-          Little Giant Marketing
-        </p>
-        <p className="text-brand-heading font-semibold text-[14px] leading-tight mt-0.5 truncate">
-          Employee Health
+        <p className="text-brand-heading font-semibold text-[14px] leading-tight truncate">
+          Team AI Assistant
         </p>
       </div>
       <p className="sm:hidden text-brand-heading font-semibold text-[13px] whitespace-nowrap">
-        Employee Health
+        Team AI Assistant
       </p>
     </div>
   )

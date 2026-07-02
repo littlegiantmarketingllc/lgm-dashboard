@@ -245,7 +245,7 @@ export default function App() {
       </div>
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; Employee Health Dashboard
+        Little Giant Marketing &mdash; Team AI Assistant
       </footer>
 
       {/* ── Modal stack — only render the top of the stack ────────────────── */}

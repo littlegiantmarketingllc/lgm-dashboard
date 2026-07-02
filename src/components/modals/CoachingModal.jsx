@@ -31,7 +31,7 @@ export default function CoachingModal({
     for (const c of allCalls.filter(c => c.employee === employeeName))
       for (const r of (c.coachingRecs || []))
         if (r && !seen.has(r)) { seen.add(r); recs.push(r) }
-    return recs
+    return recs.slice(0, 3)
   }, [allCalls, employeeName])
 
   useEffect(() => {
