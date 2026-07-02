@@ -1,58 +1,82 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
-const SYNC_URL = import.meta.env.VITE_COACHING_SYNC_URL || ''
-const LS_KEY   = 'lgm-coaching-status'
-const POLL_MS  = 15_000
+const APP_ID  = 'e6f5964b-bea0-49bb-b1c8-d687f49535ab'
+const API_KEY = import.meta.env.VITE_APPSHEET_API_KEY || ''
+const TABLE   = 'CheckboxState'
+const ROW_KEY = 'coaching_state'
+const LS_KEY  = 'lgm-coaching-status'
+const POLL_MS = 15_000
+
+const ENDPOINT = `https://api.appsheet.com/api/v2/apps/${APP_ID}/tables/${TABLE}/Action`
 
 function loadLocal() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') } catch { return {} }
 }
-
 function saveLocal(val) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(val)) } catch {}
 }
 
-async function fetchRemote() {
-  const res = await fetch(SYNC_URL, { cache: 'no-store' })
-  if (!res.ok) throw new Error(res.status)
-  const data = await res.json()
-  if (typeof data !== 'object' || data === null) throw new Error('bad payload')
-  return data
-}
-
-function writeRemote(next) {
-  if (!SYNC_URL) return
-  // mode: no-cors avoids CORS preflight; Apps Script receives body via e.postData.contents
-  fetch(SYNC_URL, {
+function appsheetCall(action, rows) {
+  return fetch(ENDPOINT, {
     method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(next),
-  }).catch(() => {})
+    headers: {
+      'ApplicationAccessKey': API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ Action: action, Properties: {}, Rows: rows }),
+  })
 }
 
 export function useCoachingStatus() {
   const [statuses, setStatuses] = useState(loadLocal)
+  const rowExists = useRef(null) // null=unknown, true=row in sheet, false=needs Add
 
-  // Sync from remote on mount + poll
-  useEffect(() => {
-    if (!SYNC_URL) return
-    let cancelled = false
-
-    async function poll() {
-      try {
-        const remote = await fetchRemote()
-        if (!cancelled) {
-          setStatuses(remote)
-          saveLocal(remote)
-        }
-      } catch {}
-    }
-
-    poll()
-    const id = setInterval(poll, POLL_MS)
-    return () => { cancelled = true; clearInterval(id) }
+  const applyRemote = useCallback((data) => {
+    setStatuses(data)
+    saveLocal(data)
   }, [])
+
+  // Read from AppSheet
+  const fetchRemote = useCallback(async () => {
+    if (!API_KEY) return
+    try {
+      const res = await appsheetCall('Find', [])
+      if (!res.ok) return
+      const rows = await res.json()
+      const row = Array.isArray(rows) ? rows.find(r => r.Key === ROW_KEY) : null
+      rowExists.current = !!row
+      if (row) applyRemote(JSON.parse(row.StateJSON || '{}'))
+    } catch {}
+  }, [applyRemote])
+
+  // Write to AppSheet (optimistic — called after local state already updated)
+  const writeRemote = useCallback(async (next) => {
+    if (!API_KEY) return
+    const payload = { Key: ROW_KEY, StateJSON: JSON.stringify(next) }
+    try {
+      if (rowExists.current === false) {
+        await appsheetCall('Add', [payload])
+        rowExists.current = true
+      } else {
+        const res = await appsheetCall('Edit', [payload])
+        if (res.ok) {
+          rowExists.current = true
+        } else if (rowExists.current === null) {
+          // Row may not exist yet — try Add
+          await appsheetCall('Add', [payload])
+          rowExists.current = true
+        }
+      }
+    } catch {}
+  }, [])
+
+  // Poll on mount
+  useEffect(() => {
+    if (!API_KEY) return
+    fetchRemote()
+    const id = setInterval(fetchRemote, POLL_MS)
+    return () => clearInterval(id)
+  }, [fetchRemote])
 
   const toggleRec = useCallback((employeeName, recIdx) => {
     setStatuses(prev => {
@@ -64,7 +88,7 @@ export function useCoachingStatus() {
       writeRemote(next)
       return next
     })
-  }, [])
+  }, [writeRemote])
 
   const isRecDone = useCallback((employeeName, recIdx) => {
     return Boolean(statuses[employeeName]?.[recIdx])
@@ -84,7 +108,7 @@ export function useCoachingStatus() {
       writeRemote(next)
       return next
     })
-  }, [])
+  }, [writeRemote])
 
   return { statuses, toggleRec, isRecDone, isCoachingComplete, resetEmployee }
 }
