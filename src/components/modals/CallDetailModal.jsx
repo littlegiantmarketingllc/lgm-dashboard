@@ -1,6 +1,23 @@
 import { useEffect, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { scoreColor, VERDICT_STYLE, SENTIMENT_STYLE, RISK_STYLE, STATUS_STYLE, G } from '../../lib/ehUtils'
+import { useActionStatus } from '../../hooks/useActionStatus'
+
+function Checkbox({ checked, onClick }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      className="w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all duration-200 focus:outline-none mt-0.5"
+      style={{ borderColor: checked ? G : '#D1D5DB', background: checked ? G : 'white' }}
+    >
+      {checked && (
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      )}
+    </button>
+  )
+}
 
 function ScoreBlock({ label, value }) {
   if (!value && value !== 0) return null
@@ -43,12 +60,24 @@ function Section({ title, children }) {
   )
 }
 
+function parseItems(str) {
+  if (!str?.trim()) return []
+  const text = str.trim()
+  if (text.includes('|'))  return text.split('|').map(s => s.trim()).filter(Boolean)
+  if (text.includes('\n')) return text.split('\n').map(s => s.trim()).filter(Boolean)
+  return [text]
+}
+
 export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, onEmployeeClick }) {
+  const { toggleAction, isDone } = useActionStatus()
+
   const rows = useMemo(() =>
     allCalls.filter(c => c.meetingId === meetingId),
     [allCalls, meetingId]
   )
   const primary = rows[0]
+
+  const actionItems = useMemo(() => parseItems(primary?.actionItems), [primary])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -77,6 +106,13 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, 
     ? (() => { try { return format(parseISO(primary.date), 'MMMM d, yyyy') } catch { return primary.date } })()
     : '—'
 
+  const hasFollowup   = !!(primary.followupOwner || primary.promisedDeadline)
+  const followupKey   = `${meetingId}-followup`
+  const followupDone  = isDone(followupKey)
+
+  const actionDone  = actionItems.filter((_, i) => isDone(`${meetingId}-ai-${i}`)).length
+  const actionTotal = actionItems.length
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="animate-backdrop-in absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -87,7 +123,6 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, 
         {/* Header */}
         <div className="px-6 py-5 border-b border-brand-border flex-shrink-0"
           style={{ background: 'linear-gradient(135deg, rgba(140,198,63,0.06) 0%, white 60%)' }}>
-          {/* Back navigation */}
           {onBack && (
             <button onClick={onBack}
               className="flex items-center gap-1.5 text-[11px] font-semibold text-brand-muted hover:text-brand-heading transition-colors mb-3 -mt-1 group">
@@ -207,20 +242,59 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, 
             </Section>
           )}
 
-          {(primary.actionItems || primary.followupOwner || primary.promisedDeadline) && (
-            <Section title="Action Items & Follow-up">
-              <div className="rounded-xl border border-brand-border bg-brand-bg p-3 space-y-2">
-                {primary.actionItems && (
-                  <p className="text-[12px] text-brand-text">{primary.actionItems}</p>
+          {/* ── Action Items & Follow-up (with checkboxes) ── */}
+          {(actionItems.length > 0 || hasFollowup) && (
+            <Section title={`Action Items & Follow-up${actionTotal > 0 ? ` — ${actionDone}/${actionTotal} done` : ''}`}>
+              <div className="space-y-2">
+
+                {/* One checkbox row per action item */}
+                {actionItems.map((item, i) => {
+                  const key  = `${meetingId}-ai-${i}`
+                  const done = isDone(key)
+                  return (
+                    <div key={i}
+                      className="flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200"
+                      style={{
+                        borderColor: done ? '#BBF7D0' : '#E5E7E5',
+                        background:  done ? '#F0FDF4' : '#F9FAF9',
+                        opacity: done ? 0.72 : 1,
+                      }}
+                    >
+                      <Checkbox checked={done} onClick={() => toggleAction(key)} />
+                      <span className={`text-[12px] leading-relaxed ${done ? 'line-through text-brand-muted' : 'text-brand-text'}`}>
+                        {item}
+                      </span>
+                    </div>
+                  )
+                })}
+
+                {/* Follow-up checkbox */}
+                {hasFollowup && (
+                  <div
+                    className="flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200"
+                    style={{
+                      borderColor: followupDone ? '#BBF7D0' : '#BFDBFE',
+                      background:  followupDone ? '#F0FDF4' : '#EFF6FF',
+                      opacity: followupDone ? 0.72 : 1,
+                    }}
+                  >
+                    <Checkbox checked={followupDone} onClick={() => toggleAction(followupKey)} />
+                    <div className={followupDone ? 'opacity-60' : ''}>
+                      <p className={`text-[11px] font-bold text-blue-600 mb-0.5 ${followupDone ? 'line-through' : ''}`}>
+                        Follow-up
+                      </p>
+                      <div className="flex flex-wrap gap-3 text-[11px] text-brand-muted">
+                        {primary.followupOwner && (
+                          <span>Owner: <strong className="text-brand-text">{primary.followupOwner}</strong></span>
+                        )}
+                        {primary.promisedDeadline && (
+                          <span>Deadline: <strong className="text-brand-text">{primary.promisedDeadline}</strong></span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <div className="flex flex-wrap gap-3 text-[11px] text-brand-muted">
-                  {primary.followupOwner && (
-                    <span>Owner: <strong className="text-brand-text">{primary.followupOwner}</strong></span>
-                  )}
-                  {primary.promisedDeadline && (
-                    <span>Deadline: <strong className="text-brand-text">{primary.promisedDeadline}</strong></span>
-                  )}
-                </div>
+
               </div>
             </Section>
           )}
