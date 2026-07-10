@@ -148,8 +148,16 @@ function rowToCall(row, colIdx, idx) {
 
   const overallScore   = parseScore(get(row, colIdx, 'Overall Score'))
   const frustratedFlag = parseFrustrated(get(row, colIdx, 'Frustrated Flag'))
+  const meetingIdVal   = get(row, colIdx, 'Meeting ID') || `row-${idx}`
   const callTypeRaw    = get(row, colIdx, 'Call Type') || get(row, colIdx, 'Type')
-  const callType       = callTypeRaw === 'Phone Call' ? 'Phone Call' : 'Meeting'
+  // If the sheet cell is blank, infer from Meeting ID: GHL- prefix → Phone Call, hex ID → Meeting
+  const callType = callTypeRaw === 'Phone Call'
+    ? 'Phone Call'
+    : callTypeRaw === 'Meeting'
+      ? 'Meeting'
+      : meetingIdVal.startsWith('GHL-')
+        ? 'Phone Call'
+        : 'Meeting'
 
   return {
     id:                  idx + 1,
@@ -182,7 +190,7 @@ function rowToCall(row, colIdx, idx) {
     frustrated:          frustratedFlag,
     frustratedFlag,
     coachingFlag:        get(row, colIdx, 'Coaching Flag').toLowerCase() === 'true',
-    meetingId:           get(row, colIdx, 'Meeting ID') || `row-${idx}`,
+    meetingId:           meetingIdVal,
     callType,
   }
 }
