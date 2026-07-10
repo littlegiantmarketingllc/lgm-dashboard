@@ -49,6 +49,10 @@ export default function RecentCallsFeed({ calls, onCallClick, onCustomerClick })
                     >
                       {call.customer}
                     </button>
+                    {call.callType === 'Phone Call'
+                      ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 bg-sky-50 text-sky-700 border-sky-200">Phone</span>
+                      : <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 bg-violet-50 text-violet-700 border-violet-200">Meeting</span>
+                    }
                     {call.category && (
                       <span className="text-[10px] text-brand-muted bg-brand-bg px-1.5 py-0.5 rounded flex-shrink-0">
                         {call.category}

@@ -127,23 +127,63 @@ function parseDuration(raw) {
   return isNaN(n) ? 0 : Math.max(0, Math.round(n))
 }
 
-// Sheet columns: Employee, Date, Time, Customer, Score, Frustrated, Category, Duration (min), Status, Call Summary
-function rowToCall(row, idx) {
-  const [employee, date, time, customer, score, frustrated, category, duration, , summary] = row
-  const emp = (employee ?? '').trim()
-  const dt  = parseDate(date)
+// Column-name lookup — works regardless of column order in the sheet.
+// Pass colIdx (built from the header row) so position changes never break parsing.
+function get(row, colIdx, name) {
+  let i = colIdx[name]
+  if (i === undefined) {
+    // case-insensitive fallback (handles "Follow-up Owner" vs "Follow-Up Owner")
+    const lower = name.toLowerCase()
+    for (const [k, v] of Object.entries(colIdx)) {
+      if (k.toLowerCase() === lower) { i = v; break }
+    }
+  }
+  return i !== undefined ? (row[i] ?? '').trim() : ''
+}
+
+function rowToCall(row, colIdx, idx) {
+  const emp = get(row, colIdx, 'Employee')
+  const dt  = parseDate(get(row, colIdx, 'Date'))
   if (!emp || !dt) return null
+
+  const overallScore   = parseScore(get(row, colIdx, 'Overall Score'))
+  const frustratedFlag = parseFrustrated(get(row, colIdx, 'Frustrated Flag'))
+  const callTypeRaw    = get(row, colIdx, 'Call Type')
+  const callType       = callTypeRaw === 'Phone Call' ? 'Phone Call' : 'Meeting'
+
   return {
-    id:         idx + 1,
-    employee:   emp,
-    date:       dt,
-    time:       (time ?? '').trim(),
-    customer:   (customer ?? '').trim(),
-    score:      parseScore(score),
-    frustrated: parseFrustrated(frustrated),
-    category:   (category ?? '').trim() || 'General',
-    duration:   parseDuration(duration),
-    summary:    (summary ?? '').trim(),
+    id:                  idx + 1,
+    _rowIdx:             idx,
+    employee:            emp,
+    date:                dt,
+    time:                get(row, colIdx, 'Time'),
+    customer:            get(row, colIdx, 'Customer'),
+    category:            get(row, colIdx, 'Category') || 'General',
+    duration:            parseDuration(get(row, colIdx, 'Duration (min)')),
+    status:              get(row, colIdx, 'Status'),
+    finalVerdict:        get(row, colIdx, 'Final Verdict'),
+    sentiment:           get(row, colIdx, 'Customer Sentiment'),
+    score:               overallScore,
+    overallScore,
+    commScore:           parseScore(get(row, colIdx, 'Communication Score')),
+    profScore:           parseScore(get(row, colIdx, 'Professionalism Score')),
+    prodKnowScore:       parseScore(get(row, colIdx, 'Product Knowledge Score')),
+    cxScore:             parseScore(get(row, colIdx, 'Customer Experience Score')),
+    positiveHighlights:  get(row, colIdx, 'Positive Highlights'),
+    areasForImprovement: get(row, colIdx, 'Areas for Improvement'),
+    redFlags:            get(row, colIdx, 'Red Flags'),
+    behaviorTags:        get(row, colIdx, 'Behavior Tags').split(',').map(t => t.trim()).filter(Boolean),
+    coachingRecs:        get(row, colIdx, 'Coaching Recommendations').split('|').map(t => t.trim()).filter(Boolean),
+    actionItems:         get(row, colIdx, 'Action Items'),
+    followUpOwner:       get(row, colIdx, 'Follow-Up Owner') || get(row, colIdx, 'Follow-up Owner'),
+    promisedDeadline:    get(row, colIdx, 'Promised Deadline'),
+    clientRiskLevel:     get(row, colIdx, 'Client Risk Level'),
+    summary:             get(row, colIdx, 'Summary'),
+    frustrated:          frustratedFlag,
+    frustratedFlag,
+    coachingFlag:        get(row, colIdx, 'Coaching Flag').toLowerCase() === 'true',
+    meetingId:           get(row, colIdx, 'Meeting ID') || `row-${idx}`,
+    callType,
   }
 }
 
@@ -192,9 +232,13 @@ export function useGoogleSheets() {
       const rows = parseCSV(text)
       if (rows.length < 2) throw new Error('Sheet appears to be empty — add a header row and at least one data row.')
 
+      // Build column-name → index map from the header row
+      const colIdx = {}
+      rows[0].forEach((h, i) => { colIdx[h.trim()] = i })
+
       const parsed = rows
         .slice(1)
-        .map((row, i) => rowToCall(row, i))
+        .map((row, i) => rowToCall(row, colIdx, i))
         .filter(Boolean)
 
       if (parsed.length === 0) {

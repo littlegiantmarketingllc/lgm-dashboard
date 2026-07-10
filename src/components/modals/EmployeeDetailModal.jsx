@@ -489,6 +489,7 @@ export default function EmployeeDetailModal({
                     <tr className="border-b border-brand-border">
                       <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted">Date</th>
                       <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted">Customer</th>
+                      <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted hidden sm:table-cell">Type</th>
                       <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted hidden sm:table-cell">Verdict</th>
                       <th className="py-2 pr-3 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted">Score</th>
                       <th className="py-2 text-left text-[10px] font-bold uppercase tracking-wider text-brand-muted hidden sm:table-cell">Status</th>
@@ -515,6 +516,12 @@ export default function EmployeeDetailModal({
                               )}
                             </div>
                           </div>
+                        </td>
+                        <td className="py-2.5 pr-3 hidden sm:table-cell">
+                          {call.callType === 'Phone Call'
+                            ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200 whitespace-nowrap">Phone</span>
+                            : <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200 whitespace-nowrap">Meeting</span>
+                          }
                         </td>
                         <td className="py-2.5 pr-3 hidden sm:table-cell">
                           {call.finalVerdict
