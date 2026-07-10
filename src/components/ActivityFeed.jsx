@@ -59,6 +59,10 @@ function FeedRow({ call, isExpanded, onToggle, onEmployeeClick, onCallClick }) {
             </button>
             <span className="flex-shrink-0">·</span>
             <span className="truncate">{call.category}</span>
+            {call.callType === 'Phone Call'
+              ? <span className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200">Phone</span>
+              : <span className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200">Meeting</span>
+            }
           </div>
           {call.finalVerdict && (
             <p className="text-[10px] text-brand-muted/70 mt-0.5 truncate">{call.finalVerdict}</p>

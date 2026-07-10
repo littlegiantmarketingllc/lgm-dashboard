@@ -141,6 +141,10 @@ export default function CallDetailModal({ meetingId, allCalls, onClose, onBack, 
                 {primary.category && <><span>·</span><span>{primary.category}</span></>}
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
+                {primary.callType === 'Phone Call'
+                  ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-sky-50 text-sky-700 border-sky-200">Phone Call</span>
+                  : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-violet-50 text-violet-700 border-violet-200">Meeting</span>
+                }
                 <Badge text={primary.finalVerdict} styleMap={VERDICT_STYLE} />
                 <Badge text={primary.sentiment} styleMap={SENTIMENT_STYLE} />
                 {primary.riskLevel && <Badge text={`Risk: ${primary.riskLevel}`} styleMap={RISK_STYLE} />}
