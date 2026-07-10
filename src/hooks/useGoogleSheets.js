@@ -148,7 +148,7 @@ function rowToCall(row, colIdx, idx) {
 
   const overallScore   = parseScore(get(row, colIdx, 'Overall Score'))
   const frustratedFlag = parseFrustrated(get(row, colIdx, 'Frustrated Flag'))
-  const callTypeRaw    = get(row, colIdx, 'Call Type')
+  const callTypeRaw    = get(row, colIdx, 'Call Type') || get(row, colIdx, 'Type')
   const callType       = callTypeRaw === 'Phone Call' ? 'Phone Call' : 'Meeting'
 
   return {
