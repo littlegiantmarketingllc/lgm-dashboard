@@ -137,7 +137,7 @@ export default function EmployeeProfileModal({ employeeName, allCalls, onClose, 
                   </span>
                   {stats.coachingFlag && (
                     <span className="text-[11px] px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">
-                      🎓 Coaching Required
+                      🎓 Coaching Notes
                     </span>
                   )}
                 </div>

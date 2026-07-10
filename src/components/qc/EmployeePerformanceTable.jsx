@@ -58,7 +58,7 @@ const COLUMNS = [
   { key: 'avgOverall', label: 'Overall',         sortable: true  },
   { key: 'topVerdict', label: 'Verdict',         sortable: false },
   { key: 'trend',      label: 'Trend',           sortable: false },
-  { key: 'coaching',   label: 'Coach',           sortable: true  },
+  { key: 'coaching',   label: 'Coaching',         sortable: true  },
 ]
 
 export default function EmployeePerformanceTable({ calls, onEmployeeClick }) {
