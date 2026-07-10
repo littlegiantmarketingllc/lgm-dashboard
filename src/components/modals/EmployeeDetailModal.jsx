@@ -431,68 +431,22 @@ export default function EmployeeDetailModal({
             </div>
           )}
 
-          {/* Coaching Recommendations — checkboxes synced with CoachingModal */}
-          {coachingRecs.length > 0 && (() => {
-            const empCoachStatus = coachingStatuses?.[employeeName] || {}
-            const coachDone  = coachingRecs.filter((_, i) => empCoachStatus[i]).length
-            const coachTotal = coachingRecs.length
-            return (
-              <div className="px-6 py-5">
-                <SectionHead
-                  title={`Coaching Recommendations (${coachTotal})`}
-                  badge={
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                        style={coachDone === coachTotal
-                          ? { color: G,      background: `${G}12`,     borderColor: `${G}28` }
-                          : { color: GOLD,   background: `${GOLD}12`,  borderColor: `${GOLD}28` }}>
-                        {coachDone}/{coachTotal} reviewed
-                      </span>
-                      <button
-                        onClick={() => onCoachingClick?.(employeeName)}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
-                        style={{ color: GOLD, background: `${GOLD}08`, borderColor: `${GOLD}28` }}
-                        title="Open coaching review window"
-                      >
-                        Open Review →
-                      </button>
-                    </div>
-                  }
-                />
-                <ProgressBar done={coachDone} total={coachTotal} color={coachDone === coachTotal ? G : GOLD} />
-                <div className="mt-3 space-y-2">
-                  {coachingRecs.map((rec, i) => {
-                    const done = Boolean(empCoachStatus[i])
-                    return (
-                      <div key={i}
-                        className="flex items-start gap-3 rounded-xl border p-3 transition-all duration-200"
-                        style={{
-                          borderColor: done ? '#BBF7D0' : `${GOLD}35`,
-                          background:  done ? '#F0FDF4' : `${GOLD}05`,
-                          opacity: done ? 0.72 : 1,
-                        }}>
-                        <Checkbox checked={done} onClick={() => onToggleRec?.(employeeName, i)} />
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          <span className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold"
-                            style={{ borderColor: done ? '#BBF7D0' : '#FDE68A', color: done ? '#16a34a' : GOLD, background: done ? '#F0FDF4' : '#FFFBEB' }}>
-                            {i + 1}
-                          </span>
-                          <p className={`text-[12px] leading-relaxed ${done ? 'line-through text-brand-muted' : 'text-brand-text'}`}>
-                            {rec}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                {coachDone === coachTotal && (
-                  <p className="text-[11px] font-semibold text-center mt-3" style={{ color: G }}>
-                    ✓ All coaching items reviewed!
-                  </p>
-                )}
+          {/* Coaching Notes — informational bullet points */}
+          {coachingRecs.length > 0 && (
+            <div className="px-6 py-5">
+              <SectionHead title="Coaching Notes" />
+              <div className="mt-3 space-y-2">
+                {coachingRecs.map((rec, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-yellow-50 border border-yellow-200 flex items-center justify-center text-[10px] font-bold text-yellow-600">
+                      {i + 1}
+                    </span>
+                    <p className="text-[12px] leading-relaxed text-brand-text">{rec}</p>
+                  </div>
+                ))}
               </div>
-            )
-          })()}
+            </div>
+          )}
 
           {/* Behavior Tags */}
           {(posTags.length > 0 || negTags.length > 0) && (
