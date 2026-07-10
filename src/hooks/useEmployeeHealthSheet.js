@@ -158,6 +158,8 @@ const HEADER_MAP = {
   'meeting id':                    'meetingId',
   'meetingid':                     'meetingId',
   'id':                            'meetingId',
+  'call type':                     'callType',
+  'type':                          'callType',
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -211,6 +213,13 @@ function buildRow(header, row, rowIdx) {
     frustratedFlag,
     coachingFlag: parseBool(obj.coachingFlag),
     meetingId:   (obj.meetingId ?? '').trim() || `row-${rowIdx}`,
+    callType:    (() => {
+      const raw = (obj.callType ?? '').trim()
+      const mid = (obj.meetingId ?? '').trim() || `row-${rowIdx}`
+      if (raw === 'Phone Call') return 'Phone Call'
+      if (raw === 'Meeting')    return 'Meeting'
+      return mid.startsWith('GHL-') ? 'Phone Call' : 'Meeting'
+    })(),
     // backward compat aliases
     score:       overallScore,
     frustrated:  frustratedFlag,
