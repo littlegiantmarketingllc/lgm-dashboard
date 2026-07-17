@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   scoreColor, G, filterCalls, fmtMins,
@@ -10,6 +10,26 @@ import EmployeeAvatar from '../EmployeeAvatar'
 const RED  = '#EF4444'
 const GOLD = '#F59E0B'
 
+const RANGE_OPTIONS = [
+  { label: 'Today',     value: 'today'     },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: '2d',        value: '2'         },
+  { label: '7d',        value: '7'         },
+  { label: '14d',       value: '14'        },
+  { label: '30d',       value: '30'        },
+  { label: 'All',       value: 'all'       },
+]
+
+// Maps the main dashboard filter type to one of the modal's pill values
+function normalizeFilterType(type) {
+  if (['today', 'yesterday', 'all'].includes(type)) return type
+  const n = parseInt(type)
+  if (n === 2)  return '2'
+  if (n === 7)  return '7'
+  if (n === 14) return '14'
+  if (n === 30) return '30'
+  return 'today'
+}
 
 function ScoreRing({ value, size = 72 }) {
   const r    = (size / 2) - 6
@@ -107,6 +127,10 @@ export default function EmployeeDetailModal({
   onClose, onBack, onCallClick, onCoachingClick,
   statuses: callStatuses, setStatus: setCallStatus,
 }) {
+  const [dateFilter, setDateFilter] = useState(() => ({
+    type: normalizeFilterType(filter?.type),
+    from: '', to: '',
+  }))
   const { toggleAction, isDone } = useActionStatus()
 
   useEffect(() => {
@@ -126,8 +150,8 @@ export default function EmployeeDetailModal({
   )
 
   const filteredCalls = useMemo(() =>
-    filterCalls(empCalls, filter),
-    [empCalls, filter]
+    filterCalls(empCalls, dateFilter),
+    [empCalls, dateFilter]
   )
 
   const stats = useMemo(() => {
@@ -222,6 +246,19 @@ export default function EmployeeDetailModal({
             </button>
           </div>
 
+          {/* Date range pills */}
+          <div className="flex items-center gap-0.5 mt-4 bg-brand-bg border border-brand-border rounded-lg p-0.5 w-fit">
+            {RANGE_OPTIONS.map(opt => {
+              const active = dateFilter.type === opt.value
+              return (
+                <button key={opt.value} onClick={() => setDateFilter(p => ({ ...p, type: opt.value }))}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 whitespace-nowrap"
+                  style={active ? { background: G, color: 'white' } : { color: '#6B7280' }}>
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* ── Body ── */}
