@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   scoreColor, G, filterCalls, fmtMins,
@@ -10,15 +10,6 @@ import EmployeeAvatar from '../EmployeeAvatar'
 const RED  = '#EF4444'
 const GOLD = '#F59E0B'
 
-const RANGE_OPTIONS = [
-  { label: 'Today',     value: 'today'     },
-  { label: 'Yesterday', value: 'yesterday' },
-  { label: '2d',    value: '2'     },
-  { label: '7d',    value: '7'     },
-  { label: '14d',   value: '14'    },
-  { label: '30d',   value: '30'    },
-  { label: 'All',   value: 'all'   },
-]
 
 function ScoreRing({ value, size = 72 }) {
   const r    = (size / 2) - 6
@@ -112,11 +103,10 @@ function avg(arr) {
 }
 
 export default function EmployeeDetailModal({
-  employeeName, allCalls, onClose, onBack, onCallClick, onCoachingClick,
+  employeeName, allCalls, filter,
+  onClose, onBack, onCallClick, onCoachingClick,
   statuses: callStatuses, setStatus: setCallStatus,
-  coachingStatuses, onToggleRec,
 }) {
-  const [dateFilter, setDateFilter] = useState({ type: 'all', from: '', to: '' })
   const { toggleAction, isDone } = useActionStatus()
 
   useEffect(() => {
@@ -136,8 +126,8 @@ export default function EmployeeDetailModal({
   )
 
   const filteredCalls = useMemo(() =>
-    filterCalls(empCalls, dateFilter),
-    [empCalls, dateFilter]
+    filterCalls(empCalls, filter),
+    [empCalls, filter]
   )
 
   const stats = useMemo(() => {
@@ -153,15 +143,6 @@ export default function EmployeeDetailModal({
       frustrated: filteredCalls.filter(c => c.frustratedFlag).length,
       coaching:   filteredCalls.filter(c => c.coachingFlag).length,
     }
-  }, [filteredCalls])
-
-  const coachingRecs = useMemo(() => {
-    const seen = new Set()
-    const recs = []
-    for (const c of filteredCalls)
-      for (const r of (c.coachingRecs || []))
-        if (r && !seen.has(r)) { seen.add(r); recs.push(r) }
-    return recs
   }, [filteredCalls])
 
   const behaviorInsights = useMemo(() => buildBehaviorInsights(filteredCalls), [filteredCalls])
@@ -241,19 +222,6 @@ export default function EmployeeDetailModal({
             </button>
           </div>
 
-          {/* Date range pills */}
-          <div className="flex items-center gap-0.5 mt-4 bg-brand-bg border border-brand-border rounded-lg p-0.5 w-fit">
-            {RANGE_OPTIONS.map(opt => {
-              const active = dateFilter.type === opt.value
-              return (
-                <button key={opt.value} onClick={() => setDateFilter(p => ({ ...p, type: opt.value }))}
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 whitespace-nowrap"
-                  style={active ? { background: G, color: 'white' } : { color: '#6B7280' }}>
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         {/* ── Body ── */}
@@ -427,23 +395,6 @@ export default function EmployeeDetailModal({
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* Coaching Notes — informational bullet points */}
-          {coachingRecs.length > 0 && (
-            <div className="px-6 py-5">
-              <SectionHead title="Coaching Notes" />
-              <div className="mt-3 space-y-2">
-                {coachingRecs.map((rec, i) => (
-                  <div key={i} className="flex items-start gap-2.5">
-                    <span className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-yellow-50 border border-yellow-200 flex items-center justify-center text-[10px] font-bold text-yellow-600">
-                      {i + 1}
-                    </span>
-                    <p className="text-[12px] leading-relaxed text-brand-text">{rec}</p>
-                  </div>
-                ))}
               </div>
             </div>
           )}

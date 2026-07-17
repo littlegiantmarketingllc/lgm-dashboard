@@ -68,7 +68,7 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [filter, setFilter]                 = useState({ type: '30d', from: '', to: '' })
+  const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [searchQuery, setSearchQuery]       = useState('')
@@ -87,7 +87,7 @@ export default function App() {
   // (handled inside each modal component via onClose = closeAll)
 
   const { statuses, setStatus } = useCallStatus()
-  const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching } = useCoachingStatus()
+  const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching, markAllComplete: markAllCoachingComplete } = useCoachingStatus()
 
   const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
@@ -202,6 +202,7 @@ export default function App() {
                   onEmployeeClick={(n) => pushModal({ type: 'employee',  id: n })}
                   onCoachingClick={(n) => pushModal({ type: 'coaching',  id: n })}
                   isComplete={isCoachingComplete}
+                  onClearAll={() => markAllCoachingComplete(employees)}
                 />
               </div>
               <div className="lg:col-span-2">
@@ -254,14 +255,13 @@ export default function App() {
           key={currentModal.id}
           employeeName={currentModal.id}
           allCalls={calls}
+          filter={filter}
           onClose={closeAll}
           onBack={canGoBack ? popModal : null}
           onCallClick={(mid) => pushModal({ type: 'call',     id: mid })}
           onCoachingClick={(n)  => pushModal({ type: 'coaching', id: n })}
           statuses={statuses}
           setStatus={setStatus}
-          coachingStatuses={coachingStatuses}
-          onToggleRec={toggleCoachingRec}
         />
       )}
       {currentModal?.type === 'call' && (

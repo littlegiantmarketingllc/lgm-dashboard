@@ -75,5 +75,21 @@ export function useCoachingStatus() {
     })
   }, [])
 
-  return { statuses, toggleRec, isRecDone, isCoachingComplete, resetEmployee }
+  const markAllComplete = useCallback((employeesList) => {
+    setStatuses(prev => {
+      const next = { ...prev }
+      for (const emp of employeesList) {
+        const count = (emp.coachingRecs || []).length
+        if (count > 0) {
+          next[emp.name] = {}
+          for (let i = 0; i < count; i++) next[emp.name][i] = true
+        }
+      }
+      saveLocal(next)
+      fbWrite(next).catch(() => {})
+      return next
+    })
+  }, [])
+
+  return { statuses, toggleRec, isRecDone, isCoachingComplete, resetEmployee, markAllComplete }
 }

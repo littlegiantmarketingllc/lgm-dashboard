@@ -2,7 +2,7 @@ import { G, scoreColor } from '../lib/ehUtils'
 
 const GOLD = '#F59E0B'
 
-export default function NeedCoaching({ employees, onCoachingClick, onEmployeeClick, isComplete }) {
+export default function NeedCoaching({ employees, onCoachingClick, onEmployeeClick, isComplete, onClearAll }) {
   const needsCoaching = employees.filter(e =>
     e.coaching > 0 && !isComplete?.(e.name, e.coachingRecs?.length)
   )
@@ -32,10 +32,22 @@ export default function NeedCoaching({ employees, onCoachingClick, onEmployeeCli
             {needsCoaching.length} employee{needsCoaching.length !== 1 ? 's' : ''} flagged · click flag to review
           </p>
         </div>
-        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border"
-          style={{ color: GOLD, background: `${GOLD}12`, borderColor: `${GOLD}30` }}>
-          {needsCoaching.length} flagged
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border"
+            style={{ color: GOLD, background: `${GOLD}12`, borderColor: `${GOLD}30` }}>
+            {needsCoaching.length} flagged
+          </span>
+          {onClearAll && (
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all coaching tips for all employees?')) onClearAll()
+              }}
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-brand-border text-brand-muted hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Employee chips — two clickable zones: avatar/name → profile, flag badge → coaching modal */}
