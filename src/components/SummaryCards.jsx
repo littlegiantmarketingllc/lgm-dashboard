@@ -60,39 +60,48 @@ function Card({ label, value, sub, icon, accentBorder, trend, lowerIsBetter, del
   )
 }
 
+const VIO = '#7C3AED'
+
 export default function SummaryCards({ summary, trends }) {
-  const { total, positive, frustrated } = summary
+  const { total, positive, frustrated, meetingCount = 0, phoneCount = 0 } = summary
   const posRate = total > 0 ? Math.round((positive / total) * 100) : 0
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
       <Card
-        label="Total Meetings"
-        value={total}
-        sub="Unique meetings this period"
-        icon={<svg viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.07 3.38 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></svg>}
+        label="Meetings"
+        value={meetingCount}
+        sub="TLDV video meetings"
+        icon={<svg viewBox="0 0 24 24" fill="none" stroke={BLU} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="7" width="15" height="12" rx="2"/><path d="m17 9 5-3v12l-5-3"/></svg>}
         accentBorder={BLU}
-        trend={trends.total}
         delay={0}
       />
       <Card
-        label="Positive Meetings"
+        label="Phone Calls"
+        value={phoneCount}
+        sub="GHL inbound & outbound"
+        icon={<svg viewBox="0 0 24 24" fill="none" stroke={VIO} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12 19.79 19.79 0 0 1 1.07 3.38 2 2 0 0 1 3.05 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></svg>}
+        accentBorder={VIO}
+        delay={80}
+      />
+      <Card
+        label="Positive"
         value={positive}
         sub={`${posRate}% satisfaction rate`}
         icon={<svg viewBox="0 0 24 24" fill="none" stroke={G} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="20 6 9 17 4 12"/></svg>}
         accentBorder={G}
         trend={trends.positive}
-        delay={80}
+        delay={160}
       />
       <Card
-        label="Priority Calls"
+        label="Priority"
         value={frustrated}
         sub={frustrated === 0 ? 'All clear this period' : 'Require follow-up'}
         icon={<svg viewBox="0 0 24 24" fill="none" stroke={frustrated > 0 ? RED : G} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
         accentBorder={frustrated > 0 ? RED : G}
         trend={trends.frustrated}
         lowerIsBetter
-        delay={160}
+        delay={240}
       />
     </div>
   )

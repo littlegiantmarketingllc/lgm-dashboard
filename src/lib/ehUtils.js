@@ -79,15 +79,18 @@ export function calcSummary(calls) {
   calls.forEach((c, i) => {
     const key = c.meetingId || `__row_${i}`
     if (!meetings.has(key)) {
-      meetings.set(key, { frustrated: Boolean(c.frustratedFlag) })
+      meetings.set(key, { frustrated: Boolean(c.frustratedFlag), callType: c.callType })
     } else if (c.frustratedFlag) {
       meetings.get(key).frustrated = true
     }
   })
-  const total      = meetings.size
-  const frustrated = [...meetings.values()].filter(m => m.frustrated).length
-  const positive   = total - frustrated
-  return { total, positive, frustrated }
+  const vals         = [...meetings.values()]
+  const total        = meetings.size
+  const frustrated   = vals.filter(m => m.frustrated).length
+  const positive     = total - frustrated
+  const meetingCount = vals.filter(m => m.callType === 'Meeting').length
+  const phoneCount   = vals.filter(m => m.callType === 'Phone Call').length
+  return { total, positive, frustrated, meetingCount, phoneCount }
 }
 
 // ─── Employee aggregation (per-row, not per-meeting) ─────────────────────────
