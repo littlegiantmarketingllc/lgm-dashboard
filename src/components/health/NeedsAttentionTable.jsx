@@ -1,6 +1,11 @@
+import { useState, useMemo } from 'react'
+
 const G   = '#8CC63F'
 const RED = '#EF4444'
 const AMB = '#EAB308'
+
+const HIGHLY_NEEDED_COUNT = 10
+const PAGE_SIZE           = 20
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString() }
 
@@ -81,13 +86,105 @@ function ActionButtons({ id, status, setStatus }) {
   )
 }
 
+function AccountRow({ a, i, getStatus, getResolvedAt, setStatus, onAccountClick }) {
+  const status     = getStatus(a.id)
+  const resolvedAt = getResolvedAt(a.id)
+  const isResolved = status === 'resolved'
+
+  return (
+    <tr key={a.id}
+      className={`animate-slide-in-row border-b border-brand-border/60 transition-all duration-200 ${isResolved ? 'opacity-50' : 'hover:bg-red-50/30'}`}
+      style={{ animationDelay: `${i * 30}ms`, borderLeft: `2px solid ${isResolved ? '#E5E7E5' : RED}` }}>
+
+      <td className="pl-5 pr-3 py-3">
+        <button
+          onClick={() => onAccountClick?.(a)}
+          className="text-[12px] font-semibold hover:underline text-left"
+          style={{ color: RED }}
+        >
+          {a.accountName}
+        </button>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <span className="text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap text-brand-muted">
+          {a.accountType}
+        </span>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <span className="num text-[12px] font-semibold text-brand-text">{a.transactions.toLocaleString()}</span>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <span className="num text-[12px] text-brand-text">{a.users}</span>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <span className="num text-[12px] font-semibold text-brand-text">{fmt(a.totalRev)}</span>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <HealthPill score={a._health?.score ?? 0} band={a._health?.band ?? 'at_risk'} />
+      </td>
+      <td className="px-3 sm:px-4 py-3 max-w-[200px]">
+        <p className="text-[11px] text-brand-muted leading-snug">{a._health?.action ?? ''}</p>
+      </td>
+      <td className="px-3 sm:px-4 py-3">
+        <div className="flex flex-col gap-1">
+          <StatusBadge status={status} />
+          {isResolved && resolvedAt && (
+            <span className="text-[10px] text-brand-muted">Resolved {resolvedAgo(resolvedAt)}</span>
+          )}
+        </div>
+      </td>
+      <td className="px-3 sm:px-4 py-3 pr-5">
+        <ActionButtons id={a.id} status={status} setStatus={setStatus} />
+      </td>
+    </tr>
+  )
+}
+
+const TABLE_HEADERS = ['Account Name', 'Type', 'Transactions', 'Users', 'Total Rev', 'Health', 'Recommended Action', 'Status', 'Actions']
+
+function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClick }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-brand-border bg-brand-bg/50">
+            {TABLE_HEADERS.map(h => (
+              <th key={h} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((a, i) => (
+            <AccountRow key={a.id} a={a} i={i} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function NeedsAttentionTable({ accounts, statuses, setStatus, onAccountClick }) {
+  const [page, setPage] = useState(1)
+
+  // Reset to page 1 whenever the incoming accounts list changes (filters applied upstream)
+  const accountsKey = accounts.length
+  useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const getStatus     = (id) => statuses[String(id)]?.status ?? 'action_required'
   const getResolvedAt = (id) => statuses[String(id)]?.resolvedAt ?? null
 
   const actionRequired = accounts.filter(a => getStatus(a.id) === 'action_required').length
   const inProgress     = accounts.filter(a => getStatus(a.id) === 'in_progress').length
   const resolved       = accounts.filter(a => getStatus(a.id) === 'resolved').length
+
+  // Accounts arrive pre-sorted worst-health-first — the first N are the most urgent.
+  const highlyNeeded = accounts.slice(0, HIGHLY_NEEDED_COUNT)
+  const todo          = accounts.slice(HIGHLY_NEEDED_COUNT)
+
+  const totalPages = Math.max(1, Math.ceil(todo.length / PAGE_SIZE))
+  const pageData   = useMemo(() => todo.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [todo, page])
 
   return (
     <div
@@ -117,85 +214,60 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
         )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Account Name', 'Type', 'Transactions', 'Users', 'Total Rev', 'Health', 'Recommended Action', 'Status', 'Actions'].map(h => (
-                <th key={h} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.length === 0 && (
-              <tr>
-                <td colSpan={9} className="py-14 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <span className="text-4xl">✅</span>
-                    <p className="text-brand-muted text-sm">No at-risk accounts — portfolio looking healthy</p>
-                  </div>
-                </td>
-              </tr>
-            )}
-            {accounts.map((a, i) => {
-              const status     = getStatus(a.id)
-              const resolvedAt = getResolvedAt(a.id)
-              const isResolved = status === 'resolved'
+      {accounts.length === 0 ? (
+        <div className="py-14 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-4xl">✅</span>
+            <p className="text-brand-muted text-sm">No at-risk accounts — portfolio looking healthy</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Highly Needed — worst accounts, always visible, no pagination */}
+          <div className="px-4 sm:px-6 pt-4 pb-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-red-500 flex items-center gap-1.5">
+              🔴 Highly Needed — fix these first ({highlyNeeded.length})
+            </p>
+          </div>
+          <AccountTable rows={highlyNeeded} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
 
-              return (
-                <tr key={a.id}
-                  className={`animate-slide-in-row border-b border-brand-border/60 transition-all duration-200 ${isResolved ? 'opacity-50' : 'hover:bg-red-50/30'}`}
-                  style={{ animationDelay: `${560 + i * 40}ms`, borderLeft: `2px solid ${isResolved ? '#E5E7E5' : RED}` }}>
+          {todo.length > 0 && (
+            <>
+              <div className="px-4 sm:px-6 pt-4 pb-1.5 border-t border-brand-border">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-muted flex items-center gap-1.5">
+                  🟡 To-Do — {todo.length} more, lower priority
+                </p>
+              </div>
+              <AccountTable rows={pageData} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
 
-                  <td className="pl-5 pr-3 py-3">
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="px-5 py-3 border-t border-brand-border flex items-center justify-between">
+                  <span className="text-[11px] text-brand-muted">
+                    Page {page} of {totalPages} · {todo.length} accounts
+                  </span>
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => onAccountClick?.(a)}
-                      className="text-[12px] font-semibold hover:underline text-left"
-                      style={{ color: RED }}
+                      disabled={page === 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
                     >
-                      {a.accountName}
+                      ← Prev
                     </button>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <span className="text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap text-brand-muted">
-                      {a.accountType}
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <span className="num text-[12px] font-semibold text-brand-text">{a.transactions.toLocaleString()}</span>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <span className="num text-[12px] text-brand-text">{a.users}</span>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <span className="num text-[12px] font-semibold text-brand-text">{fmt(a.totalRev)}</span>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <HealthPill score={a._health?.score ?? 0} band={a._health?.band ?? 'at_risk'} />
-                  </td>
-                  <td className="px-3 sm:px-4 py-3 max-w-[200px]">
-                    <p className="text-[11px] text-brand-muted leading-snug">{a._health?.action ?? ''}</p>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <StatusBadge status={status} />
-                      {isResolved && resolvedAt && (
-                        <span className="text-[10px] text-brand-muted">Resolved {resolvedAgo(resolvedAt)}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 sm:px-4 py-3 pr-5">
-                    <ActionButtons id={a.id} status={status} setStatus={setStatus} />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <button
+                      disabled={page === totalPages}
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }

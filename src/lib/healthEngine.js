@@ -92,7 +92,10 @@ export function isAtRisk(account) {
 }
 
 export function isUpsellReady(account) {
-  return account.transactions > CHURN_TXN_THRESHOLD && account.users > UPSELL_MIN_USERS
+  // Per John's exact rule: >3,500 transactions AND >3 users AND no add-ons yet
+  return account.transactions > CHURN_TXN_THRESHOLD &&
+    account.users > UPSELL_MIN_USERS &&
+    !account.addOns
 }
 
 export function suggestAddon(account) {
@@ -161,4 +164,44 @@ export function concentrationRisk(accounts) {
     .slice(0, 10)
     .reduce((s, a) => s + (a.totalRev || 0), 0)
   return Math.round((top10Rev / total) * 100)
+}
+
+// Active = has any LC transaction activity at all (excludes fully dormant accounts)
+export function activeAccounts(accounts) {
+  return accounts.filter(a => (a.transactions || 0) > 0)
+}
+
+export function avgWalletSpend(accounts) {
+  const withWallet = accounts.filter(a => (a.lcWalletCharges || 0) > 0)
+  if (!withWallet.length) return { mean: 0, median: 0, count: 0 }
+  const vals   = withWallet.map(a => a.lcWalletCharges).sort((a, b) => a - b)
+  const mean   = vals.reduce((s, v) => s + v, 0) / vals.length
+  const mid    = Math.floor(vals.length / 2)
+  const median = vals.length % 2 === 0 ? (vals[mid - 1] + vals[mid]) / 2 : vals[mid]
+  return { mean: +mean.toFixed(2), median: +median.toFixed(2), count: withWallet.length }
+}
+
+// LC infrastructure cost pass-through: accounts where what we charge for LC
+// doesn't cover what LC actually costs us. Separate from overall profitability.
+export function isLcLeaking(account) {
+  return (account.lcAgencyGrossProfit ?? 0) < 0
+}
+
+export function lcCostLeakage(accounts) {
+  const leaking = accounts.filter(isLcLeaking)
+  const totalLoss = leaking.reduce((s, a) => s + Math.abs(a.lcAgencyGrossProfit || 0), 0)
+  return { count: leaking.length, totalLoss, accounts: leaking }
+}
+
+// Accounts with a flagged DataHealthStatus discrepancy — still counted in all
+// totals, just surfaced so the team knows which numbers might need a closer look.
+export function dataHealthSummary(accounts) {
+  const flagged = accounts.filter(a => a.hasDataIssue)
+  return { flaggedCount: flagged.length, totalCount: accounts.length, accounts: flagged }
+}
+
+// Accounts where a real plan-change scenario has been modeled with a
+// meaningful $ impact (positive or negative), not just left equal to current.
+export function whatIfOpportunities(accounts, minDelta = 10) {
+  return accounts.filter(a => Math.abs(a.whatIfDelta || 0) >= minDelta)
 }

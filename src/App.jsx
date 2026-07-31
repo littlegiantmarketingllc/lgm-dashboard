@@ -10,6 +10,7 @@ import {
 } from './lib/ehUtils'
 
 import Header              from './components/Header'
+import TabSwitcher         from './components/TabSwitcher'
 import SummaryCards        from './components/SummaryCards'
 import QuickStats          from './components/QuickStats'
 import TopPerformer        from './components/TopPerformer'
@@ -22,6 +23,7 @@ import BehaviorInsights    from './components/BehaviorInsights'
 import ResolutionTracker   from './components/ResolutionTracker'
 import FrustratedTable     from './components/FrustratedTable'
 import ActivityFeed        from './components/ActivityFeed'
+import HealthDashboard     from './components/health/HealthDashboard'
 
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
@@ -68,30 +70,40 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [activeTab, setActiveTab] = useState(() =>
+    localStorage.getItem('lgm-active-tab') || 'qc'
+  )
+
+  const handleTabChange = useCallback((tab) => {
+    setActiveTab(tab)
+    localStorage.setItem('lgm-active-tab', tab)
+  }, [])
+
+  // ── QC state ────────────────────────────────────────────────────────────────
   const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [searchQuery, setSearchQuery]       = useState('')
 
-  // ── Navigation stack: each entry is { type: 'call'|'employee', id } ─────────
   const [modalStack, setModalStack] = useState([])
-
   const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null
   const canGoBack    = modalStack.length > 1
-
   const pushModal  = useCallback((m) => setModalStack(s => [...s, m]), [])
   const popModal   = useCallback(()  => setModalStack(s => s.slice(0, -1)), [])
   const closeAll   = useCallback(()  => setModalStack([]), [])
-
-  // Escape closes the entire stack
-  // (handled inside each modal component via onClose = closeAll)
 
   const { statuses, setStatus } = useCallStatus()
   const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching, markAllComplete: markAllCoachingComplete } = useCoachingStatus()
 
   const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
-  // ── Derived filter options ─────────────────────────────────────────────────
+  // ── Health tab state ────────────────────────────────────────────────────────
+  const [healthFilters, setHealthFilters] = useState({
+    search: '', typeFilter: 'all', bandFilter: 'all',
+    dateRange: { type: 'all', from: '', to: '' },
+  })
+
+  // ── QC derived data ─────────────────────────────────────────────────────────
   const allCategories = useMemo(() => {
     const cats = new Set(calls.map(c => c.category).filter(Boolean))
     return [...cats].sort()
@@ -102,7 +114,6 @@ export default function App() {
     return [...emps].sort()
   }, [calls])
 
-  // ── Filtered calls ─────────────────────────────────────────────────────────
   const filteredCalls = useMemo(() => {
     let result = filterCalls(calls, filter)
     if (categoryFilter !== 'all') result = result.filter(c => c.category === categoryFilter)
@@ -125,7 +136,6 @@ export default function App() {
 
   const prevCalls = useMemo(() => getPrevCalls(calls, filter), [calls, filter])
 
-  // ── All derived data (before conditional returns) ──────────────────────────
   const summary         = useMemo(() => calcSummary(filteredCalls),             [filteredCalls])
   const prevSummary     = useMemo(() => calcSummary(prevCalls),                 [prevCalls])
   const employees       = useMemo(() => aggregateEmployees(filteredCalls),      [filteredCalls])
@@ -139,9 +149,7 @@ export default function App() {
   , [employees, isCoachingComplete])
 
   const recentActivity = useMemo(() =>
-    [...calls]
-      .sort((a, b) => b._rowIdx - a._rowIdx)
-      .slice(0, 15),
+    [...calls].sort((a, b) => b._rowIdx - a._rowIdx).slice(0, 15),
     [calls]
   )
 
@@ -152,104 +160,132 @@ export default function App() {
     frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated) : null,
   }), [summary, prevSummary, canCompare])
 
-  // ── Early returns ──────────────────────────────────────────────────────────
   if (loading && calls.length === 0) return <LoadingScreen />
   if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
-      <Header
-        filter={filter}           setFilter={setFilter}
-        categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
-        employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
-        searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
-        searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
-        lastUpdated={lastUpdated}  onRefresh={refetch}
-        isRefreshing={loading}     retrying={retrying} dataError={error}
-      />
+      {/* Shared header (QC tab only — health has its own filter bar) */}
+      {activeTab === 'qc' && (
+        <Header
+          filter={filter}           setFilter={setFilter}
+          categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
+          employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
+          searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
+          searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
+          lastUpdated={lastUpdated}  onRefresh={refetch}
+          isRefreshing={loading}     retrying={retrying} dataError={error}
+        />
+      )}
 
-      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        {error && calls.length > 0 && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Auto-refresh failed — showing last known data.{' '}
-              <button onClick={refetch} className="underline font-medium">Retry</button>
-            </span>
-          </div>
-        )}
-
-        {!loading && filteredCalls.length === 0 && calls.length > 0 && (
-          <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
-            <span>📅</span>
-            <span>No calls match the current filters. Try adjusting the date range or clearing filters.</span>
-          </div>
-        )}
-
-        <div className="flex gap-7 items-start">
-
-          {/* ── Main column ──────────────────────────────────────────────── */}
-          <div className="flex-1 min-w-0 space-y-6">
-
-            <SummaryCards summary={summary} trends={trends} />
-            <QuickStats stats={quickStats} coachingNeeded={coachingNeeded} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="flex flex-col gap-6">
-                <TopPerformer performer={topPerformer} onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
-                <NeedCoaching
-                  employees={employees}
-                  onEmployeeClick={(n) => pushModal({ type: 'employee',  id: n })}
-                  onCoachingClick={(n) => pushModal({ type: 'coaching',  id: n })}
-                  isComplete={isCoachingComplete}
-                  onClearAll={() => markAllCoachingComplete(employees)}
-                />
-              </div>
-              <div className="lg:col-span-2">
-                <EmployeeTable
-                  employees={employees}
-                  onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })}
-                  onCoachingClick={(n) => pushModal({ type: 'coaching', id: n })}
-                />
+      {activeTab === 'health' && (
+        <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
+          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderTop: '3px solid #8CC63F' }}>
+          <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 h-[60px] flex items-center">
+            <div className="flex items-center gap-3 min-w-0">
+              <img src="/lgm-logo.png" alt="Little Giant Marketing"
+                className="h-8 sm:h-9 w-auto flex-shrink-0 object-contain"
+                onError={(e) => { e.target.style.display = 'none' }} />
+              <div className="hidden sm:block leading-tight min-w-0">
+                <p className="shimmer-text text-[10px] font-extrabold tracking-[0.2em] uppercase leading-none">
+                  Little Giant Marketing
+                </p>
+                <p className="text-brand-heading font-semibold text-[14px] leading-tight mt-0.5">
+                  Customer Health
+                </p>
               </div>
             </div>
+          </div>
+        </header>
+      )}
 
-            <MeetingsChart data={chartData} />
+      {/* Tab switcher — always visible */}
+      <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <VerdictDistribution calls={filteredCalls} />
-              <CategoryPerformance calls={filteredCalls} />
+      {/* ── QC Tab ─────────────────────────────────────────────────────────── */}
+      {activeTab === 'qc' && (
+        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+          {error && calls.length > 0 && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Auto-refresh failed — showing last known data.{' '}
+                <button onClick={refetch} className="underline font-medium">Retry</button>
+              </span>
+            </div>
+          )}
+
+          {!loading && filteredCalls.length === 0 && calls.length > 0 && (
+            <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 flex items-center gap-2">
+              <span>📅</span>
+              <span>No calls match the current filters. Try adjusting the date range or clearing filters.</span>
+            </div>
+          )}
+
+          <div className="flex gap-7 items-start">
+            <div className="flex-1 min-w-0 space-y-6">
+              <SummaryCards summary={summary} trends={trends} />
+              <QuickStats stats={quickStats} coachingNeeded={coachingNeeded} />
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="flex flex-col gap-6">
+                  <TopPerformer performer={topPerformer} onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })} />
+                  <NeedCoaching
+                    employees={employees}
+                    onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })}
+                    onCoachingClick={(n) => pushModal({ type: 'coaching', id: n })}
+                    isComplete={isCoachingComplete}
+                    onClearAll={() => markAllCoachingComplete(employees)}
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <EmployeeTable
+                    employees={employees}
+                    onEmployeeClick={(n) => pushModal({ type: 'employee', id: n })}
+                    onCoachingClick={(n) => pushModal({ type: 'coaching', id: n })}
+                  />
+                </div>
+              </div>
+
+              <MeetingsChart data={chartData} />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <VerdictDistribution calls={filteredCalls} />
+                <CategoryPerformance calls={filteredCalls} />
+              </div>
+
+              <BehaviorInsights calls={filteredCalls} />
+              <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
+              <FrustratedTable
+                calls={frustratedCalls}
+                statuses={statuses}
+                setStatus={setStatus}
+                onEmployeeClick={(n)  => pushModal({ type: 'employee', id: n })}
+                onCallClick={(mid)    => pushModal({ type: 'call',     id: mid })}
+              />
             </div>
 
-            <BehaviorInsights calls={filteredCalls} />
-
-            <ResolutionTracker calls={frustratedCalls} statuses={statuses} />
-
-            <FrustratedTable
-              calls={frustratedCalls}
-              statuses={statuses}
-              setStatus={setStatus}
-              onEmployeeClick={(n)   => pushModal({ type: 'employee', id: n })}
-              onCallClick={(mid)     => pushModal({ type: 'call',     id: mid })}
-            />
+            <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
+              <ActivityFeed
+                calls={recentActivity}
+                onEmployeeClick={(n)  => pushModal({ type: 'employee', id: n })}
+                onCallClick={(mid)    => pushModal({ type: 'call',     id: mid })}
+              />
+            </aside>
           </div>
-
-          {/* ── Sidebar ──────────────────────────────────────────────────── */}
-          <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 sticky top-20">
-            <ActivityFeed
-              calls={recentActivity}
-              onEmployeeClick={(n)   => pushModal({ type: 'employee', id: n })}
-              onCallClick={(mid)     => pushModal({ type: 'call',     id: mid })}
-            />
-          </aside>
         </div>
-      </div>
+      )}
+
+      {/* ── Customer Health Tab ─────────────────────────────────────────────── */}
+      {activeTab === 'health' && (
+        <HealthDashboard filters={healthFilters} setFilters={setHealthFilters} />
+      )}
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; Team AI Assistant
+        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health Dashboard (Beta)' : 'Team AI Assistant'}
       </footer>
 
-      {/* ── Modal stack — only render the top of the stack ────────────────── */}
+      {/* ── Modal stack (QC tab) ───────────────────────────────────────────── */}
       {currentModal?.type === 'employee' && (
         <EmployeeDetailModal
           key={currentModal.id}
@@ -258,7 +294,7 @@ export default function App() {
           filter={filter}
           onClose={closeAll}
           onBack={canGoBack ? popModal : null}
-          onCallClick={(mid) => pushModal({ type: 'call',     id: mid })}
+          onCallClick={(mid)    => pushModal({ type: 'call',     id: mid })}
           onCoachingClick={(n)  => pushModal({ type: 'coaching', id: n })}
           statuses={statuses}
           setStatus={setStatus}
