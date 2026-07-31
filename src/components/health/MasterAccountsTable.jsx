@@ -127,6 +127,12 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
                   >
                     {a.accountName}
                     {a.hasDataIssue && <span title="Flagged data issue — see account detail">🩹</span>}
+                    {a._ghlOnly && (
+                      <span title="In GHL but not yet in LGM billing sheet"
+                        className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-600 uppercase tracking-wide">
+                        new
+                      </span>
+                    )}
                   </button>
                 </td>
                 <td className="px-3 py-2.5">

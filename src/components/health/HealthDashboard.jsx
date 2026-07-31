@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { useHealthSheet }      from '../../hooks/useHealthSheet'
+import { useMergedHealthData } from '../../hooks/useMergedHealthData'
+import GHLDataBanner           from './GHLDataBanner'
 import { useAccountStatus }    from '../../hooks/useAccountStatus'
 import {
   scoreAccount, classify, isAtRisk, isUpsellReady,
@@ -106,7 +107,10 @@ function ErrorBanner({ message, onRetry }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function HealthDashboard({ filters, setFilters }) {
-  const { accounts: raw, loading, error, lastUpdated, refetch, retrying } = useHealthSheet()
+  const {
+    accounts: raw, loading, error, lastUpdated, refetch, retrying,
+    dataSourceStatus,
+  } = useMergedHealthData()
   const { statuses, setStatus, isContacted, toggleContacted, getContactedAt } = useAccountStatus()
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
@@ -163,31 +167,36 @@ export default function HealthDashboard({ filters, setFilters }) {
   }, [accounts, filters])
 
   // ── All derived data from filteredAccounts — everything reacts together ───
+  // Exclude _ghlOnly accounts from scoring tables — they have no billing data
+  // yet so they'd score 0 and flood the at-risk / upsell lists with noise.
+  // They're still visible in the Master Table so the team can see them.
+  const scorableAccounts = useMemo(() => filteredAccounts.filter(a => !a._ghlOnly), [filteredAccounts])
+
   const atRiskAccounts  = useMemo(() =>
-    filteredAccounts.filter(isAtRisk).sort((a, b) => a._health.score - b._health.score),
-    [filteredAccounts]
+    scorableAccounts.filter(isAtRisk).sort((a, b) => a._health.score - b._health.score),
+    [scorableAccounts]
   )
-  const upsellAccounts  = useMemo(() => filteredAccounts.filter(isUpsellReady),                           [filteredAccounts])
-  const healthyAccounts = useMemo(() => filteredAccounts.filter(a => a._health.band === 'healthy'),       [filteredAccounts])
-  const breakdown       = useMemo(() => dmVsAgent(filteredAccounts),                                      [filteredAccounts])
-  const subStats        = useMemo(() => avgSubscription(filteredAccounts),                                [filteredAccounts])
+  const upsellAccounts  = useMemo(() => scorableAccounts.filter(isUpsellReady),                           [scorableAccounts])
+  const healthyAccounts = useMemo(() => scorableAccounts.filter(a => a._health.band === 'healthy'),       [scorableAccounts])
+  const breakdown       = useMemo(() => dmVsAgent(scorableAccounts),                                      [scorableAccounts])
+  const subStats        = useMemo(() => avgSubscription(scorableAccounts),                                [scorableAccounts])
   const riskRevenue     = useMemo(() => revenueAtRisk(atRiskAccounts),                                    [atRiskAccounts])
   const upsellMRR       = useMemo(() => potentialUpsellMRR(upsellAccounts),                               [upsellAccounts])
-  const concRisk        = useMemo(() => concentrationRisk(filteredAccounts),                              [filteredAccounts])
-  const activeAccts     = useMemo(() => activeAccounts(filteredAccounts),                                 [filteredAccounts])
-  const walletStats     = useMemo(() => avgWalletSpend(filteredAccounts),                                 [filteredAccounts])
-  const lcLeakage       = useMemo(() => lcCostLeakage(filteredAccounts),                                  [filteredAccounts])
-  const dataHealth      = useMemo(() => dataHealthSummary(filteredAccounts),                               [filteredAccounts])
+  const concRisk        = useMemo(() => concentrationRisk(scorableAccounts),                              [scorableAccounts])
+  const activeAccts     = useMemo(() => activeAccounts(scorableAccounts),                                 [scorableAccounts])
+  const walletStats     = useMemo(() => avgWalletSpend(scorableAccounts),                                 [scorableAccounts])
+  const lcLeakage       = useMemo(() => lcCostLeakage(scorableAccounts),                                  [scorableAccounts])
+  const dataHealth      = useMemo(() => dataHealthSummary(scorableAccounts),                               [scorableAccounts])
 
   const avgHealthDm    = useMemo(() => {
-    const dm = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
+    const dm = scorableAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
     return dm.length ? Math.round(dm.reduce((s, a) => s + a._health.score, 0) / dm.length) : null
-  }, [filteredAccounts])
+  }, [scorableAccounts])
 
   const avgHealthAgent = useMemo(() => {
-    const ag = filteredAccounts.filter(a => (a.accountType || '').toLowerCase() !== 'dm')
+    const ag = scorableAccounts.filter(a => (a.accountType || '').toLowerCase() !== 'dm')
     return ag.length ? Math.round(ag.reduce((s, a) => s + a._health.score, 0) / ag.length) : null
-  }, [filteredAccounts])
+  }, [scorableAccounts])
 
   const top3Upsell  = useMemo(() => [...upsellAccounts].slice(0, 3), [upsellAccounts])
   const top3AtRisk  = useMemo(() => atRiskAccounts.slice(0, 3),      [atRiskAccounts])
@@ -200,6 +209,9 @@ export default function HealthDashboard({ filters, setFilters }) {
 
   return (
     <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
+
+      {/* GHL data source status banner */}
+      <GHLDataBanner status={dataSourceStatus} />
 
       {/* Sub-header: refresh + live dot + concentration risk */}
       <div className="flex items-center justify-between flex-wrap gap-3">
