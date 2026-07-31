@@ -37,7 +37,11 @@ export default async function handler(req, res) {
 
     const now = new Date()
 
-    const accounts = all.map(loc => {
+    // Strip internal sandbox / test accounts — they aren't real clients
+    const SANDBOX_PATTERNS = /sandbox|test account|test 2|in progress|bilingual snapshot/i
+    const realLocs = all.filter(loc => !SANDBOX_PATTERNS.test(loc.name || ''))
+
+    const accounts = realLocs.map(loc => {
       const updatedAt        = loc.dateUpdated ? new Date(loc.dateUpdated) : null
       const daysSinceUpdate  = updatedAt
         ? Math.floor((now - updatedAt) / 86_400_000)
@@ -73,7 +77,7 @@ export default async function handler(req, res) {
 
     // Cache at Vercel CDN edge for 15 min, serve stale for up to 30 min while revalidating
     res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800')
-    res.json({ accounts, total: all.length, syncedAt: now.toISOString() })
+    res.json({ accounts, total: accounts.length, rawTotal: all.length, syncedAt: now.toISOString() })
   } catch (err) {
     console.error('GHL accounts fetch error:', err.message)
     res.status(500).json({ error: err.message })

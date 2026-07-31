@@ -22,16 +22,11 @@ export default function GHLDataBanner({ status }) {
         {ghlTotal > 0 && (
           <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-            {ghlTotal} accounts live from GHL
+            {ghlTotal} real clients in GHL
           </span>
         )}
         <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700">
           ✓ Name · Join date · Last activity · City/State
-        </span>
-
-        {/* Pending scopes */}
-        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-          ⚠ Needs GHL scope: {pendingScopes.join(' · ')}
         </span>
 
         {/* LGM sheet */}
@@ -39,20 +34,25 @@ export default function GHLDataBanner({ status }) {
           📋 Revenue · Plans · GP · Notes — from LGM billing sheet
         </span>
 
-        {/* Not matched */}
-        {sheetOnly > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-gray-600">
-            {sheetOnly} sheet accounts not found in GHL
-          </span>
-        )}
-
         {/* GHL-only — in GHL but not in billing sheet */}
         {ghlOnly > 0 && (
           <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-700"
-            title="These accounts exist in GHL but have no row in the LGM billing sheet yet. They appear at the bottom of the Master table.">
-            ✦ {ghlOnly} in GHL but missing from billing sheet
+            title="These clients exist in GHL but have no row in the LGM billing sheet yet. They show up in the Master Table with a 'new' badge.">
+            ✦ {ghlOnly} clients in GHL but not yet in billing sheet
           </span>
         )}
+
+        {/* Not matched */}
+        {sheetOnly > 0 && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-gray-600">
+            {sheetOnly} billed accounts couldn't match to a GHL location
+          </span>
+        )}
+
+        {/* Pending scopes */}
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+          ⚠ Pending GHL scope: {pendingScopes.join(' · ')}
+        </span>
 
         {/* GHL error */}
         {ghlError && (

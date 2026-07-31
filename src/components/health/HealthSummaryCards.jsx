@@ -34,30 +34,35 @@ function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefi
   )
 }
 
-export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount, activeCount, avgWallet, medianWallet, walletCount, lcLeakageCount, lcLeakageTotal }) {
+export default function HealthSummaryCards({ accounts, ghlTotal = 0, ghlOnlyCount = 0, atRisk, healthy, upsellReady, riskRevenue, upsellMRR, avgSub, medianSub, dmCount, agentCount, activeCount, avgWallet, medianWallet, walletCount, lcLeakageCount, lcLeakageTotal }) {
   const totalMRR   = accounts.reduce((s, a) => s + (a.totalRev || 0), 0)
   const avgPerAcct = accounts.length ? Math.round(totalMRR / accounts.length) : 0
+
+  // Build Total Accounts subtitle: show how many are in GHL but not yet billed
+  const accountsSub = ghlOnlyCount > 0
+    ? `${dmCount} DM · ${agentCount} Agent · ${ghlOnlyCount} in GHL, not yet billed`
+    : `${dmCount} DM · ${agentCount} Agent`
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       <Card
-        label="Total Accounts"
+        label="Billed Accounts"
         value={accounts.length}
-        sub={`${dmCount} DM · ${agentCount} Agent`}
+        sub={accountsSub}
         icon="🏢"
         delay={0}
       />
       <Card
         label="Active Accounts"
         value={activeCount}
-        sub={`${accounts.length ? Math.round(activeCount / accounts.length * 100) : 0}% of total have transactions`}
+        sub={`${accounts.length ? Math.round(activeCount / accounts.length * 100) : 0}% of billed have transactions`}
         icon="🟢"
         delay={30}
       />
       <Card
         label="Total MRR"
         value={Math.round(totalMRR)}
-        sub={`Avg ${fmt(avgPerAcct)}/account`}
+        sub={`Avg ${fmt(avgPerAcct)}/billed account`}
         icon="💰"
         prefix="$"
         delay={60}
@@ -73,7 +78,7 @@ export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellRe
       <Card
         label="Healthy Accounts"
         value={healthy}
-        sub={`Score 80+ · ${accounts.length ? Math.round(healthy/accounts.length*100) : 0}% of total`}
+        sub={`Score 80+ · ${accounts.length ? Math.round(healthy/accounts.length*100) : 0}% of billed`}
         icon="✅"
         accentColor={G}
         delay={180}
@@ -97,7 +102,7 @@ export default function HealthSummaryCards({ accounts, atRisk, healthy, upsellRe
       <Card
         label="Avg Wallet Spend"
         value={Math.round(avgWallet || 0)}
-        sub={`${walletCount || 0} of ${accounts.length} accounts have wallet data`}
+        sub={`${walletCount || 0} of ${accounts.length} billed accounts have wallet data`}
         icon="💳"
         prefix="$"
         delay={360}

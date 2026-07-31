@@ -282,9 +282,13 @@ export default function HealthDashboard({ filters, setFilters }) {
         </div>
       )}
 
-      {/* 1. Summary cards — always visible, always current */}
+      {/* 1. Summary cards — always visible, always current.
+           Use scorableAccounts (billing sheet accounts only) so totals reflect
+           actual billed clients, not the GHL-only stub rows. */}
       <HealthSummaryCards
-        accounts={filteredAccounts}
+        accounts={scorableAccounts}
+        ghlTotal={dataSourceStatus?.ghlTotal ?? 0}
+        ghlOnlyCount={dataSourceStatus?.ghlOnly ?? 0}
         atRisk={atRiskAccounts.length}
         healthy={healthyAccounts.length}
         upsellReady={upsellAccounts.length}
