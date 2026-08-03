@@ -10,7 +10,6 @@ import {
 } from './lib/ehUtils'
 
 import Header              from './components/Header'
-import TabSwitcher         from './components/TabSwitcher'
 import SummaryCards        from './components/SummaryCards'
 import QuickStats          from './components/QuickStats'
 import TopPerformer        from './components/TopPerformer'
@@ -23,8 +22,6 @@ import BehaviorInsights    from './components/BehaviorInsights'
 import ResolutionTracker   from './components/ResolutionTracker'
 import FrustratedTable     from './components/FrustratedTable'
 import ActivityFeed        from './components/ActivityFeed'
-import HealthDashboard     from './components/health/HealthDashboard'
-
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
 import CoachingModal       from './components/modals/CoachingModal'
@@ -70,15 +67,6 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab] = useState(() =>
-    localStorage.getItem('lgm-active-tab') || 'qc'
-  )
-
-  const handleTabChange = useCallback((tab) => {
-    setActiveTab(tab)
-    localStorage.setItem('lgm-active-tab', tab)
-  }, [])
-
   // ── QC state ────────────────────────────────────────────────────────────────
   const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -96,12 +84,6 @@ export default function App() {
   const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching, markAllComplete: markAllCoachingComplete } = useCoachingStatus()
 
   const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
-
-  // ── Health tab state ────────────────────────────────────────────────────────
-  const [healthFilters, setHealthFilters] = useState({
-    search: '', typeFilter: 'all', bandFilter: 'all',
-    dateRange: { type: 'all', from: '', to: '' },
-  })
 
   // ── QC derived data ─────────────────────────────────────────────────────────
   const allCategories = useMemo(() => {
@@ -165,45 +147,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
-      {/* Shared header (QC tab only — health has its own filter bar) */}
-      {activeTab === 'qc' && (
-        <Header
-          filter={filter}           setFilter={setFilter}
-          categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
-          employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
-          searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
-          searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
-          lastUpdated={lastUpdated}  onRefresh={refetch}
-          isRefreshing={loading}     retrying={retrying} dataError={error}
-        />
-      )}
+      <Header
+        filter={filter}           setFilter={setFilter}
+        categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} allCategories={allCategories}
+        employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} allEmployees={allEmployees}
+        searchQuery={searchQuery}  setSearchQuery={setSearchQuery}
+        searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
+        lastUpdated={lastUpdated}  onRefresh={refetch}
+        isRefreshing={loading}     retrying={retrying} dataError={error}
+      />
 
-      {activeTab === 'health' && (
-        <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
-          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderTop: '3px solid #8CC63F' }}>
-          <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 h-[60px] flex items-center">
-            <div className="flex items-center gap-3 min-w-0">
-              <img src="/lgm-logo.png" alt="Little Giant Marketing"
-                className="h-8 sm:h-9 w-auto flex-shrink-0 object-contain"
-                onError={(e) => { e.target.style.display = 'none' }} />
-              <div className="hidden sm:block leading-tight min-w-0">
-                <p className="shimmer-text text-[10px] font-extrabold tracking-[0.2em] uppercase leading-none">
-                  Little Giant Marketing
-                </p>
-                <p className="text-brand-heading font-semibold text-[14px] leading-tight mt-0.5">
-                  Customer Health
-                </p>
-              </div>
-            </div>
-          </div>
-        </header>
-      )}
-
-      {/* Tab switcher — always visible */}
-      <TabSwitcher activeTab={activeTab} setActiveTab={handleTabChange} />
-
-      {/* ── QC Tab ─────────────────────────────────────────────────────────── */}
-      {activeTab === 'qc' && (
+      {/* ── QC Dashboard ─────────────────────────────────────────────────── */}
+      {true && (
         <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
           {error && calls.length > 0 && (
@@ -276,13 +231,8 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Customer Health Tab ─────────────────────────────────────────────── */}
-      {activeTab === 'health' && (
-        <HealthDashboard filters={healthFilters} setFilters={setHealthFilters} />
-      )}
-
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health Dashboard (Beta)' : 'Team AI Assistant'}
+        Little Giant Marketing &mdash; Team AI Assistant
       </footer>
 
       {/* ── Modal stack (QC tab) ───────────────────────────────────────────── */}

@@ -6,28 +6,28 @@ const REFRESH_MS  = 60_000
 const RETRY_MS    = 10_000
 const MAX_RETRIES = 3
 
-// ── CSV parser (identical to useGoogleSheets) ─────────────────────────────────
+// ── CSV parser — handles multi-line quoted fields ─────────────────────────────
 function parseCSV(text) {
   const rows = []
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.trim()) continue
-    const fields = []
-    let field = '', inQuotes = false
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (inQuotes) {
-        if (ch === '"' && line[i + 1] === '"') { field += '"'; i++ }
-        else if (ch === '"') inQuotes = false
-        else field += ch
-      } else {
-        if (ch === '"')      inQuotes = true
-        else if (ch === ',') { fields.push(field); field = '' }
-        else                  field += ch
-      }
+  let row = [], field = '', inQuotes = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++ }
+      else if (ch === '"')                    { inQuotes = false }
+      else                                    { field += ch }
+    } else {
+      if      (ch === '"')                    { inQuotes = true }
+      else if (ch === ',')                    { row.push(field); field = '' }
+      else if (ch === '\r' || ch === '\n') {
+        if (ch === '\r' && text[i + 1] === '\n') i++
+        row.push(field); field = ''
+        if (row.some(f => f.trim())) rows.push(row)
+        row = []
+      } else { field += ch }
     }
-    fields.push(field)
-    rows.push(fields)
   }
+  if (field || row.length) { row.push(field); if (row.some(f => f.trim())) rows.push(row) }
   return rows
 }
 
@@ -77,22 +77,30 @@ function parseIntSafe(raw) {
 }
 
 // ── Header → field map ────────────────────────────────────────────────────────
+// Patterns ordered most-specific first; first match wins per column.
 const HEADER_PATTERNS = [
-  { field: 'accountType',     tests: [/account\s*type/i, /^type$/i] },
+  { field: 'accountName',     tests: [/^subaccounts?$/i, /account\s*name/i, /^name$/i] },
+  { field: 'accountType',     tests: [/account\s*category/i, /account\s*type/i, /^type$/i] },
   { field: 'stripeStartDate', tests: [/stripe\s*start/i, /start\s*date/i] },
-  { field: 'accountName',     tests: [/account\s*name/i, /^name$/i] },
-  { field: 'gp',              tests: [/^gp$/i, /gross\s*profit/i] },
-  { field: 'totalRev',        tests: [/total\s*rev/i, /^revenue$/i] },
+  // Must match "Agency Gross Profit" (col 24) NOT "LC Agency Gross Profit" (col 22)
+  { field: 'gp',              tests: [/^agency\s*gross\s*profit$/i, /^gp$/i] },
+  // "Total Mon. Charges" = total monthly revenue from the client
+  { field: 'totalRev',        tests: [/total\s*mon\.?\s*charges?/i, /total\s*rev/i, /^revenue$/i] },
   { field: 'planPrice',       tests: [/plan\s*price/i] },
   { field: 'monthlyUserSub',  tests: [/monthly\s*user/i, /user\s*sub/i] },
-  { field: 'users',           tests: [/users?\s*\(?adjusted\)?/i, /^users?$/i] },
+  // "GHL Adj User Count" = adjusted user count from GHL
+  { field: 'users',           tests: [/ghl\s*adj\s*user/i, /adj\s*user\s*count/i, /users?\s*\(?adjusted\)?/i, /^users?$/i] },
   { field: 'addOns',          tests: [/add[-\s]?ons?/i] },
-  { field: 'lcWalletCharges', tests: [/lc\s*wallet/i, /wallet\s*charge/i] },
-  { field: 'transactions',    tests: [/^transactions?$/i, /lc\s*transactions?/i] },
+  // "LC Agent Charges" = LC platform costs charged to this sub-account
+  { field: 'lcWalletCharges', tests: [/lc\s*agent\s*charges?/i, /lc\s*wallet/i, /wallet\s*charge/i] },
+  // "DataHealthStatus" (1–5 scale) scaled ×1000 so threshold 3500 = status ≤3.5 → at-risk
+  { field: 'transactions',    tests: [/^datahealth\s*status$/i, /^transactions?$/i, /lc\s*transactions?/i] },
   { field: 'subAcntCount',    tests: [/subac[cn]t\s*count/i, /sub[\s-]?ac[cn]t/i] },
-  { field: 'annualSubs',      tests: [/annual\s*sub/i] },
+  { field: 'annualSubs',      tests: [/annual\s*sub/i, /annually\s*charge/i] },
   { field: 'multiLocation',   tests: [/multi[-\s]?location/i] },
   { field: 'lastActivity',    tests: [/last\s*activity/i, /login\s*activity/i] },
+  // LocationId enables direct GHL ↔ sheet matching without fuzzy name search
+  { field: 'sheetGhlId',      tests: [/^locationid$/i] },
 ]
 
 function buildHeaderMap(headerRow) {
@@ -113,6 +121,18 @@ function rowToAccount(row, hmap, idx) {
   const name = get('accountName')
   if (!name) return null
 
+  // DataHealthStatus: "All Good!" = healthy (5000), "1"–"5" scaled ×1000,
+  // empty/unknown = 0. Threshold 3500 → status ≤3 at-risk, ≥4 healthy.
+  const rawTxn = get('transactions')
+  const txnNum = parseIntSafe(rawTxn)
+  const transactions = /all\s*good/i.test(rawTxn) ? 5000
+    : txnNum >= 1 && txnNum <= 5                   ? txnNum * 1000
+    : txnNum
+
+  // Multi-location: truthy if the field has any non-empty content
+  const mlRaw = get('multiLocation')
+  const multiLocation = mlRaw.length > 0 && !/^(no|false|0|-)$/i.test(mlRaw)
+
   return {
     id:               idx + 1,
     accountName:      name,
@@ -125,11 +145,12 @@ function rowToAccount(row, hmap, idx) {
     users:            parseIntSafe(get('users')),
     addOns:           parseNum(get('addOns')),
     lcWalletCharges:  parseNum(get('lcWalletCharges')),
-    transactions:     parseIntSafe(get('transactions')),
+    transactions,
     subAcntCount:     parseIntSafe(get('subAcntCount')),
     annualSubs:       parseNum(get('annualSubs')),
-    multiLocation:    /^yes$/i.test(get('multiLocation')),
+    multiLocation,
     lastActivity:     hmap['lastActivity'] !== undefined ? get('lastActivity') : null,
+    sheetGhlId:       get('sheetGhlId') || null,
   }
 }
 
