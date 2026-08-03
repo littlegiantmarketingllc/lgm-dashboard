@@ -1,8 +1,9 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ReferenceLine, Legend,
+  PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts'
 import { CHURN_TXN_THRESHOLD } from '../../lib/healthConfig'
+import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -10,15 +11,18 @@ const RED = '#EF4444'
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString() }
 
-function Card({ title, subtitle, children, delay = 0 }) {
+function Card({ title, subtitle, infoText, children, delay = 0 }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{ animationDelay: `${delay}ms`, boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
-      <div className="px-5 sm:px-6 py-4 border-b border-brand-border">
-        <h3 className="text-brand-heading font-semibold text-sm">{title}</h3>
-        {subtitle && <p className="text-brand-muted text-[11px] mt-0.5">{subtitle}</p>}
+      <div className="px-5 sm:px-6 py-4 border-b border-brand-border flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-brand-heading font-semibold text-sm">{title}</h3>
+          {subtitle && <p className="text-brand-muted text-[11px] mt-0.5">{subtitle}</p>}
+        </div>
+        {infoText && <InfoTip text={infoText} position="top-end" />}
       </div>
       <div className="px-5 sm:px-6 py-5">
         {children}
@@ -43,7 +47,8 @@ function HealthDistribution({ accounts }) {
   ].filter(d => d.value > 0)
 
   return (
-    <Card title="Health Distribution" subtitle="Accounts by health band" delay={620}>
+    <Card title="Health Distribution" subtitle="Accounts by health band" delay={620}
+      infoText="Donut showing portfolio breakdown by health band. Healthy = composite score ≥ 80, Watch = 50–79, At-Risk = below 50. Score weights: DataHealthStatus 40%, Users 20%, Revenue 15%, Tenure 15%, Activity 10%.">
       <div className="flex flex-col sm:flex-row items-center gap-6">
         <div className="w-36 h-36 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
@@ -97,7 +102,8 @@ function RevenueByBand({ accounts }) {
   ]
 
   return (
-    <Card title="Revenue by Health Band" subtitle="MRR distribution across risk segments" delay={660}>
+    <Card title="Revenue by Health Band" subtitle="Monthly charges by health segment" delay={660}
+      infoText="Monthly charges from the billing sheet grouped by client health band. A large At-Risk bar means significant revenue is at churn risk. Use the Needs Attention table to prioritize outreach.">
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
@@ -140,7 +146,8 @@ function TxnHistogram({ accounts }) {
   const thresholdBucket = buckets.findIndex(b => b.min <= CHURN_TXN_THRESHOLD && b.max > CHURN_TXN_THRESHOLD)
 
   return (
-    <Card title="Transaction Distribution" subtitle={`Vertical line = ${CHURN_TXN_THRESHOLD.toLocaleString()} transaction threshold`} delay={700}>
+    <Card title="Health Status Distribution" subtitle="DataHealthStatus score spread across accounts" delay={700}
+      infoText="Distribution of DataHealthStatus scores (1–5) from the billing sheet. Score ≤ 3 = at-risk zone (left of the dashed line). 'All Good!' accounts are mapped to score 5. Helps identify how many clients need follow-up.">
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />

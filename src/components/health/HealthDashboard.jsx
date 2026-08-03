@@ -19,6 +19,8 @@ import MasterAccountsTable     from './MasterAccountsTable'
 import HealthCharts            from './HealthCharts'
 import QuickWins               from './QuickWins'
 import AccountModal            from './AccountModal'
+import WalletDrilldown         from './WalletDrilldown'
+import TransactionBreakdown    from './TransactionBreakdown'
 
 const G = '#8CC63F'
 
@@ -112,7 +114,8 @@ export default function HealthDashboard({ filters, setFilters }) {
     dataSourceStatus,
   } = useMergedHealthData()
   const { statuses, setStatus, isContacted, toggleContacted, getContactedAt } = useAccountStatus()
-  const [selectedAccount, setSelectedAccount] = useState(null)
+  const [selectedAccount, setSelectedAccount]   = useState(null)
+  const [showWalletDrill, setShowWalletDrill]   = useState(false)
   const [elapsed, setElapsed] = useState('—')
 
   useEffect(() => {
@@ -187,6 +190,37 @@ export default function HealthDashboard({ filters, setFilters }) {
   const walletStats     = useMemo(() => avgWalletSpend(scorableAccounts),                                 [scorableAccounts])
   const lcLeakage       = useMemo(() => lcCostLeakage(scorableAccounts),                                  [scorableAccounts])
   const dataHealth      = useMemo(() => dataHealthSummary(scorableAccounts),                               [scorableAccounts])
+
+  // ── New metrics ───────────────────────────────────────────────────────────
+  // New customers: joined within the active date window
+  // When dateRange = 'all', default to last 30 days so the card always shows something useful
+  const { newCustomers, newPeriodLabel } = useMemo(() => {
+    const today = new Date()
+    const isAllTime = filters.dateRange.type === 'all'
+    const from = isAllTime ? format(subDays(today, 30), 'yyyy-MM-dd') : getDateWindow(filters.dateRange).from
+    const to   = isAllTime ? format(today, 'yyyy-MM-dd')              : getDateWindow(filters.dateRange).to
+    const label = isAllTime ? 'last 30 days' : (() => {
+      const types = { this_month: 'this month', last_month: 'last month', last_30: 'last 30 days', last_90: 'last 90 days' }
+      return types[filters.dateRange.type] || 'selected period'
+    })()
+    const list = scorableAccounts.filter(a => {
+      const d = a.stripeStartDate || ''
+      return d && d >= from && d <= to
+    })
+    return { newCustomers: list, newPeriodLabel: label }
+  }, [scorableAccounts, filters.dateRange])
+
+  const newCustomerMRR = useMemo(() =>
+    newCustomers.reduce((s, a) => s + (a.totalRev || 0), 0),
+    [newCustomers]
+  )
+
+  const avgUsersPerAccount = useMemo(() => {
+    const withUsers = scorableAccounts.filter(a => (a.users || 0) > 0)
+    return withUsers.length
+      ? +(withUsers.reduce((s, a) => s + a.users, 0) / withUsers.length).toFixed(1)
+      : 0
+  }, [scorableAccounts])
 
   const avgHealthDm    = useMemo(() => {
     const dm = scorableAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
@@ -302,10 +336,20 @@ export default function HealthDashboard({ filters, setFilters }) {
         avgWallet={walletStats.mean}
         medianWallet={walletStats.median}
         walletCount={walletStats.count}
-        lcLeakageCount={lcLeakage.count}
-        lcLeakageTotal={lcLeakage.totalLoss}
-        dataHealthFlagged={dataHealth.flaggedCount}
+        newCount={newCustomers.length}
+        newMRR={newCustomerMRR}
+        newPeriodLabel={newPeriodLabel}
+        avgUsers={avgUsersPerAccount}
+        onWalletDrilldown={() => setShowWalletDrill(v => !v)}
       />
+
+      {/* Wallet spend drill-down panel — shown inline below summary cards */}
+      {showWalletDrill && (
+        <WalletDrilldown
+          accounts={scorableAccounts}
+          onClose={() => setShowWalletDrill(false)}
+        />
+      )}
 
       {/* 2. DM vs Agent breakdown */}
       <DmAgentBreakdown
@@ -343,7 +387,10 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* 6. Charts — fed filtered accounts so they update with filters */}
       <HealthCharts accounts={filteredAccounts} />
 
-      {/* 7. Master accounts table */}
+      {/* 7. Transaction / billing breakdown table with drill-down */}
+      <TransactionBreakdown accounts={scorableAccounts} />
+
+      {/* 8. Master accounts table */}
       <MasterAccountsTable accounts={filteredAccounts} onAccountClick={setSelectedAccount} />
 
       {/* Account detail modal */}
