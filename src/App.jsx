@@ -1,5 +1,16 @@
 import { useState } from 'react'
 import HealthDashboard from './components/health/HealthDashboard'
+import LoginPage       from './components/health/LoginPage'
+
+const COOKIE = 'lgm-health-auth'
+
+function getSessionCookie() {
+  return document.cookie
+    .split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith(COOKIE + '='))
+    ?.slice(COOKIE.length + 1) || null
+}
 
 function LogoMark() {
   return (
@@ -33,17 +44,40 @@ function LogoMark() {
 }
 
 export default function App() {
+  // Middleware redirects unauthenticated requests to /?login=1.
+  // On load: if ?login=1 → show login. If session cookie exists → allow through.
+  const params      = new URLSearchParams(window.location.search)
+  const loginForced = params.get('login') === '1'
+  const hasCookie   = !!getSessionCookie()
+
+  const [authed, setAuthed] = useState(!loginForced && hasCookie)
+
   const [healthFilters, setHealthFilters] = useState({
     search: '', typeFilter: 'all', bandFilter: 'all',
     dateRange: { type: 'all', from: '', to: '' },
   })
 
+  function handleLoginSuccess() {
+    setAuthed(true)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('login')
+    window.history.replaceState({}, '', url.toString())
+  }
+
+  if (!authed) return <LoginPage onSuccess={handleLoginSuccess} />
+
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <header className="sticky top-0 z-50 bg-white border-b border-brand-border"
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderTop: '3px solid #8CC63F' }}>
-        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 h-[60px] flex items-center">
+        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 h-[60px] flex items-center justify-between">
           <LogoMark />
+          <button
+            onClick={() => { window.location.href = '/api/auth?logout=1' }}
+            className="text-[11px] text-brand-muted hover:text-brand-heading transition-colors px-3 py-1.5 rounded-lg hover:bg-brand-bg border border-transparent hover:border-brand-border"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 
