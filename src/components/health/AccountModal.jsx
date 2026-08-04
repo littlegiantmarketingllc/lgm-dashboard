@@ -1,6 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { differenceInDays, parseISO, isValid, format } from 'date-fns'
 import { isAtRisk, isUpsellReady, suggestAddon, recommendAction } from '../../lib/healthEngine'
+import GHLInfoPanel from './GHLInfoPanel'
+
+// Strip noise words before searching GHL so "Pontes Agency LLC" → "Pontes"
+const NOISE = /\b(agency|llc|inc|corp|insurance|marketing|services|group|associates|co\.?|ltd|the)\b/gi
+function buildGHLQuery(name) {
+  return name.replace(NOISE, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 2).join(' ')
+}
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -47,6 +54,28 @@ function StatBlock({ label, value }) {
 }
 
 export default function AccountModal({ account, onClose }) {
+  const [ghlData,    setGhlData]    = useState(null)
+  const [ghlLoading, setGhlLoading] = useState(false)
+  const [ghlError,   setGhlError]   = useState(null)
+
+  const fetchGHLInfo = useCallback(async () => {
+    if (ghlLoading) return
+    setGhlLoading(true)
+    setGhlError(null)
+    try {
+      const q = buildGHLQuery(account.accountName)
+      const res = await fetch(`/api/ghl-contact?q=${encodeURIComponent(q)}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setGhlData(data)
+    } catch (err) {
+      setGhlError(err.message)
+    } finally {
+      setGhlLoading(false)
+    }
+  }, [account.accountName, ghlLoading])
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -205,6 +234,17 @@ export default function AccountModal({ account, onClose }) {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* GHL CRM on-demand lookup */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Live GHL CRM Data</p>
+            <GHLInfoPanel
+              data={ghlData}
+              loading={ghlLoading}
+              error={ghlError}
+              onFetch={fetchGHLInfo}
+            />
           </div>
 
         </div>
