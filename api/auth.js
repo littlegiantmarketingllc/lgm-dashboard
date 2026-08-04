@@ -4,7 +4,7 @@
 // GET  /api/auth?check=1               → 200 ok | 401 not authenticated
 
 const COOKIE_NAME = 'lgm-health-auth'
-const MAX_AGE     = 60 * 60 * 24 * 7  // 7 days
+const MAX_AGE     = 60 * 60 * 24 * 365  // 1 year — recognized device stays logged in
 
 function cookieHeader(value, maxAge) {
   return `${COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Strict; Secure`
