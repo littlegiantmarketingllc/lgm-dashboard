@@ -64,12 +64,21 @@ export default function HealthSummaryCards({
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
 
       <Card
+        label="Total GHL Sub-accounts"
+        value={ghlTotal}
+        sub={ghlTotal > 0 ? `${accounts.length} billed · ${Math.max(0, ghlTotal - accounts.length)} not yet in billing sheet` : 'Loading GHL data…'}
+        icon="🔗"
+        delay={0}
+        infoText="Total sub-accounts synced from GoHighLevel (excludes sandbox/test accounts). This is your complete GHL portfolio count. 'Billed' = accounts in the LGM billing sheet. The difference are sub-accounts in GHL that haven't been added to billing yet."
+      />
+
+      <Card
         label="Billed Accounts"
         value={accounts.length}
         sub={accountsSub}
         icon="🏢"
-        delay={0}
-        infoText="Total client accounts in the LGM billing sheet. DM = Digital Marketing clients; Agent = Conversational AI clients. GHL-only stubs (not yet billed) are excluded from all KPIs."
+        delay={20}
+        infoText="Total client accounts in the LGM billing sheet. DM = Digital Marketing clients; Agent = Conversational AI clients. GHL-only stubs (not yet billed) are excluded from health KPIs."
       />
 
       <Card

@@ -82,8 +82,12 @@ const HEADER_PATTERNS = [
   { field: 'accountName',     tests: [/^subaccounts?$/i, /account\s*name/i, /^name$/i] },
   { field: 'accountType',     tests: [/account\s*category/i, /account\s*type/i, /^type$/i] },
   { field: 'stripeStartDate', tests: [/stripe\s*start/i, /start\s*date/i] },
+  { field: 'planName',        tests: [/current\s*plan\s*name/i, /plan\s*name/i] },
+  { field: 'billingTerm',     tests: [/^term$/i] },
   // Must match "Agency Gross Profit" (col 24) NOT "LC Agency Gross Profit" (col 22)
   { field: 'gp',              tests: [/^agency\s*gross\s*profit$/i, /^gp$/i] },
+  { field: 'agencyGpPct',     tests: [/^agency\s*gross\s*profit\s*%$/i] },
+  { field: 'lcAgencyCosts',   tests: [/^lc\s*agency\s*costs?$/i] },
   // "Total Mon. Charges" = total monthly revenue from the client
   { field: 'totalRev',        tests: [/total\s*mon\.?\s*charges?/i, /total\s*rev/i, /^revenue$/i] },
   { field: 'planPrice',       tests: [/plan\s*price/i] },
@@ -95,6 +99,9 @@ const HEADER_PATTERNS = [
   { field: 'lcWalletCharges', tests: [/lc\s*agent\s*charges?/i, /lc\s*wallet/i, /wallet\s*charge/i] },
   // "DataHealthStatus" (1–5 scale) scaled ×1000 so threshold 3500 = status ≤3.5 → at-risk
   { field: 'transactions',    tests: [/^datahealth\s*status$/i, /^transactions?$/i, /lc\s*transactions?/i] },
+  { field: 'dataHealthNotes', tests: [/datahealth\s*notes?/i, /health\s*notes?/i] },
+  { field: 'needsReview',     tests: [/needs\s*review/i] },
+  { field: 'notes',           tests: [/^notes?$/i] },
   { field: 'subAcntCount',    tests: [/subac[cn]t\s*count/i, /sub[\s-]?ac[cn]t/i] },
   { field: 'annualSubs',      tests: [/annual\s*sub/i, /annually\s*charge/i] },
   { field: 'multiLocation',   tests: [/multi[-\s]?location/i] },
@@ -151,6 +158,14 @@ function rowToAccount(row, hmap, idx) {
     multiLocation,
     lastActivity:     hmap['lastActivity'] !== undefined ? get('lastActivity') : null,
     sheetGhlId:       get('sheetGhlId') || null,
+    // Newly parsed fields
+    planName:         get('planName') || null,
+    billingTerm:      get('billingTerm') || null,
+    agencyGpPct:      get('agencyGpPct') || null,
+    lcAgencyCosts:    parseNum(get('lcAgencyCosts')),
+    dataHealthNotes:  get('dataHealthNotes') || null,
+    needsReview:      /^true$/i.test(get('needsReview')),
+    notes:            get('notes') || null,
   }
 }
 

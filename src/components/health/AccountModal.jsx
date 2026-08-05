@@ -127,8 +127,9 @@ export default function AccountModal({ account, onClose }) {
                   {bandLabel(band)}
                 </span>
                 <span className="text-[11px] text-brand-muted">{account.accountType}</span>
-                {atRisk  && <span className="text-[11px] font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">⚠ At-Risk</span>}
-                {upsell  && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{ color: G, background: `${G}10`, borderColor: `${G}28` }}>📈 Upsell Ready</span>}
+                {atRisk            && <span className="text-[11px] font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">⚠ At-Risk</span>}
+                {upsell            && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border" style={{ color: G, background: `${G}10`, borderColor: `${G}28` }}>📈 Upsell Ready</span>}
+                {account.needsReview && <span className="text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">🔍 Needs Review</span>}
               </div>
             </div>
           </div>
@@ -236,14 +237,30 @@ export default function AccountModal({ account, onClose }) {
               <p className="num font-medium text-brand-text mt-0.5">{tenureDays !== null ? `${tenureDays}d` : '—'}</p>
             </div>
             <div>
+              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Billing Term</p>
+              <p className="font-medium text-brand-text mt-0.5">{account.billingTerm || '—'}</p>
+            </div>
+            <div>
               <p className="text-[10px] text-brand-muted uppercase tracking-wider">Multi-Location</p>
               <p className="font-medium text-brand-text mt-0.5">{account.multiLocation ? 'Yes' : 'No'}</p>
             </div>
-            <div>
-              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Sub-Acnt Count</p>
-              <p className="num font-medium text-brand-text mt-0.5">{account.subAcntCount.toLocaleString()}</p>
-            </div>
           </div>
+
+          {/* Current plan */}
+          {account.planName && (
+            <div className="rounded-xl border border-brand-border p-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-0.5">Current Plan</p>
+                <p className="text-[12px] font-medium text-brand-text truncate">{account.planName}</p>
+              </div>
+              {account.agencyGpPct && (
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-0.5">Agency GP %</p>
+                  <p className="text-[13px] font-bold" style={{ color: G }}>{account.agencyGpPct}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Rules triggered */}
           <div className="space-y-2.5">
@@ -269,6 +286,30 @@ export default function AccountModal({ account, onClose }) {
               </div>
             )}
           </div>
+
+          {/* DataHealthNotes from billing sheet */}
+          {account.dataHealthNotes && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">📋 DataHealth Notes</p>
+              <p className="text-[12px] text-amber-800 leading-relaxed">{account.dataHealthNotes}</p>
+            </div>
+          )}
+
+          {/* Needs Review flag */}
+          {account.needsReview && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-1">🔍 Flagged: Needs Review</p>
+              <p className="text-[12px] text-orange-700">This account has been flagged in the billing sheet for manual review.</p>
+            </div>
+          )}
+
+          {/* Staff notes */}
+          {account.notes && (
+            <div className="rounded-xl border border-brand-border bg-brand-bg px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">📝 Notes</p>
+              <p className="text-[12px] text-brand-text leading-relaxed whitespace-pre-wrap">{account.notes}</p>
+            </div>
+          )}
 
           {/* GHL CRM on-demand lookup */}
           <div>
