@@ -176,11 +176,25 @@ export default function HealthDashboard({ filters, setFilters }) {
     })
   }, [accounts, filters])
 
-  // ── All derived data from filteredAccounts — everything reacts together ───
-  // Exclude _ghlOnly accounts from scoring tables — they have no billing data
-  // yet so they'd score 0 and flood the at-risk / upsell lists with noise.
-  // They're still visible in the Master Table so the team can see them.
-  const scorableAccounts = useMemo(() => filteredAccounts.filter(a => !a._ghlOnly), [filteredAccounts])
+  // ── Portfolio-wide accounts: all billing sheet accounts, no date filter ──────
+  // Used for KPIs (At-Risk, Revenue, Health etc.) that show the full portfolio.
+  // The date filter only makes sense on these KPIs when it returns actual billed
+  // accounts; if it returns 0, we fall back to the full set so the cards don't
+  // all show 0 just because new clients haven't been added to the billing sheet.
+  const allScorableAccounts = useMemo(
+    () => accounts.filter(a => !a._ghlOnly),
+    [accounts]
+  )
+
+  // Date-filtered billing accounts — when the date filter returns some billed
+  // accounts we use those; when it returns 0 we fall back to allScorableAccounts
+  // so the health KPIs always show meaningful portfolio data.
+  const filteredScorable = useMemo(
+    () => filteredAccounts.filter(a => !a._ghlOnly),
+    [filteredAccounts]
+  )
+  const dateFilterEmpty = filters.dateRange.type !== 'all' && filteredScorable.length === 0
+  const scorableAccounts = dateFilterEmpty ? allScorableAccounts : filteredScorable
 
   const atRiskAccounts  = useMemo(() =>
     scorableAccounts.filter(isAtRisk).sort((a, b) => a._health.score - b._health.score),
@@ -313,27 +327,46 @@ export default function HealthDashboard({ filters, setFilters }) {
       />
 
       {/* Active-filter context banner */}
-      {filters.dateRange.type !== 'all' && filteredAccounts.length > 0 && (
+      {filters.dateRange.type !== 'all' && filteredAccounts.length > 0 && !dateFilterEmpty && (
         <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-[11px] text-brand-heading flex items-center gap-2"
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
           <span>📅</span>
           <span>
-            Showing <strong>{filteredAccounts.length}</strong> accounts whose GHL sub-account was created in this period.
-            {' '}All KPIs and tables update live as you change the range.
+            Showing <strong>{filteredScorable.length}</strong> billed account{filteredScorable.length !== 1 ? 's' : ''} whose GHL sub-account was created in this period.
+            {' '}Health KPIs and tables update live as you change the range.
           </span>
         </div>
       )}
 
-      {/* Zero-result explanation when date filter is active */}
+      {/* New-GHL-accounts banner: date filter is active but no billed accounts match —
+          the accounts in the window exist in GHL but haven't been added to billing yet */}
+      {dateFilterEmpty && filteredAccounts.length > 0 && (
+        <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-[12px] text-purple-800 flex items-start gap-3"
+          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
+          <span className="text-base flex-shrink-0 mt-0.5">✦</span>
+          <div>
+            <p className="font-semibold mb-0.5">
+              {filteredAccounts.length} new GHL sub-account{filteredAccounts.length !== 1 ? 's' : ''} created in this period
+              — not yet in the billing sheet.
+            </p>
+            <p className="text-purple-700 text-[11px] leading-relaxed">
+              These accounts appear in the Master Table below with a <strong>new</strong> badge.
+              Portfolio KPIs (At-Risk, Revenue, Health) show your <strong>full {allScorableAccounts.length}-account portfolio</strong> since these clients have no billing data yet.
+              Once added to the billing sheet they will count toward all metrics.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Zero-result explanation when date filter is active and nothing at all matches */}
       {filters.dateRange.type !== 'all' && filteredAccounts.length === 0 && accounts.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 flex items-start gap-3">
           <span className="text-base flex-shrink-0 mt-0.5">📅</span>
           <div>
             <p className="font-semibold mb-0.5">No accounts found for this period.</p>
             <p className="text-amber-700 text-[11px] leading-relaxed">
-              Dates are sourced from the <strong>GHL sub-account creation date</strong> (automatically synced).
-              Either no sub-accounts were created in this window, or the GHL agency data is still loading — try refreshing.
-              Select <strong>All Dates</strong> to see all {accounts.length} accounts.
+              No GHL sub-accounts were created in this window.
+              Select <strong>All Dates</strong> to see all {allScorableAccounts.length} billed accounts.
             </p>
           </div>
         </div>
