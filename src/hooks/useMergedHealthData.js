@@ -28,8 +28,10 @@ export function useMergedHealthData() {
   // Enrich every sheet account with whatever GHL can provide
   const enrichedSheet = useMemo(() => {
     return sheet.accounts.map(acc => {
+      // sheetGhlId = the "locationid" column from the billing sheet
+      // locationId is NOT set yet on the raw sheet row — only set after enrichment
       const ghlMatch =
-        (acc.locationId && ghlById[acc.locationId]) ||
+        (acc.sheetGhlId && ghlById[acc.sheetGhlId]) ||
         ghlByName[norm(acc.accountName)]
 
       if (!ghlMatch) return { ...acc, _ghlMatch: false }

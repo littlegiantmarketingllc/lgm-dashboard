@@ -28,6 +28,10 @@ const G = '#8CC63F'
 function getDateWindow(dateRange) {
   if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
   const today = new Date()
+  if (dateRange.type === 'last_7') return {
+    from: format(subDays(today, 7),  'yyyy-MM-dd'),
+    to:   format(today, 'yyyy-MM-dd'),
+  }
   if (dateRange.type === 'this_month') return {
     from: format(startOfMonth(today), 'yyyy-MM-dd'),
     to:   format(endOfMonth(today),   'yyyy-MM-dd'),
@@ -162,7 +166,10 @@ export default function HealthDashboard({ filters, setFilters }) {
       if (typeF !== 'all' && (a.accountType || '').toLowerCase() !== typeF.toLowerCase()) return false
       if (bandF !== 'all' && a._health?.band !== bandF) return false
       if (filters.dateRange.type !== 'all') {
-        const d = a.stripeStartDate || ''
+        // Use stripeStartDate first, then GHL sub-account creation date as fallback.
+        // stripeStartDate may already contain ghlDateAdded via useMergedHealthData merge,
+        // but check ghlDateAdded directly too in case the merge match missed.
+        const d = a.stripeStartDate || a.ghlDateAdded || ''
         if (!d || d < from || d > to) return false
       }
       return true
@@ -200,11 +207,11 @@ export default function HealthDashboard({ filters, setFilters }) {
     const from = isAllTime ? format(subDays(today, 30), 'yyyy-MM-dd') : getDateWindow(filters.dateRange).from
     const to   = isAllTime ? format(today, 'yyyy-MM-dd')              : getDateWindow(filters.dateRange).to
     const label = isAllTime ? 'last 30 days' : (() => {
-      const types = { this_month: 'this month', last_month: 'last month', last_30: 'last 30 days', last_90: 'last 90 days' }
+      const types = { last_7: 'last 7 days', this_month: 'this month', last_month: 'last month', last_30: 'last 30 days', last_90: 'last 90 days' }
       return types[filters.dateRange.type] || 'selected period'
     })()
     const list = scorableAccounts.filter(a => {
-      const d = a.stripeStartDate || ''
+      const d = a.stripeStartDate || a.ghlDateAdded || ''
       return d && d >= from && d <= to
     })
     return { newCustomers: list, newPeriodLabel: label }
@@ -310,8 +317,8 @@ export default function HealthDashboard({ filters, setFilters }) {
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
           <span>📅</span>
           <span>
-            Showing <strong>{filteredAccounts.length}</strong> accounts whose Stripe Start Date (join date) falls in this range.
-            {' '}Numbers update live as the range changes.
+            Showing <strong>{filteredAccounts.length}</strong> accounts whose GHL sub-account was created in this period.
+            {' '}All KPIs and tables update live as you change the range.
           </span>
         </div>
       )}
@@ -321,11 +328,11 @@ export default function HealthDashboard({ filters, setFilters }) {
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 flex items-start gap-3">
           <span className="text-base flex-shrink-0 mt-0.5">📅</span>
           <div>
-            <p className="font-semibold mb-0.5">No accounts joined during this period.</p>
+            <p className="font-semibold mb-0.5">No accounts found for this period.</p>
             <p className="text-amber-700 text-[11px] leading-relaxed">
-              The date filter shows accounts by their <strong>Stripe Start Date</strong> — when they first joined LGM as a paying client.
-              All {accounts.length} accounts in your sheet joined outside this window.
-              Select <strong>All Dates</strong> to see the full portfolio, or use <strong>Custom Range</strong> to find a specific cohort.
+              Dates are sourced from the <strong>GHL sub-account creation date</strong> (automatically synced).
+              Either no sub-accounts were created in this window, or the GHL agency data is still loading — try refreshing.
+              Select <strong>All Dates</strong> to see all {accounts.length} accounts.
             </p>
           </div>
         </div>

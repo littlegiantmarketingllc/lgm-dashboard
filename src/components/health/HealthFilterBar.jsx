@@ -3,12 +3,13 @@ import InfoTip from './InfoTip'
 const G = '#8CC63F'
 
 const DATE_OPTIONS = [
-  { label: 'All Dates',       value: 'all'        },
-  { label: 'Joined This Mo.', value: 'this_month' },
-  { label: 'Joined Last Mo.', value: 'last_month' },
-  { label: 'Joined Last 30d', value: 'last_30'    },
-  { label: 'Joined Last 90d', value: 'last_90'    },
-  { label: 'Custom Range',    value: 'custom'     },
+  { label: 'All Dates',    value: 'all'        },
+  { label: 'Last 7 Days',  value: 'last_7'     },
+  { label: 'This Month',   value: 'this_month' },
+  { label: 'Last Month',   value: 'last_month' },
+  { label: 'Last 30 Days', value: 'last_30'    },
+  { label: 'Last 90 Days', value: 'last_90'    },
+  { label: 'Custom',       value: 'custom'     },
 ]
 
 function todayStr() {
@@ -97,7 +98,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider whitespace-nowrap hidden sm:inline">Customer Since</span>
           <InfoTip
-            text={`Filters accounts by their Stripe Start Date — the date they first joined LGM as a paying client.\n\n"Joined This Mo." shows accounts that started THIS month. "Joined Last Mo." shows accounts that started LAST month — not accounts that were active last month.\n\nMost accounts joined months or years ago, so recent windows may show 0 results. Use "All Dates" to see everyone, or "Custom Range" to look up a specific cohort.`}
+            text="Filters accounts by their join date — when the GHL sub-account was created for this client (pulled automatically from GoHighLevel). If the billing sheet has a Stripe Start Date, that is used instead. 'Last 7 Days' = accounts whose sub-account was created in the past 7 days. 'This Month' = created this calendar month. Use 'All Dates' to see the full portfolio."
             position="bottom-end"
           />
         </div>
@@ -141,7 +142,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
       {/* Custom date row */}
       {dateRange.type === 'custom' && (
         <div className="border-t border-brand-border/50 px-4 sm:px-6 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-brand-muted text-[11px] font-semibold flex-shrink-0">Customer joined between:</span>
+          <span className="text-brand-muted text-[11px] font-semibold flex-shrink-0">GHL sub-account created between:</span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <label className="text-brand-muted text-[11px]">From</label>
             <input
