@@ -69,7 +69,7 @@ export default function HealthSummaryCards({
         sub={ghlTotal > 0 ? `${accounts.length} billed · ${Math.max(0, ghlTotal - accounts.length)} not yet in billing sheet` : 'Loading GHL data…'}
         icon="🔗"
         delay={0}
-        infoText="Total sub-accounts pulled live from GoHighLevel every page load — no caching. This is your exact GHL count including all sandbox/test accounts. 'Billed' = accounts in the LGM billing sheet. The difference are sub-accounts not yet in billing."
+        infoText="Total client sub-accounts pulled live from GoHighLevel on every dashboard load (no caching). Internal sandbox/test accounts are excluded. 'Billed' = accounts in the LGM billing sheet. The difference are GHL sub-accounts not yet added to billing."
       />
 
       <Card

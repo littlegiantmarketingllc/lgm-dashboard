@@ -37,10 +37,11 @@ export default async function handler(req, res) {
 
     const now = new Date()
 
-    // Mark internal sandbox/test accounts but include them in the total (per user request)
+    // Strip internal sandbox / test accounts — they aren't real clients
     const SANDBOX_PATTERNS = /sandbox|test account|test 2|in progress|bilingual snapshot/i
+    const realLocs = all.filter(loc => !SANDBOX_PATTERNS.test(loc.name || ''))
 
-    const accounts = all.map(loc => {
+    const accounts = realLocs.map(loc => {
       const updatedAt        = loc.dateUpdated ? new Date(loc.dateUpdated) : null
       const daysSinceUpdate  = updatedAt
         ? Math.floor((now - updatedAt) / 86_400_000)
@@ -64,7 +65,6 @@ export default async function handler(req, res) {
         ghlDaysSinceUpdate: daysSinceUpdate,
         ghlPermissions:     loc.permissions     || {},
         ghlSnapshotId:      loc.snapshotId      || '',
-        ghlIsSandbox:       SANDBOX_PATTERNS.test(loc.name || ''),
 
         // ⚠️ Null = needs additional GHL API scope — will show as pending in UI
         ghlUserCount:       null,  // needs users.readonly scope
