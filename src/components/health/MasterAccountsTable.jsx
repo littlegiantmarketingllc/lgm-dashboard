@@ -45,7 +45,7 @@ const COLUMNS = [
 
 const PAGE_SIZE = 25
 
-export default function MasterAccountsTable({ accounts, onAccountClick }) {
+export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCount = 0, onAccountClick }) {
   const [sortCol, setSortCol] = useState('totalRev')
   const [sortDir, setSortDir] = useState('desc')
   const [page,    setPage]    = useState(1)
@@ -86,7 +86,16 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
           <div>
             <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
             <p className="text-brand-muted text-[11px] mt-0.5">
-              {accounts.length} accounts · click any column header to sort
+              {billedCount != null
+                ? <>
+                    <span className="font-medium text-brand-text">{billedCount}</span> billed
+                    {ghlOnlyCount > 0 && (
+                      <> · <span className="text-purple-600 font-medium">{ghlOnlyCount}</span> in GHL, not yet billed</>
+                    )}
+                  </>
+                : <>{accounts.length} accounts</>
+              }
+              {' '}· click any column header to sort
             </p>
           </div>
           <InfoTip

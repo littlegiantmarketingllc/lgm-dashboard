@@ -199,8 +199,9 @@ export default function HealthDashboard({ filters, setFilters }) {
   const dataHealth      = useMemo(() => dataHealthSummary(scorableAccounts),                               [scorableAccounts])
 
   // ── New metrics ───────────────────────────────────────────────────────────
-  // New customers: joined within the active date window
-  // When dateRange = 'all', default to last 30 days so the card always shows something useful
+  // New customers: joined within the active date window.
+  // Uses filteredAccounts (includes _ghlOnly) so newly created GHL sub-accounts
+  // that aren't in the billing sheet yet are still counted as new clients.
   const { newCustomers, newPeriodLabel } = useMemo(() => {
     const today = new Date()
     const isAllTime = filters.dateRange.type === 'all'
@@ -210,12 +211,12 @@ export default function HealthDashboard({ filters, setFilters }) {
       const types = { last_7: 'last 7 days', this_month: 'this month', last_month: 'last month', last_30: 'last 30 days', last_90: 'last 90 days' }
       return types[filters.dateRange.type] || 'selected period'
     })()
-    const list = scorableAccounts.filter(a => {
+    const list = filteredAccounts.filter(a => {
       const d = a.stripeStartDate || a.ghlDateAdded || ''
       return d && d >= from && d <= to
     })
     return { newCustomers: list, newPeriodLabel: label }
-  }, [scorableAccounts, filters.dateRange])
+  }, [filteredAccounts, filters.dateRange])
 
   const newCustomerMRR = useMemo(() =>
     newCustomers.reduce((s, a) => s + (a.totalRev || 0), 0),
@@ -413,7 +414,12 @@ export default function HealthDashboard({ filters, setFilters }) {
       <TransactionBreakdown accounts={scorableAccounts} />
 
       {/* 8. Master accounts table */}
-      <MasterAccountsTable accounts={filteredAccounts} onAccountClick={setSelectedAccount} />
+      <MasterAccountsTable
+        accounts={filteredAccounts}
+        billedCount={scorableAccounts.length}
+        ghlOnlyCount={filteredAccounts.filter(a => a._ghlOnly).length}
+        onAccountClick={setSelectedAccount}
+      />
 
       {/* Account detail modal */}
       {selectedAccount && (

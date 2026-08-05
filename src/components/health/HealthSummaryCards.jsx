@@ -57,7 +57,7 @@ export default function HealthSummaryCards({
   onWalletDrilldown,
 }) {
   const accountsSub = ghlOnlyCount > 0
-    ? `${dmCount} DM · ${agentCount} Agent · ${ghlOnlyCount} in GHL, not yet billed`
+    ? `${dmCount} DM · ${agentCount} Agent · +${ghlOnlyCount} in GHL, not yet in billing sheet`
     : `${dmCount} DM · ${agentCount} Agent`
 
   return (
