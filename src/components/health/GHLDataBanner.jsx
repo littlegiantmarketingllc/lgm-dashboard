@@ -20,9 +20,12 @@ export default function GHLDataBanner({ status }) {
 
         {/* GHL live — what we have */}
         {ghlTotal > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700">
+          <span
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700"
+            title="Total GHL sub-accounts (includes internal, trial, and inactive — not all are paying clients). Billing sheet is the source of truth for billed accounts."
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-            {ghlTotal} real clients in GHL
+            {ghlTotal} GHL sub-accounts synced
           </span>
         )}
         <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700">
@@ -49,9 +52,12 @@ export default function GHLDataBanner({ status }) {
           </span>
         )}
 
-        {/* Pending scopes */}
-        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-          ⚠ Pending GHL scope: {pendingScopes.join(' · ')}
+        {/* Pending per-location data */}
+        <span
+          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700"
+          title="These fields require per-sub-account API tokens, which are different from the agency-level key. Revenue and plan data come from the billing sheet instead."
+        >
+          ⚠ GHL per-account data not yet available: {pendingScopes.join(' · ')}
         </span>
 
         {/* GHL error */}

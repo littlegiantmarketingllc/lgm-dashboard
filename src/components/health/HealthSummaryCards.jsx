@@ -87,7 +87,7 @@ export default function HealthSummaryCards({
         sub={`Joined in ${newPeriodLabel} · ${fmt(newMRR)}/mo`}
         icon="✨"
         delay={60}
-        infoText={`Clients whose Stripe Start Date falls within the selected date range. When no date filter is set, defaults to the last 30 days. New Customer MRR is shown as the subtitle.`}
+        infoText={`Clients whose GHL sub-account was created within the selected date range (pulled from GoHighLevel). When no date filter is set, defaults to the last 30 days. New Customer MRR is shown as the subtitle.`}
         accentColor={G}
       />
 
