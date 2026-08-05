@@ -1,12 +1,14 @@
+import InfoTip from './InfoTip'
+
 const G = '#8CC63F'
 
 const DATE_OPTIONS = [
-  { label: 'All Time',    value: 'all'        },
-  { label: 'This Month',  value: 'this_month' },
-  { label: 'Last Month',  value: 'last_month' },
-  { label: 'Last 30d',    value: 'last_30'    },
-  { label: 'Last 90d',    value: 'last_90'    },
-  { label: 'Custom',      value: 'custom'     },
+  { label: 'All Dates',       value: 'all'        },
+  { label: 'Joined This Mo.', value: 'this_month' },
+  { label: 'Joined Last Mo.', value: 'last_month' },
+  { label: 'Joined Last 30d', value: 'last_30'    },
+  { label: 'Joined Last 90d', value: 'last_90'    },
+  { label: 'Custom Range',    value: 'custom'     },
 ]
 
 function todayStr() {
@@ -30,50 +32,76 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
       <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
 
         {/* Search */}
-        <input
-          type="text"
-          placeholder="Search accounts…"
-          value={search}
-          onChange={e => set({ search: e.target.value })}
-          className="text-[12px] border border-brand-border rounded-lg px-3 py-1.5 bg-brand-bg focus:outline-none focus:border-brand-green flex-shrink-0 w-[175px]"
-        />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <input
+            type="text"
+            placeholder="Search accounts…"
+            value={search}
+            onChange={e => set({ search: e.target.value })}
+            className="text-[12px] border border-brand-border rounded-lg px-3 py-1.5 bg-brand-bg focus:outline-none focus:border-brand-green w-[165px]"
+          />
+          <InfoTip
+            text="Search by account name. Case-insensitive partial match — type any part of the name to filter."
+            position="bottom-end"
+          />
+        </div>
 
         {/* Type filter */}
-        <select
-          value={typeFilter}
-          onChange={e => set({ typeFilter: e.target.value })}
-          className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer flex-shrink-0 transition-colors duration-150"
-          style={{
-            color:       typeFilter !== 'all' ? '#3a6b10' : '#6B7280',
-            background:  typeFilter !== 'all' ? `${G}10`  : '#F4F6F4',
-            borderColor: typeFilter !== 'all' ? `${G}50`  : '#E5E7E5',
-          }}
-        >
-          <option value="all">All Types</option>
-          {accountTypes.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <select
+            value={typeFilter}
+            onChange={e => set({ typeFilter: e.target.value })}
+            className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer transition-colors duration-150"
+            style={{
+              color:       typeFilter !== 'all' ? '#3a6b10' : '#6B7280',
+              background:  typeFilter !== 'all' ? `${G}10`  : '#F4F6F4',
+              borderColor: typeFilter !== 'all' ? `${G}50`  : '#E5E7E5',
+            }}
+          >
+            <option value="all">All Types</option>
+            {accountTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <InfoTip
+            text="Filter by account type. DM = Digital Marketing clients; Agent = Conversational AI clients. Types come directly from the billing sheet."
+            position="bottom-end"
+          />
+        </div>
 
         {/* Band filter */}
-        <select
-          value={bandFilter}
-          onChange={e => set({ bandFilter: e.target.value })}
-          className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer flex-shrink-0 transition-colors duration-150"
-          style={{
-            color:       bandFilter !== 'all' ? '#3a6b10' : '#6B7280',
-            background:  bandFilter !== 'all' ? `${G}10`  : '#F4F6F4',
-            borderColor: bandFilter !== 'all' ? `${G}50`  : '#E5E7E5',
-          }}
-        >
-          <option value="all">All Health</option>
-          <option value="healthy">Healthy (80+)</option>
-          <option value="watch">Watch (50–79)</option>
-          <option value="at_risk">At-Risk (&lt;50)</option>
-        </select>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <select
+            value={bandFilter}
+            onChange={e => set({ bandFilter: e.target.value })}
+            className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer transition-colors duration-150"
+            style={{
+              color:       bandFilter !== 'all' ? '#3a6b10' : '#6B7280',
+              background:  bandFilter !== 'all' ? `${G}10`  : '#F4F6F4',
+              borderColor: bandFilter !== 'all' ? `${G}50`  : '#E5E7E5',
+            }}
+          >
+            <option value="all">All Health</option>
+            <option value="healthy">Healthy (80+)</option>
+            <option value="watch">Watch (50–79)</option>
+            <option value="at_risk">At-Risk (&lt;50)</option>
+          </select>
+          <InfoTip
+            text="Filter by composite health band. Healthy = score 80+, Watch = 50–79, At-Risk = below 50. The score is calculated from DataHealthStatus, Users, Revenue, Tenure, and Login Activity."
+            position="bottom-end"
+          />
+        </div>
 
         {/* Divider */}
         <div className="w-px h-5 bg-brand-border flex-shrink-0 hidden sm:block" />
 
-        {/* Date range pills */}
+        {/* Date range label + pills */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-[10px] font-bold text-brand-muted uppercase tracking-wider whitespace-nowrap hidden sm:inline">Customer Since</span>
+          <InfoTip
+            text={`Filters accounts by their Stripe Start Date — the date they first joined LGM as a paying client.\n\n"Joined This Mo." shows accounts that started THIS month. "Joined Last Mo." shows accounts that started LAST month — not accounts that were active last month.\n\nMost accounts joined months or years ago, so recent windows may show 0 results. Use "All Dates" to see everyone, or "Custom Range" to look up a specific cohort.`}
+            position="bottom-end"
+          />
+        </div>
+
         <div className="flex items-center gap-0.5 bg-brand-bg border border-brand-border rounded-lg p-0.5 flex-shrink-0 overflow-x-auto">
           {DATE_OPTIONS.map(opt => {
             const active = dateRange.type === opt.value
@@ -81,7 +109,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
               <button
                 key={opt.value}
                 onClick={() => setDR({ type: opt.value })}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
                   active ? 'text-white btn-green-active' : 'text-brand-muted hover:text-brand-text hover:bg-white'
                 }`}
                 style={active ? { background: G } : {}}
@@ -113,7 +141,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
       {/* Custom date row */}
       {dateRange.type === 'custom' && (
         <div className="border-t border-brand-border/50 px-4 sm:px-6 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-brand-muted text-[11px] font-semibold flex-shrink-0">Filter by Stripe Start Date:</span>
+          <span className="text-brand-muted text-[11px] font-semibold flex-shrink-0">Customer joined between:</span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <label className="text-brand-muted text-[11px]">From</label>
             <input

@@ -305,14 +305,29 @@ export default function HealthDashboard({ filters, setFilters }) {
       />
 
       {/* Active-filter context banner */}
-      {filters.dateRange.type !== 'all' && (
+      {filters.dateRange.type !== 'all' && filteredAccounts.length > 0 && (
         <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-[11px] text-brand-heading flex items-center gap-2"
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
           <span>📅</span>
           <span>
-            Showing <strong>{filteredAccounts.length}</strong> accounts with Stripe Start Date in the selected range.
+            Showing <strong>{filteredAccounts.length}</strong> accounts whose Stripe Start Date (join date) falls in this range.
             {' '}Numbers update live as the range changes.
           </span>
+        </div>
+      )}
+
+      {/* Zero-result explanation when date filter is active */}
+      {filters.dateRange.type !== 'all' && filteredAccounts.length === 0 && accounts.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 flex items-start gap-3">
+          <span className="text-base flex-shrink-0 mt-0.5">📅</span>
+          <div>
+            <p className="font-semibold mb-0.5">No accounts joined during this period.</p>
+            <p className="text-amber-700 text-[11px] leading-relaxed">
+              The date filter shows accounts by their <strong>Stripe Start Date</strong> — when they first joined LGM as a paying client.
+              All {accounts.length} accounts in your sheet joined outside this window.
+              Select <strong>All Dates</strong> to see the full portfolio, or use <strong>Custom Range</strong> to find a specific cohort.
+            </p>
+          </div>
         </div>
       )}
 

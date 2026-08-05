@@ -1,4 +1,5 @@
 import { suggestAddon } from '../../lib/healthEngine'
+import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const RED = '#EF4444'
@@ -17,12 +18,18 @@ export default function QuickWins({ topUpsell, topAtRisk, onAccountClick }) {
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{ animationDelay: '520ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
-      <div className="px-5 sm:px-6 py-4 border-b border-brand-border flex items-center gap-2">
-        <span className="text-base">⚡</span>
-        <div>
-          <h2 className="text-brand-heading font-semibold text-sm">Quick Wins — Do These Today</h2>
-          <p className="text-brand-muted text-[11px] mt-0.5">Top 3 upsell opportunities + 3 most urgent at-risk accounts</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-base">⚡</span>
+          <div>
+            <h2 className="text-brand-heading font-semibold text-sm">Quick Wins — Do These Today</h2>
+            <p className="text-brand-muted text-[11px] mt-0.5">Top 3 upsell opportunities + 3 most urgent at-risk accounts</p>
+          </div>
         </div>
+        <InfoTip
+          text="A prioritized to-do list for today. Left side: the 3 accounts with the highest estimated upsell revenue — call them first. Right side: the 3 most at-risk accounts by health score — reach out before they churn. Click any account name to open its full detail panel."
+          position="top-end"
+        />
       </div>
 
       <div className="px-5 sm:px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">

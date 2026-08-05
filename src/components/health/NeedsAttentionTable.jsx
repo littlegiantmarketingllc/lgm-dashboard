@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const RED = '#EF4444'
@@ -140,7 +141,17 @@ function AccountRow({ a, i, getStatus, getResolvedAt, setStatus, onAccountClick 
   )
 }
 
-const TABLE_HEADERS = ['Account Name', 'Type', 'Transactions', 'Users', 'Total Rev', 'Health', 'Recommended Action', 'Status', 'Actions']
+const TABLE_HEADERS = [
+  { label: 'Account Name',       tip: null },
+  { label: 'Type',               tip: 'DM = Digital Marketing, Agent = Conversational AI.' },
+  { label: 'Transactions',       tip: 'DataHealthStatus score (1–5 scale × 1000). A score ≤ 3,000 means the client has low platform activity — the primary at-risk trigger. "All Good!" = 5,000.' },
+  { label: 'Users',              tip: 'GHL Adjusted User Count — the number of active user seats on this sub-account as reported by GoHighLevel.' },
+  { label: 'Total Rev',          tip: 'Total Monthly Charges — sum of Plan Price + User Seat Fees + Add-ons + LC Platform Usage + Annual Subs.' },
+  { label: 'Health',             tip: 'Composite health score out of 100. Weighted: DataHealthStatus 40%, Users 20%, Revenue 15%, Tenure 15%, Activity 10%. Below 50 = At-Risk.' },
+  { label: 'Recommended Action', tip: 'Rule-based suggestion generated from the account\'s health data — e.g. schedule a check-in call, offer an add-on, or flag for churn risk review.' },
+  { label: 'Status',             tip: 'Your team\'s outreach status for this account. Tracked per-browser — use "In Progress" when outreach has started, "Mark Complete" when resolved.' },
+  { label: 'Actions',            tip: null },
+]
 
 function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClick }) {
   return (
@@ -148,9 +159,12 @@ function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClic
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-brand-border bg-brand-bg/50">
-            {TABLE_HEADERS.map(h => (
-              <th key={h} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
-                {h}
+            {TABLE_HEADERS.map(({ label, tip }) => (
+              <th key={label} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
+                <span className="flex items-center gap-1">
+                  {label}
+                  {tip && <InfoTip text={tip} position="bottom-end" />}
+                </span>
               </th>
             ))}
           </tr>
@@ -193,17 +207,23 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
     >
       {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-start sm:items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse-dot inline-block flex-shrink-0"
-              style={{ boxShadow: '0 0 5px rgba(239,68,68,0.5)' }} />
-            Needs Attention
-          </h2>
-          <p className="text-brand-muted text-[11px] mt-0.5">
-            {accounts.length === 0
-              ? 'No at-risk accounts — all clear'
-              : `${accounts.length} accounts · ${actionRequired} pending · ${inProgress} in progress · ${resolved} resolved`}
-          </p>
+        <div className="flex items-start gap-2">
+          <div>
+            <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse-dot inline-block flex-shrink-0"
+                style={{ boxShadow: '0 0 5px rgba(239,68,68,0.5)' }} />
+              Needs Attention
+            </h2>
+            <p className="text-brand-muted text-[11px] mt-0.5">
+              {accounts.length === 0
+                ? 'No at-risk accounts — all clear'
+                : `${accounts.length} accounts · ${actionRequired} pending · ${inProgress} in progress · ${resolved} resolved`}
+            </p>
+          </div>
+          <InfoTip
+            text="At-risk accounts sorted worst-first (lowest health score first). An account is at-risk if its DataHealthStatus ≤ 3 (out of 5) OR its composite health score is below 50. The top 10 are highlighted as 'Highly Needed' — fix those first. Use the status buttons to track your team's outreach progress."
+            position="top-end"
+          />
         </div>
         {accounts.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">

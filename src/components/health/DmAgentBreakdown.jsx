@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -34,9 +35,15 @@ export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgen
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{ animationDelay: '360ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
-      <div className="px-5 sm:px-6 py-4 border-b border-brand-border">
-        <h2 className="text-brand-heading font-semibold text-sm">DM vs Agent Breakdown</h2>
-        <p className="text-brand-muted text-[11px] mt-0.5">Revenue distribution by account type</p>
+      <div className="px-5 sm:px-6 py-4 border-b border-brand-border flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-brand-heading font-semibold text-sm">DM vs Agent Breakdown</h2>
+          <p className="text-brand-muted text-[11px] mt-0.5">Revenue distribution by account type</p>
+        </div>
+        <InfoTip
+          text="Splits your portfolio into two account types. DM (Digital Marketing) = traditional ad/marketing clients. Agent (Conversational AI) = clients using the AI chatbot/agent product. Revenue, count, and average health score are shown separately for each type so you can see which segment is healthier and more profitable."
+          position="top-end"
+        />
       </div>
 
       <div className="px-5 sm:px-6 py-5 flex flex-col sm:flex-row gap-6 items-center">

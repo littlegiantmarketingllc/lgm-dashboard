@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -29,17 +30,17 @@ function SortIcon({ col, sortCol, sortDir }) {
 }
 
 const COLUMNS = [
-  { key: 'accountName',   label: 'Account Name',  align: 'left'   },
-  { key: 'accountType',   label: 'Type',           align: 'left'   },
-  { key: 'totalRev',      label: 'Total Rev',      align: 'right'  },
-  { key: 'planPrice',     label: 'Plan Price',     align: 'right'  },
-  { key: 'users',         label: 'Users',          align: 'right'  },
-  { key: 'transactions',  label: 'Transactions',   align: 'right'  },
-  { key: 'addOns',        label: 'Add-ons',        align: 'right'  },
-  { key: 'annualSubs',    label: 'Annual Subs',    align: 'right'  },
-  { key: 'gp',            label: 'GP',             align: 'right'  },
-  { key: 'multiLocation', label: 'Multi-Loc',      align: 'center' },
-  { key: '_healthScore',  label: 'Health',         align: 'center' },
+  { key: 'accountName',   label: 'Account Name',  align: 'left',   tip: null },
+  { key: 'accountType',   label: 'Type',           align: 'left',   tip: 'DM = Digital Marketing, Agent = Conversational AI.' },
+  { key: 'totalRev',      label: 'Total Rev',      align: 'right',  tip: 'Total Monthly Charges = Plan Price + User Seat Fees + Add-ons + LC Platform Usage + Annual Subs.' },
+  { key: 'planPrice',     label: 'Plan Price',     align: 'right',  tip: 'Base monthly subscription fee for this client\'s GHL SaaS plan.' },
+  { key: 'users',         label: 'Users',          align: 'right',  tip: 'GHL Adjusted User Count — active user seats on this sub-account.' },
+  { key: 'transactions',  label: 'Transactions',   align: 'right',  tip: 'DataHealthStatus score × 1000. Scale: "All Good!" = 5,000, score 4 = 4,000, etc. Below 3,500 = at-risk threshold.' },
+  { key: 'addOns',        label: 'Add-ons',        align: 'right',  tip: 'Custom add-on charges billed monthly on top of the base plan.' },
+  { key: 'annualSubs',    label: 'Annual Subs',    align: 'right',  tip: 'Annual subscription charges prorated or charged as lump-sum.' },
+  { key: 'gp',            label: 'GP',             align: 'right',  tip: 'Agency Gross Profit — the margin LGM earns on this account after platform costs. Shown as a percentage.' },
+  { key: 'multiLocation', label: 'Multi-Loc',      align: 'center', tip: 'Whether this client uses a multi-location setup (franchise/chain with multiple sub-accounts).' },
+  { key: '_healthScore',  label: 'Health',         align: 'center', tip: 'Composite health score 0–100. Healthy = 80+, Watch = 50–79, At-Risk = below 50. Weighted from DataHealthStatus, Users, Revenue, Tenure, and Activity.' },
 ]
 
 const PAGE_SIZE = 25
@@ -81,11 +82,17 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
     >
       {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
-          <p className="text-brand-muted text-[11px] mt-0.5">
-            {accounts.length} accounts · click any column header to sort
-          </p>
+        <div className="flex items-start gap-2">
+          <div>
+            <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
+            <p className="text-brand-muted text-[11px] mt-0.5">
+              {accounts.length} accounts · click any column header to sort
+            </p>
+          </div>
+          <InfoTip
+            text="Complete list of all accounts in your billing sheet. Click any column header to sort ascending/descending. Click an account name to open its full health detail panel. Accounts labeled 'new' appear in GHL but aren't in the billing sheet yet. 🩹 = flagged data discrepancy."
+            position="top-end"
+          />
         </div>
       </div>
 
@@ -100,8 +107,15 @@ export default function MasterAccountsTable({ accounts, onAccountClick }) {
                   onClick={() => handleSort(col.key)}
                   className={`px-3 py-3 first:pl-5 last:pr-5 text-[10px] font-bold uppercase tracking-widest text-brand-muted cursor-pointer hover:text-brand-heading whitespace-nowrap select-none text-${col.align}`}
                 >
-                  {col.label}
-                  <SortIcon col={col.key} sortCol={sortCol} sortDir={sortDir} />
+                  <span className="inline-flex items-center gap-1">
+                    {col.label}
+                    <SortIcon col={col.key} sortCol={sortCol} sortDir={sortDir} />
+                    {col.tip && (
+                      <span onClick={e => e.stopPropagation()}>
+                        <InfoTip text={col.tip} position="bottom-end" />
+                      </span>
+                    )}
+                  </span>
                 </th>
               ))}
             </tr>

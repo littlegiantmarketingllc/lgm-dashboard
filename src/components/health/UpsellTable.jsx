@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { suggestAddon } from '../../lib/healthEngine'
+import InfoTip from './InfoTip'
 
 const G = '#8CC63F'
 
@@ -73,7 +74,15 @@ function UpsellRow({ a, i, isContacted, toggleContacted, getContactedAt, onAccou
   )
 }
 
-const UPSELL_HEADERS = ['Account Name', 'Transactions', 'Users', 'Current Rev', 'Suggested Add-on', 'Est. Extra/mo', 'Action']
+const UPSELL_HEADERS = [
+  { label: 'Account Name',    tip: null },
+  { label: 'Transactions',    tip: 'DataHealthStatus × 1000. Accounts here all have 3,500+ = active platform usage — a prerequisite for upsell.' },
+  { label: 'Users',           tip: 'Current GHL Adjusted User Count. Accounts with 3+ users have room to upsell additional seats or advanced features.' },
+  { label: 'Current Rev',     tip: 'Total Monthly Charges currently billed — the baseline before any upsell.' },
+  { label: 'Suggested Add-on', tip: 'Rule-based suggestion for the most likely upsell product based on this account\'s current usage and size.' },
+  { label: 'Est. Extra/mo',   tip: 'Estimated additional monthly revenue if the suggested add-on is sold. Based on current pricing tiers.' },
+  { label: 'Action',          tip: 'Track whether your team has reached out to this account. Marked contacts are dimmed so you focus on uncontacted ones first.' },
+]
 
 function UpsellRows({ rows, isContacted, toggleContacted, getContactedAt, onAccountClick }) {
   return (
@@ -81,9 +90,12 @@ function UpsellRows({ rows, isContacted, toggleContacted, getContactedAt, onAcco
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-brand-border bg-brand-bg/50">
-            {UPSELL_HEADERS.map(h => (
-              <th key={h} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
-                {h}
+            {UPSELL_HEADERS.map(({ label, tip }) => (
+              <th key={label} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
+                <span className="flex items-center gap-1">
+                  {label}
+                  {tip && <InfoTip text={tip} position="bottom-end" />}
+                </span>
               </th>
             ))}
           </tr>
@@ -124,14 +136,20 @@ export default function UpsellTable({ accounts, isContacted, toggleContacted, ge
     >
       {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-start sm:items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: G }} />
-            Upsell Opportunities
-          </h2>
-          <p className="text-brand-muted text-[11px] mt-0.5">
-            {accounts.length} accounts ready · {contacted} contacted
-          </p>
+        <div className="flex items-start gap-2">
+          <div>
+            <h2 className="text-brand-heading font-semibold text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: G }} />
+              Upsell Opportunities
+            </h2>
+            <p className="text-brand-muted text-[11px] mt-0.5">
+              {accounts.length} accounts ready · {contacted} contacted
+            </p>
+          </div>
+          <InfoTip
+            text="Accounts that qualify for an upsell conversation: DataHealthStatus > 3,000 (active platform usage), more than 3 user seats, and no add-ons currently purchased. Sorted by estimated additional MRR — highest potential first. Mark accounts as 'Contacted' to track your team's outreach."
+            position="top-end"
+          />
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold px-3 py-1.5 rounded-full border"
