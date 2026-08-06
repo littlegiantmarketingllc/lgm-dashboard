@@ -47,27 +47,6 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
           />
         </div>
 
-        {/* Type filter */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <select
-            value={typeFilter}
-            onChange={e => set({ typeFilter: e.target.value })}
-            className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer transition-colors duration-150"
-            style={{
-              color:       typeFilter !== 'all' ? '#3a6b10' : '#6B7280',
-              background:  typeFilter !== 'all' ? `${G}10`  : '#F4F6F4',
-              borderColor: typeFilter !== 'all' ? `${G}50`  : '#E5E7E5',
-            }}
-          >
-            <option value="all">All Types</option>
-            {accountTypes.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <InfoTip
-            text="Filter by account type. DM = Digital Marketing clients; Agent = Conversational AI clients. Types come directly from the billing sheet."
-            position="bottom-end"
-          />
-        </div>
-
         {/* Band filter */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <select
@@ -81,12 +60,12 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
             }}
           >
             <option value="all">All Health</option>
-            <option value="healthy">Healthy (80+)</option>
-            <option value="watch">Watch (50–79)</option>
-            <option value="at_risk">At-Risk (&lt;50)</option>
+            <option value="healthy">Active (70+)</option>
+            <option value="watch">Slowing (40–69)</option>
+            <option value="at_risk">Stale (&lt;40)</option>
           </select>
           <InfoTip
-            text="Filter by composite health band. Healthy = score 80+, Watch = 50–79, At-Risk = below 50. The score is calculated from DataHealthStatus, Users, Revenue, Tenure, and Login Activity."
+            text="Filter by activity band. Active = score 70+ (recent GHL activity + good tenure). Slowing = 40–69. Stale = below 40 (30+ days no GHL activity)."
             position="bottom-end"
           />
         </div>

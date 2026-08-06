@@ -1,17 +1,12 @@
 import { useCountUp } from '../../hooks/useCountUp'
 import InfoTip from './InfoTip'
 
-const G = '#8CC63F'
+const G   = '#8CC63F'
+const AMB = '#EAB308'
+const RED = '#EF4444'
 
-function fmt(n) { return '$' + Math.round(n).toLocaleString() }
-
-function Card({
-  label, value, sub, icon, accentColor, delay,
-  decimals = 0, prefix = '', suffix = '',
-  infoText, onClick, clickable,
-}) {
-  const displayed = useCountUp(typeof value === 'number' ? value : 0, { duration: 1200, delay, decimals })
-
+function Card({ label, value, sub, icon, accentColor, delay, infoText, onClick, clickable }) {
+  const displayed = useCountUp(typeof value === 'number' ? value : 0, { duration: 1200, delay })
   return (
     <div
       onClick={onClick}
@@ -33,133 +28,63 @@ function Card({
       </div>
       <div className="flex items-baseline gap-1">
         <span className="num text-[38px] sm:text-[48px] font-bold leading-none text-brand-text tracking-tight">
-          {prefix}{decimals > 0 ? displayed.toFixed(decimals) : Math.round(displayed)}{suffix}
+          {Math.round(displayed)}
         </span>
       </div>
       <p className="text-brand-muted text-[11px] leading-snug">{sub}</p>
-      {clickable && (
-        <p className="text-[10px] text-brand-muted/60 font-medium mt-0.5">Click to expand ↓</p>
-      )}
+      {clickable && <p className="text-[10px] text-brand-muted/60 font-medium mt-0.5">Click to expand ↓</p>}
     </div>
   )
 }
 
 export default function HealthSummaryCards({
-  accounts,
-  ghlTotal = 0, ghlOnlyCount = 0,
-  atRisk, healthy, upsellReady,
-  riskRevenue, upsellMRR,
-  avgSub, medianSub,
-  dmCount, agentCount, activeCount,
-  avgWallet, medianWallet, walletCount,
-  newCount = 0, newMRR = 0, newPeriodLabel = 'last 30 days',
-  avgUsers = 0,
-  onWalletDrilldown,
+  total = 0,
+  newCount = 0,
+  newPeriodLabel = 'last 30 days',
+  activeCount = 0,
+  staleCount = 0,
+  watchCount = 0,
 }) {
-  const accountsSub = ghlOnlyCount > 0
-    ? `${dmCount} DM · ${agentCount} Agent · +${ghlOnlyCount} in GHL, not yet in billing sheet`
-    : `${dmCount} DM · ${agentCount} Agent`
-
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
 
       <Card
         label="Total GHL Sub-accounts"
-        value={ghlTotal}
-        sub={ghlTotal > 0 ? `${accounts.length} billed · ${Math.max(0, ghlTotal - accounts.length)} not yet in billing sheet` : 'Loading GHL data…'}
+        value={total}
+        sub="Live from GHL Agency API · refreshed every page load"
         icon="🔗"
         delay={0}
-        infoText="Total client sub-accounts pulled live from GoHighLevel on every dashboard load (no caching). Internal sandbox/test accounts are excluded. 'Billed' = accounts in the LGM billing sheet. The difference are GHL sub-accounts not yet added to billing."
+        infoText="Total active sub-accounts in your GHL agency (excludes sandbox/test accounts). Pulled live from the GHL API on every dashboard load — no caching."
       />
 
       <Card
-        label="Billed Accounts"
-        value={accounts.length}
-        sub={accountsSub}
-        icon="🏢"
-        delay={20}
-        infoText="Total client accounts in the LGM billing sheet. DM = Digital Marketing clients; Agent = Conversational AI clients. GHL-only stubs (not yet billed) are excluded from health KPIs."
-      />
-
-      <Card
-        label="Active Accounts"
-        value={activeCount}
-        sub={`${accounts.length ? Math.round(activeCount / accounts.length * 100) : 0}% of billed accounts have activity`}
-        icon="🟢"
-        delay={30}
-        infoText="Accounts with a non-zero DataHealthStatus score. Zero-activity accounts have no recorded LC platform usage and are flagged for immediate outreach."
-      />
-
-      <Card
-        label="New Customers"
+        label="New Accounts"
         value={newCount}
-        sub={`Joined in ${newPeriodLabel} · ${fmt(newMRR)}/mo`}
+        sub={`Created in ${newPeriodLabel}`}
         icon="✨"
-        delay={60}
-        infoText={`Clients whose GHL sub-account was created within the selected date range (pulled from GoHighLevel). When no date filter is set, defaults to the last 30 days. New Customer MRR is shown as the subtitle.`}
+        delay={40}
         accentColor={G}
+        infoText="Sub-accounts created in GHL within the selected date range (or last 30 days when no filter is set). Based on the GHL dateAdded field."
       />
 
       <Card
-        label="At-Risk Accounts"
-        value={atRisk}
-        sub={`Revenue at risk: ${fmt(riskRevenue)}/mo`}
+        label="Active (last 30 days)"
+        value={activeCount}
+        sub="Updated in GHL within 30 days"
+        icon="🟢"
+        delay={80}
+        accentColor={G}
+        infoText="Accounts whose GHL sub-account record was updated within the last 30 days. This is the best activity proxy available from the GHL Agency API."
+      />
+
+      <Card
+        label="Stale (30+ days)"
+        value={staleCount}
+        sub="No GHL activity in 30+ days"
         icon="⚠️"
-        accentColor="#EF4444"
         delay={120}
-        infoText="Accounts with a DataHealthStatus score ≤ 3 (out of 5) OR an overall health score below 50. These clients are most likely to churn and need proactive outreach."
-      />
-
-      <Card
-        label="Healthy Accounts"
-        value={healthy}
-        sub={`Score 80+ · ${accounts.length ? Math.round(healthy / accounts.length * 100) : 0}% of billed`}
-        icon="✅"
-        accentColor={G}
-        delay={150}
-        infoText="Accounts with a composite health score ≥ 80. Score is weighted: DataHealthStatus 40%, Users 20%, Revenue 15%, Tenure 15%, Activity 10%."
-      />
-
-      <Card
-        label="Upsell Opportunities"
-        value={upsellReady}
-        sub={`Potential +${fmt(upsellMRR)}/mo`}
-        icon="📈"
-        accentColor={G}
-        delay={180}
-        infoText="Healthy accounts (DataHealthStatus > 3) with more than 3 users and no current add-ons — prime candidates for an upsell conversation on seats, multi-location, or add-on products."
-      />
-
-      <Card
-        label="Avg Subscription"
-        value={Math.round(avgSub)}
-        sub={`Median ${fmt(medianSub)}/mo per billed account`}
-        icon="📊"
-        prefix="$"
-        delay={210}
-        infoText="Average total monthly charges per billed account — includes plan price, user fees, add-ons, and LC platform charges. Median is shown to reduce the effect of high-revenue outliers."
-      />
-
-      <Card
-        label="Avg Users / Account"
-        value={+avgUsers}
-        sub={`Across accounts with ≥ 1 user seat`}
-        icon="👥"
-        decimals={1}
-        delay={240}
-        infoText="Average number of GHL-adjusted user seats (GHL Adj User Count) across all billed accounts that have at least one seat. Clients pay per-user, so this tracks seat adoption and upsell headroom."
-      />
-
-      <Card
-        label="Avg Wallet Spend"
-        value={Math.round(avgWallet || 0)}
-        sub={`${walletCount || 0} accounts with LC charges · median ${fmt(medianWallet || 0)}`}
-        icon="💳"
-        prefix="$"
-        delay={270}
-        infoText="Average LC platform charges per account that has any wallet activity. This reflects actual GHL feature usage (AI, SMS, calls, etc.) — not directly billed to clients. Click to see the full account breakdown."
-        clickable={!!onWalletDrilldown}
-        onClick={onWalletDrilldown}
+        accentColor={RED}
+        infoText="Accounts that haven't had any recorded activity in GHL for over 30 days. These need a check-in. 'Activity' is measured by when the sub-account record was last updated in GHL."
       />
 
     </div>

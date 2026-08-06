@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getFirebaseToken } from '../lib/firebase'
 
 const DB     = 'https://lgm-dashboard-f3e78-default-rtdb.firebaseio.com/checkboxes'
 const KEY    = 'coaching_state'
@@ -13,13 +14,15 @@ function saveLocal(val) {
 }
 
 async function fbRead() {
-  const res = await fetch(`${DB}/${KEY}.json`)
+  const token = await getFirebaseToken()
+  const res = await fetch(`${DB}/${KEY}.json?auth=${token}`)
   if (!res.ok) throw new Error('read failed')
   return (await res.json()) || {}
 }
 
 async function fbWrite(val) {
-  await fetch(`${DB}/${KEY}.json`, {
+  const token = await getFirebaseToken()
+  await fetch(`${DB}/${KEY}.json?auth=${token}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(val),

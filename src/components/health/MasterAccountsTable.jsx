@@ -5,9 +5,6 @@ const G   = '#8CC63F'
 const AMB = '#EAB308'
 const RED = '#EF4444'
 
-function fmt(n)   { return '$' + Math.round(n).toLocaleString() }
-function fmtGP(n) { return n ? `${(n * 100).toFixed(0)}%` : '—' }
-
 function bandColor(band) {
   if (band === 'healthy') return G
   if (band === 'watch')   return AMB
@@ -24,40 +21,55 @@ function HealthPill({ score, band }) {
   )
 }
 
+function ActivityBadge({ days }) {
+  if (days === null || days === undefined) return <span className="text-brand-muted">—</span>
+  const d = Number(days)
+  const color = d <= 7 ? G : d <= 30 ? AMB : RED
+  const label = d === 0 ? 'Today' : `${d}d ago`
+  return (
+    <span className="num inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border"
+      style={{ color, background: `${color}12`, borderColor: `${color}28` }}>
+      {label}
+    </span>
+  )
+}
+
 function SortIcon({ col, sortCol, sortDir }) {
   if (sortCol !== col) return <span className="text-brand-border ml-1">↕</span>
   return <span className="ml-1" style={{ color: G }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
 }
 
 const COLUMNS = [
-  { key: 'accountName',   label: 'Account Name',  align: 'left',   tip: null },
-  { key: 'accountType',   label: 'Type',           align: 'left',   tip: 'DM = Digital Marketing, Agent = Conversational AI.' },
-  { key: 'totalRev',      label: 'Total Rev',      align: 'right',  tip: 'Total Monthly Charges = Plan Price + User Seat Fees + Add-ons + LC Platform Usage + Annual Subs.' },
-  { key: 'planPrice',     label: 'Plan Price',     align: 'right',  tip: 'Base monthly subscription fee for this client\'s GHL SaaS plan.' },
-  { key: 'users',         label: 'Users',          align: 'right',  tip: 'GHL Adjusted User Count — active user seats on this sub-account.' },
-  { key: 'transactions',  label: 'Transactions',   align: 'right',  tip: 'DataHealthStatus score × 1000. Scale: "All Good!" = 5,000, score 4 = 4,000, etc. Below 3,500 = at-risk threshold.' },
-  { key: 'addOns',        label: 'Add-ons',        align: 'right',  tip: 'Custom add-on charges billed monthly on top of the base plan.' },
-  { key: 'annualSubs',    label: 'Annual Subs',    align: 'right',  tip: 'Annual subscription charges prorated or charged as lump-sum.' },
-  { key: 'gp',            label: 'GP',             align: 'right',  tip: 'Agency Gross Profit — the margin LGM earns on this account after platform costs. Shown as a percentage.' },
-  { key: 'multiLocation', label: 'Multi-Loc',      align: 'center', tip: 'Whether this client uses a multi-location setup (franchise/chain with multiple sub-accounts).' },
-  { key: '_healthScore',  label: 'Health',         align: 'center', tip: 'Composite health score 0–100. Healthy = 80+, Watch = 50–79, At-Risk = below 50. Weighted from DataHealthStatus, Users, Revenue, Tenure, and Activity.' },
+  { key: 'accountName',       label: 'Account Name',     align: 'left'   },
+  { key: 'ghlCity',           label: 'Location',         align: 'left'   },
+  { key: 'ghlEmail',          label: 'Email',            align: 'left'   },
+  { key: 'ghlDateAdded',      label: 'Joined GHL',       align: 'left',  tip: 'Date this sub-account was created in GHL.' },
+  { key: 'ghlDaysSinceUpdate',label: 'Last Activity',    align: 'center', tip: 'Days since the GHL sub-account record was last updated — best available proxy for account activity.' },
+  { key: '_healthScore',      label: 'Health',           align: 'center', tip: 'Composite score: 50% tenure (how long in GHL) + 50% activity (how recently updated). Healthy = 70+, Watch = 40–69, At-Risk < 40.' },
 ]
 
 const PAGE_SIZE = 25
 
-export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCount = 0, onAccountClick }) {
-  const [sortCol, setSortCol] = useState('totalRev')
-  const [sortDir, setSortDir] = useState('desc')
+export default function MasterAccountsTable({ accounts, onAccountClick }) {
+  const [sortCol, setSortCol] = useState('ghlDaysSinceUpdate')
+  const [sortDir, setSortDir] = useState('asc')
   const [page,    setPage]    = useState(1)
 
-  // Reset to page 1 whenever the incoming accounts list changes (filters applied upstream)
   const accountsKey = accounts.length
   useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(() => {
     return [...accounts].sort((a, b) => {
-      let av = sortCol === '_healthScore' ? (a._health?.score ?? 0) : (a[sortCol] ?? 0)
-      let bv = sortCol === '_healthScore' ? (b._health?.score ?? 0) : (b[sortCol] ?? 0)
+      let av = sortCol === '_healthScore'
+        ? (a._health?.score ?? 0)
+        : sortCol === 'ghlDaysSinceUpdate'
+          ? (a.ghlDaysSinceUpdate ?? 9999)
+          : (a[sortCol] ?? '')
+      let bv = sortCol === '_healthScore'
+        ? (b._health?.score ?? 0)
+        : sortCol === 'ghlDaysSinceUpdate'
+          ? (b.ghlDaysSinceUpdate ?? 9999)
+          : (b[sortCol] ?? '')
       if (typeof av === 'string') av = av.toLowerCase()
       if (typeof bv === 'string') bv = bv.toLowerCase()
       if (av < bv) return sortDir === 'asc' ? -1 : 1
@@ -71,41 +83,30 @@ export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCoun
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortCol(col); setSortDir('desc') }
+    else { setSortCol(col); setSortDir(col === 'ghlDaysSinceUpdate' ? 'asc' : 'desc') }
     setPage(1)
   }
 
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
-      style={{ animationDelay: '600ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
+      style={{ animationDelay: '400ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
-      {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-start gap-2">
           <div>
-            <h2 className="text-brand-heading font-semibold text-sm">Master Accounts Table</h2>
+            <h2 className="text-brand-heading font-semibold text-sm">All GHL Sub-accounts</h2>
             <p className="text-brand-muted text-[11px] mt-0.5">
-              {billedCount != null
-                ? <>
-                    <span className="font-medium text-brand-text">{billedCount}</span> billed
-                    {ghlOnlyCount > 0 && (
-                      <> · <span className="text-purple-600 font-medium">{ghlOnlyCount}</span> in GHL, not yet billed</>
-                    )}
-                  </>
-                : <>{accounts.length} accounts</>
-              }
-              {' '}· click any column header to sort
+              <span className="font-medium text-brand-text">{accounts.length}</span> accounts · click column header to sort
             </p>
           </div>
           <InfoTip
-            text="Complete list of all accounts in your billing sheet. Click any column header to sort ascending/descending. Click an account name to open its full health detail panel. Accounts labeled 'new' appear in GHL but aren't in the billing sheet yet. 🩹 = flagged data discrepancy."
+            text="All active GHL sub-accounts. Data pulled live from GHL Agency API. Click any account name to see full details and live CRM data."
             position="top-end"
           />
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -137,7 +138,7 @@ export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCoun
                 </td>
               </tr>
             )}
-            {pageData.map((a, i) => (
+            {pageData.map(a => (
               <tr
                 key={a.id}
                 className="border-b border-brand-border/50 hover:bg-brand-bg/50 transition-colors duration-100"
@@ -145,32 +146,25 @@ export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCoun
                 <td className="pl-5 pr-3 py-2.5">
                   <button
                     onClick={() => onAccountClick?.(a)}
-                    className="text-[12px] font-medium text-brand-text hover:underline text-left inline-flex items-center gap-1.5"
-                    style={{ color: a._health?.band === 'at_risk' ? RED : undefined }}
+                    className="text-[12px] font-medium text-brand-text hover:underline text-left"
                   >
                     {a.accountName}
-                    {a.hasDataIssue && <span title="Flagged data issue — see account detail">🩹</span>}
-                    {a._ghlOnly && (
-                      <span title="In GHL but not yet in LGM billing sheet"
-                        className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-600 uppercase tracking-wide">
-                        new
-                      </span>
-                    )}
                   </button>
                 </td>
-                <td className="px-3 py-2.5">
-                  <span className="text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap text-brand-muted">
-                    {a.accountType}
-                  </span>
+                <td className="px-3 py-2.5 text-[11px] text-brand-muted">
+                  {[a.ghlCity, a.ghlState].filter(Boolean).join(', ') || '—'}
                 </td>
-                <td className="px-3 py-2.5 text-right num text-[12px] font-semibold text-brand-text">{fmt(a.totalRev)}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-muted">{fmt(a.planPrice)}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-text">{a.users}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-text">{a.transactions.toLocaleString()}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-muted">{a.addOns ? fmt(a.addOns) : '—'}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-muted">{a.annualSubs ? fmt(a.annualSubs) : '—'}</td>
-                <td className="px-3 py-2.5 text-right num text-[12px] text-brand-muted">{fmtGP(a.gp)}</td>
-                <td className="px-3 py-2.5 text-center text-[12px]">{a.multiLocation ? '✓' : '—'}</td>
+                <td className="px-3 py-2.5 text-[11px] text-brand-muted truncate max-w-[180px]">
+                  {a.ghlEmail || '—'}
+                </td>
+                <td className="px-3 py-2.5 text-[11px] text-brand-muted">
+                  {a.ghlDateAdded
+                    ? new Date(a.ghlDateAdded).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : '—'}
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  <ActivityBadge days={a.ghlDaysSinceUpdate} />
+                </td>
                 <td className="px-3 py-2.5 pr-5 text-center">
                   <HealthPill score={a._health?.score ?? 0} band={a._health?.band ?? 'at_risk'} />
                 </td>
@@ -180,7 +174,6 @@ export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCoun
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="px-5 py-3 border-t border-brand-border flex items-center justify-between">
           <span className="text-[11px] text-brand-muted">
@@ -191,16 +184,12 @@ export default function MasterAccountsTable({ accounts, billedCount, ghlOnlyCoun
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
               className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
-            >
-              ← Prev
-            </button>
+            >← Prev</button>
             <button
               disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
-            >
-              Next →
-            </button>
+            >Next →</button>
           </div>
         </div>
       )}

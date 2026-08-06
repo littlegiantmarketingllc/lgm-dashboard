@@ -1,67 +1,33 @@
 import { useState, useMemo, useEffect } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { useMergedHealthData } from '../../hooks/useMergedHealthData'
-import GHLDataBanner           from './GHLDataBanner'
 import { useAccountStatus }    from '../../hooks/useAccountStatus'
-import {
-  scoreAccount, classify, isAtRisk, isUpsellReady,
-  recommendAction, dmVsAgent, avgSubscription,
-  concentrationRisk, revenueAtRisk, potentialUpsellMRR,
-  activeAccounts, avgWalletSpend, lcCostLeakage, dataHealthSummary,
-} from '../../lib/healthEngine'
-import HealthFilterBar         from './HealthFilterBar'
-import HealthSummaryCards      from './HealthSummaryCards'
-import DmAgentBreakdown        from './DmAgentBreakdown'
-import ResolutionTrackerHealth from './ResolutionTrackerHealth'
-import NeedsAttentionTable     from './NeedsAttentionTable'
-import UpsellTable             from './UpsellTable'
-import MasterAccountsTable     from './MasterAccountsTable'
-import HealthCharts            from './HealthCharts'
-import QuickWins               from './QuickWins'
-import AccountModal            from './AccountModal'
-import WalletDrilldown         from './WalletDrilldown'
-import TransactionBreakdown    from './TransactionBreakdown'
+import { scoreAccount, classify, isAtRisk, recommendAction, activeAccounts } from '../../lib/healthEngine'
+import HealthFilterBar    from './HealthFilterBar'
+import HealthSummaryCards from './HealthSummaryCards'
+import MasterAccountsTable from './MasterAccountsTable'
+import AccountModal       from './AccountModal'
 
 const G = '#8CC63F'
 
-// ── Date window helper ────────────────────────────────────────────────────────
 function getDateWindow(dateRange) {
   if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
   const today = new Date()
-  if (dateRange.type === 'last_7') return {
-    from: format(subDays(today, 7),  'yyyy-MM-dd'),
-    to:   format(today, 'yyyy-MM-dd'),
-  }
-  if (dateRange.type === 'this_month') return {
-    from: format(startOfMonth(today), 'yyyy-MM-dd'),
-    to:   format(endOfMonth(today),   'yyyy-MM-dd'),
-  }
+  if (dateRange.type === 'last_7')    return { from: format(subDays(today, 7),  'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
+  if (dateRange.type === 'this_month') return { from: format(startOfMonth(today), 'yyyy-MM-dd'), to: format(endOfMonth(today), 'yyyy-MM-dd') }
   if (dateRange.type === 'last_month') {
     const prev = subMonths(today, 1)
-    return {
-      from: format(startOfMonth(prev), 'yyyy-MM-dd'),
-      to:   format(endOfMonth(prev),   'yyyy-MM-dd'),
-    }
+    return { from: format(startOfMonth(prev), 'yyyy-MM-dd'), to: format(endOfMonth(prev), 'yyyy-MM-dd') }
   }
-  if (dateRange.type === 'last_30') return {
-    from: format(subDays(today, 30), 'yyyy-MM-dd'),
-    to:   format(today, 'yyyy-MM-dd'),
-  }
-  if (dateRange.type === 'last_90') return {
-    from: format(subDays(today, 90), 'yyyy-MM-dd'),
-    to:   format(today, 'yyyy-MM-dd'),
-  }
-  if (dateRange.type === 'custom') return {
-    from: dateRange.from || '0000-01-01',
-    to:   dateRange.to   || format(today, 'yyyy-MM-dd'),
-  }
+  if (dateRange.type === 'last_30') return { from: format(subDays(today, 30), 'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
+  if (dateRange.type === 'last_90') return { from: format(subDays(today, 90), 'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
+  if (dateRange.type === 'custom')  return { from: dateRange.from || '0000-01-01', to: dateRange.to || format(today, 'yyyy-MM-dd') }
   return { from: '0000-01-01', to: '9999-12-31' }
 }
 
 function timeAgo(date) {
   if (!date) return '—'
-  const s = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (s < 10)  return 'just now'
+  const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
   if (s < 60)  return `${s}s ago`
   const m = Math.floor(s / 60)
   if (m < 60)  return `${m}m ago`
@@ -89,8 +55,8 @@ function LoadingScreen() {
         <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin" />
       </div>
       <div className="text-center">
-        <p className="text-brand-heading font-semibold text-sm">Loading Customer Health data…</p>
-        <p className="text-brand-muted text-[11px] mt-1">Fetching from Google Sheets</p>
+        <p className="text-brand-heading font-semibold text-sm">Loading GHL sub-accounts…</p>
+        <p className="text-brand-muted text-[11px] mt-1">Pulling live data from GoHighLevel API</p>
       </div>
     </div>
   )
@@ -100,7 +66,7 @@ function ErrorBanner({ message, onRetry }) {
   return (
     <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-8 text-center max-w-lg mx-auto my-12">
       <p className="text-3xl mb-3">⚠️</p>
-      <h3 className="text-brand-heading font-bold text-base mb-2">Could not load health data</h3>
+      <h3 className="text-brand-heading font-bold text-base mb-2">Could not load GHL data</h3>
       <p className="text-brand-muted text-sm mb-5">{message}</p>
       <button onClick={onRetry}
         className="px-5 py-2 rounded-xl text-white text-sm font-semibold"
@@ -111,15 +77,9 @@ function ErrorBanner({ message, onRetry }) {
   )
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function HealthDashboard({ filters, setFilters }) {
-  const {
-    accounts: raw, loading, error, lastUpdated, refetch, retrying,
-    dataSourceStatus,
-  } = useMergedHealthData()
-  const { statuses, setStatus, isContacted, toggleContacted, getContactedAt } = useAccountStatus()
-  const [selectedAccount, setSelectedAccount]   = useState(null)
-  const [showWalletDrill, setShowWalletDrill]   = useState(false)
+  const { accounts: raw, loading, error, lastUpdated, refetch } = useMergedHealthData()
+  const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
 
   useEffect(() => {
@@ -135,130 +95,57 @@ export default function HealthDashboard({ filters, setFilters }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  // ── Enrich raw accounts with health scores (uses full dataset for revenue scaling) ──
-  const maxRev = useMemo(() => Math.max(...raw.map(a => a.totalRev || 0), 1), [raw])
-
+  // Enrich with health scores
   const accounts = useMemo(() =>
     raw.map(a => {
-      const { score, parts } = scoreAccount(a, { maxRev })
+      const { score, parts } = scoreAccount(a)
       const band   = classify(score)
       const action = recommendAction(a)
       return { ...a, _health: { score, parts, band, action } }
     }),
-    [raw, maxRev]
+    [raw]
   )
 
-  // Available types for the filter dropdown (always from the full list)
-  const accountTypes = useMemo(() =>
-    [...new Set(accounts.map(a => a.accountType).filter(Boolean))].sort(),
-    [accounts]
-  )
-
-  // ── Apply all global filters ───────────────────────────────────────────────
+  // Apply filters
   const filteredAccounts = useMemo(() => {
     const { from, to } = getDateWindow(filters.dateRange)
-    const srch  = filters.search.toLowerCase().trim()
-    const typeF = filters.typeFilter
-    const bandF = filters.bandFilter
+    const srch = filters.search.toLowerCase().trim()
 
     return accounts.filter(a => {
-      if (srch && !a.accountName.toLowerCase().includes(srch)) return false
-      if (typeF !== 'all' && (a.accountType || '').toLowerCase() !== typeF.toLowerCase()) return false
-      if (bandF !== 'all' && a._health?.band !== bandF) return false
+      if (srch && !a.accountName.toLowerCase().includes(srch) &&
+          !(a.ghlEmail || '').toLowerCase().includes(srch) &&
+          !(a.ghlCity  || '').toLowerCase().includes(srch)) return false
+      if (filters.bandFilter !== 'all' && a._health?.band !== filters.bandFilter) return false
       if (filters.dateRange.type !== 'all') {
-        // Use stripeStartDate first, then GHL sub-account creation date as fallback.
-        // stripeStartDate may already contain ghlDateAdded via useMergedHealthData merge,
-        // but check ghlDateAdded directly too in case the merge match missed.
-        const d = a.stripeStartDate || a.ghlDateAdded || ''
+        const d = a.ghlDateAdded || ''
         if (!d || d < from || d > to) return false
       }
       return true
     })
   }, [accounts, filters])
 
-  // ── Portfolio-wide accounts: all billing sheet accounts, no date filter ──────
-  // Used for KPIs (At-Risk, Revenue, Health etc.) that show the full portfolio.
-  // The date filter only makes sense on these KPIs when it returns actual billed
-  // accounts; if it returns 0, we fall back to the full set so the cards don't
-  // all show 0 just because new clients haven't been added to the billing sheet.
-  const allScorableAccounts = useMemo(
-    () => accounts.filter(a => !a._ghlOnly),
-    [accounts]
-  )
+  // KPI calculations
+  const activeAccts = useMemo(() => activeAccounts(accounts), [accounts])
+  const staleAccts  = useMemo(() => accounts.filter(a => {
+    const d = Number(a.ghlDaysSinceUpdate)
+    return !isNaN(d) && d > 30
+  }), [accounts])
 
-  // Date-filtered billing accounts — when the date filter returns some billed
-  // accounts we use those; when it returns 0 we fall back to allScorableAccounts
-  // so the health KPIs always show meaningful portfolio data.
-  const filteredScorable = useMemo(
-    () => filteredAccounts.filter(a => !a._ghlOnly),
-    [filteredAccounts]
-  )
-  const dateFilterEmpty = filters.dateRange.type !== 'all' && filteredScorable.length === 0
-  const scorableAccounts = dateFilterEmpty ? allScorableAccounts : filteredScorable
-
-  const atRiskAccounts  = useMemo(() =>
-    scorableAccounts.filter(isAtRisk).sort((a, b) => a._health.score - b._health.score),
-    [scorableAccounts]
-  )
-  const upsellAccounts  = useMemo(() => scorableAccounts.filter(isUpsellReady),                           [scorableAccounts])
-  const healthyAccounts = useMemo(() => scorableAccounts.filter(a => a._health.band === 'healthy'),       [scorableAccounts])
-  const breakdown       = useMemo(() => dmVsAgent(scorableAccounts),                                      [scorableAccounts])
-  const subStats        = useMemo(() => avgSubscription(scorableAccounts),                                [scorableAccounts])
-  const riskRevenue     = useMemo(() => revenueAtRisk(atRiskAccounts),                                    [atRiskAccounts])
-  const upsellMRR       = useMemo(() => potentialUpsellMRR(upsellAccounts),                               [upsellAccounts])
-  const concRisk        = useMemo(() => concentrationRisk(scorableAccounts),                              [scorableAccounts])
-  const activeAccts     = useMemo(() => activeAccounts(scorableAccounts),                                 [scorableAccounts])
-  const walletStats     = useMemo(() => avgWalletSpend(scorableAccounts),                                 [scorableAccounts])
-  const lcLeakage       = useMemo(() => lcCostLeakage(scorableAccounts),                                  [scorableAccounts])
-  const dataHealth      = useMemo(() => dataHealthSummary(scorableAccounts),                               [scorableAccounts])
-
-  // ── New metrics ───────────────────────────────────────────────────────────
-  // New customers: joined within the active date window.
-  // Uses filteredAccounts (includes _ghlOnly) so newly created GHL sub-accounts
-  // that aren't in the billing sheet yet are still counted as new clients.
-  const { newCustomers, newPeriodLabel } = useMemo(() => {
+  const { newAccounts, newPeriodLabel } = useMemo(() => {
     const today = new Date()
     const isAllTime = filters.dateRange.type === 'all'
-    const from = isAllTime ? format(subDays(today, 30), 'yyyy-MM-dd') : getDateWindow(filters.dateRange).from
-    const to   = isAllTime ? format(today, 'yyyy-MM-dd')              : getDateWindow(filters.dateRange).to
-    const label = isAllTime ? 'last 30 days' : (() => {
-      const types = { last_7: 'last 7 days', this_month: 'this month', last_month: 'last month', last_30: 'last 30 days', last_90: 'last 90 days' }
-      return types[filters.dateRange.type] || 'selected period'
-    })()
-    const list = filteredAccounts.filter(a => {
-      const d = a.stripeStartDate || a.ghlDateAdded || ''
+    const from  = isAllTime ? format(subDays(today, 30), 'yyyy-MM-dd') : getDateWindow(filters.dateRange).from
+    const to    = isAllTime ? format(today, 'yyyy-MM-dd')              : getDateWindow(filters.dateRange).to
+    const label = isAllTime ? 'last 30 days' : ({
+      last_7: 'last 7 days', this_month: 'this month', last_month: 'last month',
+      last_30: 'last 30 days', last_90: 'last 90 days',
+    }[filters.dateRange.type] || 'selected period')
+    const list = accounts.filter(a => {
+      const d = a.ghlDateAdded || ''
       return d && d >= from && d <= to
     })
-    return { newCustomers: list, newPeriodLabel: label }
-  }, [filteredAccounts, filters.dateRange])
-
-  const newCustomerMRR = useMemo(() =>
-    newCustomers.reduce((s, a) => s + (a.totalRev || 0), 0),
-    [newCustomers]
-  )
-
-  const avgUsersPerAccount = useMemo(() => {
-    const withUsers = scorableAccounts.filter(a => (a.users || 0) > 0)
-    return withUsers.length
-      ? +(withUsers.reduce((s, a) => s + a.users, 0) / withUsers.length).toFixed(1)
-      : 0
-  }, [scorableAccounts])
-
-  const avgHealthDm    = useMemo(() => {
-    const dm = scorableAccounts.filter(a => (a.accountType || '').toLowerCase() === 'dm')
-    return dm.length ? Math.round(dm.reduce((s, a) => s + a._health.score, 0) / dm.length) : null
-  }, [scorableAccounts])
-
-  const avgHealthAgent = useMemo(() => {
-    const ag = scorableAccounts.filter(a => (a.accountType || '').toLowerCase() !== 'dm')
-    return ag.length ? Math.round(ag.reduce((s, a) => s + a._health.score, 0) / ag.length) : null
-  }, [scorableAccounts])
-
-  const top3Upsell  = useMemo(() => [...upsellAccounts].slice(0, 3), [upsellAccounts])
-  const top3AtRisk  = useMemo(() => atRiskAccounts.slice(0, 3),      [atRiskAccounts])
-
-  const dmCount    = breakdown.dm.count
-  const agentCount = breakdown.agent.count
+    return { newAccounts: list, newPeriodLabel: label }
+  }, [accounts, filters.dateRange])
 
   if (loading && raw.length === 0) return <LoadingScreen />
   if (error   && raw.length === 0) return <ErrorBanner message={error} onRetry={refetch} />
@@ -266,195 +153,70 @@ export default function HealthDashboard({ filters, setFilters }) {
   return (
     <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
-      {/* GHL data source status banner */}
-      <GHLDataBanner status={dataSourceStatus} />
-
-      {/* Sub-header: refresh + live dot + concentration risk */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-[11px]">
-            {error
-              ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-              : <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse inline-block" />}
-            <span className="text-brand-muted">
-              {lastUpdated ? `Updated ${elapsed}` : 'Loading…'}
-            </span>
-          </div>
-          <button
-            onClick={refetch}
-            className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg text-brand-muted hover:text-brand-text border-brand-border hover:border-[#C8CCC8]"
-          >
-            <RefreshIcon spinning={loading || retrying} />
-            <span>{retrying ? 'Retrying…' : loading ? 'Refreshing…' : 'Refresh'}</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {dataHealth.flaggedCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold text-amber-700 bg-amber-50 border-amber-200"
-              title="Accounts with a flagged billing record discrepancy — still included in all totals, just worth a closer look">
-              🩹 {dataHealth.flaggedCount} of {dataHealth.totalCount} accounts have a flagged data issue
-            </div>
-          )}
-          {concRisk > 0 && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
-              concRisk > 40 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-brand-muted bg-brand-bg border-brand-border'
-            }`}>
-              {concRisk > 40 ? '⚠' : '📊'} Top 10 accounts = {concRisk}% of MRR
-              {concRisk > 40 && ' — concentration risk'}
-            </div>
-          )}
-        </div>
+      {/* Data source badge */}
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand-border bg-white text-[11px] text-brand-muted"
+        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse flex-shrink-0" />
+        <span>
+          <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · Live from GoHighLevel Agency API · No billing sheet
+        </span>
+        <span className="ml-auto text-brand-muted/60">{lastUpdated ? `Synced ${elapsed}` : 'Syncing…'}</span>
       </div>
 
-      {/* Stale data warning */}
-      {error && raw.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
-          <span>⚠️</span>
-          <span>Auto-refresh failed — showing last known data.{' '}
-            <button onClick={refetch} className="underline font-medium">Retry</button>
-          </span>
-        </div>
-      )}
+      {/* Sub-header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={refetch}
+          className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg text-brand-muted hover:text-brand-text border-brand-border"
+        >
+          <RefreshIcon spinning={loading} />
+          <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
+        </button>
+        {error && raw.length > 0 && (
+          <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+            ⚠ Auto-refresh failed — showing last known data
+          </div>
+        )}
+      </div>
 
-      {/* Global filter bar */}
+      {/* Filter bar */}
       <HealthFilterBar
         filters={filters}
         setFilters={setFilters}
-        accountTypes={accountTypes}
+        accountTypes={[]}
         totalShowing={filteredAccounts.length}
         totalAll={accounts.length}
       />
 
-      {/* Active-filter context banner */}
-      {filters.dateRange.type !== 'all' && filteredAccounts.length > 0 && !dateFilterEmpty && (
-        <div className="rounded-xl border border-brand-border bg-white px-4 py-2.5 text-[11px] text-brand-heading flex items-center gap-2"
-          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
-          <span>📅</span>
-          <span>
-            Showing <strong>{filteredScorable.length}</strong> billed account{filteredScorable.length !== 1 ? 's' : ''} whose GHL sub-account was created in this period.
-            {' '}Health KPIs and tables update live as you change the range.
-          </span>
-        </div>
-      )}
-
-      {/* New-GHL-accounts banner: date filter is active but no billed accounts match —
-          the accounts in the window exist in GHL but haven't been added to billing yet */}
-      {dateFilterEmpty && filteredAccounts.length > 0 && (
-        <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-[12px] text-purple-800 flex items-start gap-3"
-          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
-          <span className="text-base flex-shrink-0 mt-0.5">✦</span>
-          <div>
-            <p className="font-semibold mb-0.5">
-              {filteredAccounts.length} new GHL sub-account{filteredAccounts.length !== 1 ? 's' : ''} created in this period
-              — not yet in the billing sheet.
-            </p>
-            <p className="text-purple-700 text-[11px] leading-relaxed">
-              These accounts appear in the Master Table below with a <strong>new</strong> badge.
-              Portfolio KPIs (At-Risk, Revenue, Health) show your <strong>full {allScorableAccounts.length}-account portfolio</strong> since these clients have no billing data yet.
-              Once added to the billing sheet they will count toward all metrics.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Zero-result explanation when date filter is active and nothing at all matches */}
-      {filters.dateRange.type !== 'all' && filteredAccounts.length === 0 && accounts.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 flex items-start gap-3">
-          <span className="text-base flex-shrink-0 mt-0.5">📅</span>
-          <div>
-            <p className="font-semibold mb-0.5">No accounts found for this period.</p>
-            <p className="text-amber-700 text-[11px] leading-relaxed">
-              No GHL sub-accounts were created in this window.
-              Select <strong>All Dates</strong> to see all {allScorableAccounts.length} billed accounts.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 1. Summary cards — always visible, always current.
-           Use scorableAccounts (billing sheet accounts only) so totals reflect
-           actual billed clients, not the GHL-only stub rows. */}
+      {/* KPI cards */}
       <HealthSummaryCards
-        accounts={scorableAccounts}
-        ghlTotal={dataSourceStatus?.ghlTotal ?? 0}
-        ghlOnlyCount={dataSourceStatus?.ghlOnly ?? 0}
-        atRisk={atRiskAccounts.length}
-        healthy={healthyAccounts.length}
-        upsellReady={upsellAccounts.length}
-        riskRevenue={riskRevenue}
-        upsellMRR={upsellMRR}
-        avgSub={subStats.mean}
-        medianSub={subStats.median}
-        dmCount={dmCount}
-        agentCount={agentCount}
-        activeCount={activeAccts.length}
-        avgWallet={walletStats.mean}
-        medianWallet={walletStats.median}
-        walletCount={walletStats.count}
-        newCount={newCustomers.length}
-        newMRR={newCustomerMRR}
+        total={accounts.length}
+        newCount={newAccounts.length}
         newPeriodLabel={newPeriodLabel}
-        avgUsers={avgUsersPerAccount}
-        onWalletDrilldown={() => setShowWalletDrill(v => !v)}
+        activeCount={activeAccts.length}
+        staleCount={staleAccts.length}
       />
 
-      {/* Wallet spend drill-down panel — shown inline below summary cards */}
-      {showWalletDrill && (
-        <WalletDrilldown
-          accounts={scorableAccounts}
-          onClose={() => setShowWalletDrill(false)}
-        />
+      {/* Stale accounts callout */}
+      {staleAccts.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800 flex items-start gap-3">
+          <span className="text-base flex-shrink-0 mt-0.5">⚠️</span>
+          <div>
+            <p className="font-semibold mb-0.5">{staleAccts.length} accounts have had no GHL activity in 30+ days</p>
+            <p className="text-red-700 text-[11px]">
+              Sorted to the top of the table below. These need a check-in.
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* 2. DM vs Agent breakdown */}
-      <DmAgentBreakdown
-        breakdown={breakdown}
-        avgHealthDm={avgHealthDm}
-        avgHealthAgent={avgHealthAgent}
-      />
-
-      {/* 3. Quick Wins */}
-      <QuickWins
-        topUpsell={top3Upsell}
-        topAtRisk={top3AtRisk}
-        onAccountClick={setSelectedAccount}
-      />
-
-      {/* 4. Resolution tracker + Needs Attention */}
-      <ResolutionTrackerHealth accounts={atRiskAccounts} statuses={statuses} />
-      <NeedsAttentionTable
-        accounts={atRiskAccounts}
-        statuses={statuses}
-        setStatus={setStatus}
-        onAccountClick={setSelectedAccount}
-      />
-
-      {/* 5. Upsell opportunities */}
-      <UpsellTable
-        accounts={upsellAccounts}
-        isContacted={isContacted}
-        toggleContacted={toggleContacted}
-        getContactedAt={getContactedAt}
-        onAccountClick={setSelectedAccount}
-        potentialMRR={upsellMRR}
-      />
-
-      {/* 6. Charts — fed filtered accounts so they update with filters */}
-      <HealthCharts accounts={filteredAccounts} />
-
-      {/* 7. Transaction / billing breakdown table with drill-down */}
-      <TransactionBreakdown accounts={scorableAccounts} />
-
-      {/* 8. Master accounts table */}
+      {/* Master table */}
       <MasterAccountsTable
         accounts={filteredAccounts}
-        billedCount={scorableAccounts.length}
-        ghlOnlyCount={filteredAccounts.filter(a => a._ghlOnly).length}
         onAccountClick={setSelectedAccount}
       />
 
-      {/* Account detail modal */}
+      {/* Account modal */}
       {selectedAccount && (
         <AccountModal
           account={selectedAccount}

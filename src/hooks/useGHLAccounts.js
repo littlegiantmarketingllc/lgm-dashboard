@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const REFRESH_MS = 900_000 // 15 min — matches Vercel CDN cache TTL
+const REFRESH_MS = 300_000 // 5 min refresh — GHL data, no CDN cache
 
 export function useGHLAccounts() {
   const [accounts, setAccounts] = useState([])
