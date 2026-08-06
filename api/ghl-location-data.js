@@ -81,14 +81,24 @@ async function getOAuthToken(locationId) {
     if (!data) {
       data = await fetchLocationTokenFromCompany(locationId)
       if (!data) return null
+      return data.accessToken
     }
 
+    // Token is expiring within 10 min or already expired — try to refresh
     if (Date.now() > data.expiresAt - 10 * 60 * 1000) {
       const refreshed = await refreshToken(data)
       if (refreshed) {
         await kv.set(`ghl:token:${locationId}`, refreshed)
-        data = refreshed
+        return refreshed.accessToken
       }
+      // Refresh token is dead — re-derive from company token
+      const fresh = await fetchLocationTokenFromCompany(locationId)
+      if (fresh) return fresh.accessToken
+      // Nothing worked; if the stored token isn't too old, try it anyway
+      if (data.expiresAt && Date.now() < data.expiresAt + 60 * 60 * 1000) {
+        return data.accessToken
+      }
+      return null
     }
 
     return data.accessToken
