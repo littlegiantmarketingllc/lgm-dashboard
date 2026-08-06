@@ -140,8 +140,8 @@ export default async function handler(req, res) {
   const [usersR, contactsR, oppsR] = await Promise.allSettled([
     ghlFetch(`/users/?locationId=${locationId}`, token),
     ghlFetch(`/contacts/?locationId=${locationId}&limit=1`, token),
-    // opportunities/search is a POST endpoint
-    ghlFetch(`/opportunities/search`, token, 'POST', { location_id: locationId, limit: 1 }),
+    // opportunities/search is a POST endpoint — GHL requires "locationId" (not "location_id")
+    ghlFetch(`/opportunities/search`, token, 'POST', { locationId, limit: 1 }),
   ])
 
   const users    = usersR.status    === 'fulfilled' ? usersR.value    : null
