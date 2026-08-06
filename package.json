@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/kv": "^3.0.0",
     "date-fns": "^3.6.0",
     "firebase": "^12.17.1",
     "lucide-react": "^0.400.0",

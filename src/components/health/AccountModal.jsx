@@ -45,6 +45,10 @@ export default function AccountModal({ account, onClose }) {
   const [ghlLoading, setGhlLoading] = useState(false)
   const [ghlError,   setGhlError]   = useState(null)
 
+  const [liveMetrics,        setLiveMetrics]        = useState(null)
+  const [liveMetricsLoading, setLiveMetricsLoading] = useState(true)
+  const [liveMetricsError,   setLiveMetricsError]   = useState(null)
+
   const fetchGHLInfo = useCallback(async () => {
     if (ghlLoading) return
     setGhlLoading(true)
@@ -62,6 +66,17 @@ export default function AccountModal({ account, onClose }) {
       setGhlLoading(false)
     }
   }, [account.accountName, ghlLoading])
+
+  // Auto-fetch per-location metrics (users, contacts, opportunities) via OAuth KV
+  useEffect(() => {
+    if (!account.ghlId) { setLiveMetricsLoading(false); return }
+    setLiveMetricsLoading(true)
+    setLiveMetricsError(null)
+    fetch(`/api/ghl-location-data?locationId=${encodeURIComponent(account.ghlId)}`)
+      .then(r => r.json())
+      .then(data => { setLiveMetrics(data); setLiveMetricsLoading(false) })
+      .catch(err => { setLiveMetricsError(err.message); setLiveMetricsLoading(false) })
+  }, [account.ghlId])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -214,9 +229,44 @@ export default function AccountModal({ account, onClose }) {
             )}
           </div>
 
+          {/* Live Metrics — users, contacts, opportunities via OAuth KV */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Live Account Metrics</p>
+            {liveMetricsLoading ? (
+              <div className="rounded-xl border border-brand-border p-4 flex items-center gap-2 text-[11px] text-brand-muted">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-border border-t-brand-green animate-spin flex-shrink-0" />
+                Fetching live data from GHL…
+              </div>
+            ) : liveMetricsError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] text-red-700">
+                Could not load live metrics: {liveMetricsError}
+              </div>
+            ) : liveMetrics && !liveMetrics.oauthConnected ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-700">
+                OAuth token not yet available for this location. Once the marketplace app is installed for this account, metrics will appear here automatically.
+              </div>
+            ) : liveMetrics ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Team Members', value: liveMetrics.users,         icon: '👤' },
+                  { label: 'Contacts',     value: liveMetrics.contacts,      icon: '📋' },
+                  { label: 'Opportunities',value: liveMetrics.opportunities,  icon: '🎯' },
+                ].map(({ label, value, icon }) => (
+                  <div key={label} className="bg-brand-bg rounded-xl border border-brand-border p-3 text-center">
+                    <div className="text-base mb-0.5">{icon}</div>
+                    <p className="num text-sm font-bold text-brand-text">
+                      {value === null ? '—' : value.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           {/* Live GHL CRM */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Live GHL CRM Data</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">CRM Contact Lookup</p>
             <GHLInfoPanel
               data={ghlData}
               loading={ghlLoading}
