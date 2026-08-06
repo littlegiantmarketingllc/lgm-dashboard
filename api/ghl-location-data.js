@@ -159,11 +159,5 @@ export default async function handler(req, res) {
     users:         userCount,
     contacts:      contactCount,
     opportunities: oppsCount,
-    // Debug info — shows raw status and error bodies so we can diagnose null fields
-    _debug: {
-      users:         { status: users?.status,    error: users?.text    },
-      contacts:      { status: contacts?.status, error: contacts?.text },
-      opportunities: { status: opps?.status,     error: opps?.text     },
-    },
   })
 }
