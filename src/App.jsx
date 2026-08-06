@@ -1,4 +1,10 @@
+import HealthStandaloneApp from './HealthStandaloneApp'
 import { useState, useMemo, useCallback } from 'react'
+
+// VITE_APP_MODE=health is set on the lgm-customer-health Vercel project.
+// When that build runs, this file short-circuits and exports the health-only app.
+// lgm-dashboard (QC) has no VITE_APP_MODE set, so it falls through to the full app.
+const IS_HEALTH_MODE = import.meta.env.VITE_APP_MODE === 'health'
 
 import { useEmployeeHealthSheet } from './hooks/useEmployeeHealthSheet'
 import { useCallStatus }          from './hooks/useCallStatus'
@@ -67,6 +73,7 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  if (IS_HEALTH_MODE) return <HealthStandaloneApp />
   // ── QC state ────────────────────────────────────────────────────────────────
   const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
