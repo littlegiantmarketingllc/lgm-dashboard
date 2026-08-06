@@ -97,16 +97,17 @@ async function getOAuthToken(locationId) {
   }
 }
 
-async function ghlGet(path, token) {
-  try {
-    const res = await fetch(`${GHL_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Version: GHL_VER },
-    })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+async function ghlFetch(path, token, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { Authorization: `Bearer ${token}`, Version: GHL_VER, 'Content-Type': 'application/json' },
   }
+  if (body) opts.body = JSON.stringify(body)
+  const res = await fetch(`${GHL_BASE}${path}`, opts)
+  const text = await res.text()
+  let json = null
+  try { json = JSON.parse(text) } catch {}
+  return { status: res.status, ok: res.ok, json, text: res.ok ? null : text.slice(0, 300) }
 }
 
 export default async function handler(req, res) {
@@ -127,20 +128,32 @@ export default async function handler(req, res) {
   }
 
   const [usersR, contactsR, oppsR] = await Promise.allSettled([
-    ghlGet(`/users/?locationId=${locationId}`, token),
-    ghlGet(`/contacts/?locationId=${locationId}&limit=1`, token),
-    ghlGet(`/opportunities/search?location_id=${locationId}&limit=1`, token),
+    ghlFetch(`/users/?locationId=${locationId}`, token),
+    ghlFetch(`/contacts/?locationId=${locationId}&limit=1`, token),
+    // opportunities/search is a POST endpoint
+    ghlFetch(`/opportunities/search`, token, 'POST', { location_id: locationId, limit: 1 }),
   ])
 
   const users    = usersR.status    === 'fulfilled' ? usersR.value    : null
   const contacts = contactsR.status === 'fulfilled' ? contactsR.value : null
   const opps     = oppsR.status     === 'fulfilled' ? oppsR.value     : null
 
+  // Extract counts, trying multiple known GHL response shapes
+  const userCount    = users?.json?.users?.length            ?? null
+  const contactCount = contacts?.json?.total ?? contacts?.json?.meta?.total ?? contacts?.json?.count ?? null
+  const oppsCount    = opps?.json?.total    ?? opps?.json?.meta?.total     ?? opps?.json?.opportunities?.total ?? null
+
   res.json({
     locationId,
     oauthConnected: true,
-    users:         users?.users?.length            ?? null,
-    contacts:      contacts?.total ?? contacts?.meta?.total ?? null,
-    opportunities: opps?.total    ?? opps?.meta?.total     ?? null,
+    users:         userCount,
+    contacts:      contactCount,
+    opportunities: oppsCount,
+    // Debug info — shows raw status and error bodies so we can diagnose null fields
+    _debug: {
+      users:         { status: users?.status,    error: users?.text    },
+      contacts:      { status: contacts?.status, error: contacts?.text },
+      opportunities: { status: opps?.status,     error: opps?.text     },
+    },
   })
 }
