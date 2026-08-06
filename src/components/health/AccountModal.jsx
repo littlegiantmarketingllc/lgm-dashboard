@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { differenceInDays, parseISO, isValid, format } from 'date-fns'
-import { recommendAction } from '../../lib/healthEngine'
+import { recommendAction, enhancedScoreAccount, classify } from '../../lib/healthEngine'
 import GHLInfoPanel from './GHLInfoPanel'
 import InfoTip from './InfoTip'
 
@@ -85,9 +85,17 @@ export default function AccountModal({ account, onClose }) {
 
   if (!account) return null
 
-  const { score, parts, band } = account._health || { score: 0, parts: {}, band: 'at_risk' }
+  // Use enhanced score when live metrics are loaded, fall back to basic score
+  const baseHealth = account._health || { score: 0, parts: {}, band: 'at_risk' }
+  const enhanced   = (!liveMetricsLoading && liveMetrics?.oauthConnected)
+    ? enhancedScoreAccount(account, liveMetrics)
+    : null
+  const displayScore = enhanced ?? baseHealth
+  const { score, parts } = displayScore
+  const band   = classify(score)
   const color  = bandColor(band)
   const action = recommendAction(account)
+  const isEnhanced = !!enhanced
 
   const dateAdded = account.ghlDateAdded
   let tenureDays = null, joinFormatted = null
@@ -148,10 +156,17 @@ export default function AccountModal({ account, onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-brand-bg rounded-xl p-3 border border-brand-border text-center relative">
               <div className="absolute top-2 right-2">
-                <InfoTip text="Composite health: 50% how long they've been in GHL (tenure) + 50% how recently their account was updated (activity). Active = 70+, Slowing = 40–69, Stale < 40." position="top-end" />
+                <InfoTip
+                  text={isEnhanced
+                    ? "Enhanced score: 20% tenure · 20% activity · 15% team size · 25% contacts · 20% opportunities. Updates once live metrics load."
+                    : "Basic score: 50% tenure · 50% activity. Loads instantly for all 278 accounts. Enhanced score appears once live metrics load."}
+                  position="top-end"
+                />
               </div>
               <p className="num text-base font-bold" style={{ color }}>{score}/100</p>
-              <p className="text-[10px] text-brand-muted uppercase tracking-wider mt-0.5">Health Score</p>
+              <p className="text-[10px] text-brand-muted uppercase tracking-wider mt-0.5">
+                {isEnhanced ? 'Health Score ✦' : 'Health Score'}
+              </p>
             </div>
             <div className="bg-brand-bg rounded-xl p-3 border border-brand-border text-center">
               <p className="num text-base font-bold text-brand-text">
@@ -163,9 +178,28 @@ export default function AccountModal({ account, onClose }) {
 
           {/* Score breakdown */}
           <div className="rounded-xl border border-brand-border p-4 space-y-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-1">Score Breakdown</p>
-            <SubScoreBar label="Tenure (how long in GHL) — 50%" score={parts.tenure} />
-            <SubScoreBar label="Activity (days since last update) — 50%" score={parts.activity} />
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Score Breakdown</p>
+              {isEnhanced && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#8CC63F18', color: '#3a6b10' }}>
+                  ENHANCED
+                </span>
+              )}
+            </div>
+            {isEnhanced ? (
+              <>
+                <SubScoreBar label="Tenure (how long in GHL) — 20%" score={parts.tenure} />
+                <SubScoreBar label="Activity (days since last update) — 20%" score={parts.activity} />
+                <SubScoreBar label="Team Members (users) — 15%" score={parts.users} />
+                <SubScoreBar label="Contacts (CRM size) — 25%" score={parts.contacts} />
+                <SubScoreBar label="Opportunities (pipeline) — 20%" score={parts.opps} />
+              </>
+            ) : (
+              <>
+                <SubScoreBar label="Tenure (how long in GHL) — 50%" score={parts.tenure} />
+                <SubScoreBar label="Activity (days since last update) — 50%" score={parts.activity} />
+              </>
+            )}
             <div className="mt-3 pt-3 border-t border-brand-border">
               <div className="flex items-center justify-between text-[11px] mb-1.5">
                 <span className="text-brand-muted font-semibold">Composite</span>
