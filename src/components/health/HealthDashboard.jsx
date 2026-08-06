@@ -11,6 +11,9 @@ import MasterAccountsTable        from './MasterAccountsTable'
 import HealthCharts               from './HealthCharts'
 import QuickWins                  from './QuickWins'
 import AccountModal               from './AccountModal'
+import DmAgentBreakdown           from './DmAgentBreakdown'
+import UpsellTable                from './UpsellTable'
+import TransactionBreakdown       from './TransactionBreakdown'
 
 const G = '#8CC63F'
 
@@ -78,6 +81,23 @@ function ErrorBanner({ message, onRetry }) {
       </button>
     </div>
   )
+}
+
+// Billing data not yet connected — all billing fields return 0 / null
+const BILLING = {
+  billedCount:  0,
+  atRisk:       0,
+  healthy:      0,
+  upsellReady:  0,
+  riskRevenue:  0,
+  upsellMRR:    0,
+  avgSub:       0,
+  medianSub:    0,
+  avgUsers:     0,
+  avgWallet:    0,
+  medianWallet: 0,
+  walletCount:  0,
+  newMRR:       0,
 }
 
 export default function HealthDashboard({ filters, setFilters }) {
@@ -169,7 +189,7 @@ export default function HealthDashboard({ filters, setFilters }) {
     return total / withDate.length
   }, [accounts])
 
-  // QuickWins: top 3 most stale + top 3 newest
+  // Quick Wins: top 3 stale + top 3 newest
   const top3Stale = staleAccounts.slice(0, 3)
   const top3New   = useMemo(() =>
     [...accounts]
@@ -218,7 +238,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         totalAll={accounts.length}
       />
 
-      {/* 1. KPI summary cards */}
+      {/* 1. KPI summary cards — live + billing-pending */}
       <HealthSummaryCards
         total={accounts.length}
         activeCount={activeAccounts.length}
@@ -227,19 +247,24 @@ export default function HealthDashboard({ filters, setFilters }) {
         newPeriodLabel={newPeriodLabel}
         avgScore={avgScore}
         avgTenureDays={avgTenureDays}
+        {...BILLING}
       />
 
-      {/* 2. Quick Wins — do these today */}
+      {/* 2. Quick Wins — stale, upsell (pending), newest */}
       <QuickWins
         topStale={top3Stale}
         topNew={top3New}
+        topUpsell={[]}
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 3. Resolution tracker */}
+      {/* 3. DM vs Agent breakdown — billing pending */}
+      <DmAgentBreakdown hasBilling={false} breakdown={null} avgHealthDm={null} avgHealthAgent={null} />
+
+      {/* 4. Resolution tracker */}
       <ResolutionTrackerHealth accounts={staleAccounts} statuses={statuses} />
 
-      {/* 4. Needs Attention — stale accounts with outreach tracking */}
+      {/* 5. Needs Attention — stale accounts with outreach tracking */}
       <NeedsAttentionTable
         accounts={staleAccounts}
         statuses={statuses}
@@ -247,10 +272,23 @@ export default function HealthDashboard({ filters, setFilters }) {
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 5. Charts — health distribution, join timeline, activity histogram */}
+      {/* 6. Upsell table — billing pending */}
+      <UpsellTable
+        accounts={[]}
+        isContacted={() => false}
+        toggleContacted={() => {}}
+        getContactedAt={() => null}
+        onAccountClick={setSelectedAccount}
+        potentialMRR={0}
+      />
+
+      {/* 7. Charts — health distribution, join timeline, activity + billing-pending panels */}
       <HealthCharts accounts={filteredAccounts} />
 
-      {/* 6. Master accounts table — full portfolio */}
+      {/* 8. Billing breakdown by charge type — pending */}
+      <TransactionBreakdown accounts={[]} />
+
+      {/* 9. Master accounts table — full portfolio with all original columns */}
       <MasterAccountsTable
         accounts={filteredAccounts}
         onAccountClick={setSelectedAccount}

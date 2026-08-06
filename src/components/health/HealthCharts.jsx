@@ -1,6 +1,6 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts'
 import { format, parseISO, isValid } from 'date-fns'
 import InfoTip from './InfoTip'
@@ -165,13 +165,80 @@ function ActivityHistogram({ accounts }) {
   )
 }
 
+// ── 4. Revenue by Health Band (billing-pending) ──────────────────────────────
+function RevenueByBand() {
+  const bands = [
+    { name: 'Active (80+)',    color: G   },
+    { name: 'Watch (50–79)',   color: AMB },
+    { name: 'At-Risk (<50)',   color: RED },
+  ]
+  return (
+    <Card title="Revenue by Health Band" subtitle="Monthly revenue split by account health — billing data required" delay={740}
+      infoText="Will show total monthly charges grouped by health band: Active, Watch, and At-Risk accounts. Helps quantify how much revenue is in jeopardy from stale clients. Requires billing sheet or Stripe connection.">
+      <div className="flex flex-col items-center justify-center h-[160px] gap-3">
+        <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-sm">💰</div>
+        <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
+        <div className="flex items-center gap-4">
+          {bands.map(b => (
+            <div key={b.name} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full opacity-30" style={{ background: b.color }} />
+              <span className="text-[10px] text-brand-muted opacity-60">{b.name}: —</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
+      </div>
+    </Card>
+  )
+}
+
+// ── 5. Transaction / DataHealthStatus Histogram (billing-pending) ─────────────
+function TxnHistogram() {
+  const THRESHOLD = 3_500
+  const buckets = [
+    { label: '0–999',      min: 0,    max: 1000 },
+    { label: '1k–1.9k',   min: 1000, max: 2000 },
+    { label: '2k–2.9k',   min: 2000, max: 3000 },
+    { label: '3k–3.5k',   min: 3000, max: 3500 },
+    { label: '3.5k+',     min: 3500, max: Infinity },
+  ]
+  const data = buckets.map(b => ({ label: b.label, count: 0 }))
+
+  return (
+    <Card title="Transaction Distribution" subtitle="DataHealthStatus buckets — billing data required" delay={780}
+      infoText="Will show how accounts are distributed by DataHealthStatus (transaction count × 1000). The red reference line at 3,500 marks the churn threshold — accounts below this are at risk. Requires billing sheet.">
+      <div className="relative">
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={24} />
+            <ReferenceLine x="3.5k+" stroke={RED} strokeDasharray="4 4" label={{ value: 'Threshold', position: 'insideTopRight', fontSize: 9, fill: RED }} />
+            <Bar dataKey="count" fill={G} radius={[4, 4, 0, 0]} fillOpacity={0.3} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[1px] rounded-b-xl gap-1">
+          <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
+          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires billing sheet or Stripe</p>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export default function HealthCharts({ accounts }) {
   if (!accounts.length) return null
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-      <HealthDistribution accounts={accounts} />
-      <JoinTimeline       accounts={accounts} />
-      <ActivityHistogram  accounts={accounts} />
+    <div className="space-y-4 sm:space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+        <HealthDistribution accounts={accounts} />
+        <JoinTimeline       accounts={accounts} />
+        <ActivityHistogram  accounts={accounts} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+        <RevenueByBand />
+        <TxnHistogram />
+      </div>
     </div>
   )
 }

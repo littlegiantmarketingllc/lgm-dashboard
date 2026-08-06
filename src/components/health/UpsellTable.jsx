@@ -160,8 +160,19 @@ export default function UpsellTable({ accounts, isContacted, toggleContacted, ge
       </div>
 
       {sorted.length === 0 ? (
-        <div className="py-12 text-center text-brand-muted text-sm">
-          No upsell-ready accounts yet — accounts need 3,500+ transactions, 3+ users, and no add-ons yet.
+        <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">📈</div>
+          <div>
+            <p className="text-brand-heading font-semibold text-sm">Billing Data Not Connected</p>
+            <p className="text-brand-muted text-[12px] mt-1.5 leading-relaxed max-w-[360px]">
+              Upsell-ready accounts (3,500+ transactions, 3+ users, no add-ons) will appear here once billing data is connected.
+              Requires: Stripe API key or the LGM billing sheet (plan price, DataHealthStatus, user counts, add-ons per client).
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+            <span>⚠</span>
+            <span>Data not received — connect Stripe or billing sheet to unlock this section</span>
+          </div>
         </div>
       ) : (
         <>

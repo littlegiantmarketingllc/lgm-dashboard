@@ -90,7 +90,40 @@ function DrilldownPanel({ item, accounts, onClose }) {
 export default function TransactionBreakdown({ accounts }) {
   const [expanded, setExpanded] = useState(null)
 
-  if (!accounts.length) return null
+  if (!accounts.length) return (
+    <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div className="px-5 sm:px-6 py-4 border-b border-brand-border flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-brand-heading font-semibold text-sm">Billing Breakdown by Charge Type</h3>
+          <p className="text-brand-muted text-[11px] mt-0.5">Plan subscriptions · user seats · add-ons · LC wallet charges</p>
+        </div>
+        <InfoTip position="top-end" text="Breakdown of monthly revenue by billing component. Requires billing sheet or Stripe connection." />
+      </div>
+      <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
+        <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">💳</div>
+        <div>
+          <p className="text-brand-heading font-semibold text-sm">Billing Data Not Connected</p>
+          <p className="text-brand-muted text-[12px] mt-1.5 leading-relaxed max-w-[360px]">
+            Charge-type breakdown (Base Plan, User Seats, Add-ons, LC Platform Usage) will populate once billing data is connected.
+            Requires: Stripe API key or the LGM billing sheet with planPrice, monthlyUserSub, addOns, and lcWalletCharges per client.
+          </p>
+        </div>
+        <div className="w-full max-w-[420px] divide-y divide-brand-border border border-dashed border-brand-border rounded-xl overflow-hidden">
+          {['📋  Base Plan Subscriptions', '👥  User Seat Fees', '➕  Add-On Charges', '⚡  LC Platform Usage'].map(label => (
+            <div key={label} className="flex items-center justify-between px-4 py-3 bg-brand-bg/50">
+              <span className="text-[12px] text-brand-muted">{label}</span>
+              <span className="text-brand-border font-bold text-[13px]">—</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+          <span>⚠</span>
+          <span>Data not received — connect Stripe or billing sheet to unlock this section</span>
+        </div>
+      </div>
+    </div>
+  )
 
   const rows = BILLING_ITEMS.map(item => {
     const active = accounts.filter(a => (a[item.field] || 0) > 0)

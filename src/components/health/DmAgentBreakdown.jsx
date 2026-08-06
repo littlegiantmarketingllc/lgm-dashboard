@@ -22,14 +22,36 @@ function StatLine({ dot, label, count, rev, pct }) {
   )
 }
 
-export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent }) {
-  const { dm, agent, total } = breakdown
+function PendingBanner() {
+  return (
+    <div className="px-5 sm:px-6 py-8 flex flex-col items-center gap-3 text-center">
+      <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl">
+        📊
+      </div>
+      <div>
+        <p className="text-brand-heading font-semibold text-sm">Billing Data Not Connected</p>
+        <p className="text-brand-muted text-[12px] mt-1.5 max-w-[320px] leading-relaxed">
+          Revenue split between DM and Agent account types will appear here once billing data is connected.
+          Requires: Stripe API key or the LGM billing sheet (plan type, account type, monthly charges per client).
+        </p>
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-3 w-full max-w-[280px]">
+        <div className="rounded-xl border border-dashed border-brand-border bg-brand-bg p-3 text-center">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider">DM Revenue</p>
+          <p className="text-[18px] font-bold text-brand-border mt-0.5">—</p>
+          <p className="text-[10px] text-amber-600 mt-0.5">⚠ Pending</p>
+        </div>
+        <div className="rounded-xl border border-dashed border-brand-border bg-brand-bg p-3 text-center">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider">Agent Revenue</p>
+          <p className="text-[18px] font-bold text-brand-border mt-0.5">—</p>
+          <p className="text-[10px] text-amber-600 mt-0.5">⚠ Pending</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const pieData = [
-    { name: 'DM',    value: dm.rev    || 0.01, color: G   },
-    { name: 'Agent', value: agent.rev || 0.01, color: AMB },
-  ]
-
+export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent, hasBilling = false }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
@@ -46,49 +68,53 @@ export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgen
         />
       </div>
 
-      <div className="px-5 sm:px-6 py-5 flex flex-col sm:flex-row gap-6 items-center">
-
-        {/* Donut */}
-        <div className="w-28 h-28 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" innerRadius={28} outerRadius={48}
-                dataKey="value" paddingAngle={3}>
-                {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip
-                formatter={(v, n) => [fmt(v), n]}
-                contentStyle={{ fontSize: 11, border: '1px solid #E5E7E5', borderRadius: 8 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Stats */}
-        <div className="flex-1 min-w-0 w-full">
-          <StatLine dot={G}   label="DM"    count={dm.count}    rev={dm.rev}    pct={dm.pct}    />
-          <StatLine dot={AMB} label="Agent" count={agent.count} rev={agent.rev} pct={agent.pct} />
-
-          <div className="flex items-center justify-between pt-2.5">
-            <span className="text-brand-muted text-[11px] font-semibold">Total Revenue</span>
-            <span className="num text-[13px] font-bold text-brand-text">{fmt(total)}</span>
+      {!hasBilling ? <PendingBanner /> : (
+        <div className="px-5 sm:px-6 py-5 flex flex-col sm:flex-row gap-6 items-center">
+          {/* Donut */}
+          <div className="w-28 h-28 flex-shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={[
+                  { name: 'DM',    value: breakdown?.dm?.rev    || 0.01, color: G   },
+                  { name: 'Agent', value: breakdown?.agent?.rev || 0.01, color: AMB },
+                ]} cx="50%" cy="50%" innerRadius={28} outerRadius={48}
+                  dataKey="value" paddingAngle={3}>
+                  <Cell fill={G} />
+                  <Cell fill={AMB} />
+                </Pie>
+                <Tooltip
+                  formatter={(v, n) => [fmt(v), n]}
+                  contentStyle={{ fontSize: 11, border: '1px solid #E5E7E5', borderRadius: 8 }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
 
-          {(avgHealthDm !== null || avgHealthAgent !== null) && (
-            <div className="mt-3 pt-3 border-t border-brand-border/60 grid grid-cols-2 gap-3">
-              <div className="text-center rounded-xl bg-brand-bg border border-brand-border p-2">
-                <p className="text-[10px] text-brand-muted uppercase tracking-wider">DM Avg Health</p>
-                <p className="num font-bold text-[15px] mt-0.5" style={{ color: G }}>{avgHealthDm ?? '—'}</p>
-              </div>
-              <div className="text-center rounded-xl bg-brand-bg border border-brand-border p-2">
-                <p className="text-[10px] text-brand-muted uppercase tracking-wider">Agent Avg Health</p>
-                <p className="num font-bold text-[15px] mt-0.5" style={{ color: AMB }}>{avgHealthAgent ?? '—'}</p>
-              </div>
-            </div>
-          )}
-        </div>
+          {/* Stats */}
+          <div className="flex-1 min-w-0 w-full">
+            <StatLine dot={G}   label="DM"    count={breakdown?.dm?.count ?? 0}    rev={breakdown?.dm?.rev ?? 0}    pct={breakdown?.dm?.pct ?? 0}    />
+            <StatLine dot={AMB} label="Agent" count={breakdown?.agent?.count ?? 0} rev={breakdown?.agent?.rev ?? 0} pct={breakdown?.agent?.pct ?? 0} />
 
-      </div>
+            <div className="flex items-center justify-between pt-2.5">
+              <span className="text-brand-muted text-[11px] font-semibold">Total Revenue</span>
+              <span className="num text-[13px] font-bold text-brand-text">{fmt(breakdown?.total ?? 0)}</span>
+            </div>
+
+            {(avgHealthDm !== null || avgHealthAgent !== null) && (
+              <div className="mt-3 pt-3 border-t border-brand-border/60 grid grid-cols-2 gap-3">
+                <div className="text-center rounded-xl bg-brand-bg border border-brand-border p-2">
+                  <p className="text-[10px] text-brand-muted uppercase tracking-wider">DM Avg Health</p>
+                  <p className="num font-bold text-[15px] mt-0.5" style={{ color: G }}>{avgHealthDm ?? '—'}</p>
+                </div>
+                <div className="text-center rounded-xl bg-brand-bg border border-brand-border p-2">
+                  <p className="text-[10px] text-brand-muted uppercase tracking-wider">Agent Avg Health</p>
+                  <p className="num font-bold text-[15px] mt-0.5" style={{ color: AMB }}>{avgHealthAgent ?? '—'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
