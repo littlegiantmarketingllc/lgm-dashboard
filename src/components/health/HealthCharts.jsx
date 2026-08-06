@@ -1,15 +1,13 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ReferenceLine,
+  PieChart, Pie, Cell,
 } from 'recharts'
-import { CHURN_TXN_THRESHOLD } from '../../lib/healthConfig'
+import { format, parseISO, isValid } from 'date-fns'
 import InfoTip from './InfoTip'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
 const RED = '#EF4444'
-
-function fmt(n) { return '$' + Math.round(n).toLocaleString() }
 
 function Card({ title, subtitle, infoText, children, delay = 0 }) {
   return (
@@ -24,37 +22,34 @@ function Card({ title, subtitle, infoText, children, delay = 0 }) {
         </div>
         {infoText && <InfoTip text={infoText} position="top-end" />}
       </div>
-      <div className="px-5 sm:px-6 py-5">
-        {children}
-      </div>
+      <div className="px-5 sm:px-6 py-5">{children}</div>
     </div>
   )
 }
 
 const TT_STYLE = { fontSize: 11, border: '1px solid #E5E7E5', borderRadius: 8, background: '#fff' }
 
-// ── 1. Health Distribution (donut) ───────────────────────────────────────────
+// ── 1. Health Band Distribution (donut) ──────────────────────────────────────
 function HealthDistribution({ accounts }) {
   const counts = {
-    Healthy: accounts.filter(a => a._health?.band === 'healthy').length,
-    Watch:   accounts.filter(a => a._health?.band === 'watch').length,
-    'At-Risk': accounts.filter(a => a._health?.band === 'at_risk').length,
+    Active:   accounts.filter(a => a._health?.band === 'healthy').length,
+    Slowing:  accounts.filter(a => a._health?.band === 'watch').length,
+    Stale:    accounts.filter(a => a._health?.band === 'at_risk').length,
   }
   const data = [
-    { name: 'Healthy',  value: counts.Healthy,   color: G   },
-    { name: 'Watch',    value: counts.Watch,      color: AMB },
-    { name: 'At-Risk',  value: counts['At-Risk'], color: RED },
+    { name: 'Active',   value: counts.Active,  color: G   },
+    { name: 'Slowing',  value: counts.Slowing, color: AMB },
+    { name: 'Stale',    value: counts.Stale,   color: RED },
   ].filter(d => d.value > 0)
 
   return (
     <Card title="Health Distribution" subtitle="Accounts by health band" delay={620}
-      infoText="Donut showing portfolio breakdown by health band. Healthy = composite score ≥ 80, Watch = 50–79, At-Risk = below 50. Score weights: DataHealthStatus 40%, Users 20%, Revenue 15%, Tenure 15%, Activity 10%.">
+      infoText="Portfolio breakdown by health band. Active = composite score 70+ (recent activity + good tenure). Slowing = 40–69. Stale = below 40 (30+ days no GHL activity).">
       <div className="flex flex-col sm:flex-row items-center gap-6">
         <div className="w-36 h-36 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={data} cx="50%" cy="50%" innerRadius={38} outerRadius={58}
-                dataKey="value" paddingAngle={3}>
+              <Pie data={data} cx="50%" cy="50%" innerRadius={38} outerRadius={58} dataKey="value" paddingAngle={3}>
                 {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
               <Tooltip contentStyle={TT_STYLE} formatter={(v, n) => [v + ' accounts', n]} />
@@ -63,9 +58,9 @@ function HealthDistribution({ accounts }) {
         </div>
         <div className="flex-1 space-y-3 w-full">
           {[
-            { label: 'Healthy (80+)',  count: counts.Healthy,   color: G   },
-            { label: 'Watch (50–79)',  count: counts.Watch,     color: AMB },
-            { label: 'At-Risk (<50)', count: counts['At-Risk'], color: RED },
+            { label: 'Active (70+)',    count: counts.Active,  color: G   },
+            { label: 'Slowing (40–69)', count: counts.Slowing, color: AMB },
+            { label: 'Stale (<40)',     count: counts.Stale,   color: RED },
           ].map(({ label, count, color }) => (
             <div key={label} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
@@ -87,67 +82,70 @@ function HealthDistribution({ accounts }) {
   )
 }
 
-// ── 2. Revenue by Health Band (bar) ──────────────────────────────────────────
-function RevenueByBand({ accounts }) {
-  const bands = { 'Healthy': 0, 'Watch': 0, 'At-Risk': 0 }
-  for (const a of accounts) {
-    if (a._health?.band === 'healthy')  bands['Healthy']  += a.totalRev || 0
-    else if (a._health?.band === 'watch') bands['Watch']  += a.totalRev || 0
-    else                                  bands['At-Risk'] += a.totalRev || 0
+// ── 2. Join Date Timeline (accounts added per month) ─────────────────────────
+function JoinTimeline({ accounts }) {
+  // Build monthly buckets from the last 12 months
+  const now = new Date()
+  const months = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ key: format(d, 'yyyy-MM'), label: format(d, 'MMM yy'), count: 0 })
   }
-  const data = [
-    { name: 'Healthy',  rev: Math.round(bands['Healthy']),  fill: G   },
-    { name: 'Watch',    rev: Math.round(bands['Watch']),    fill: AMB },
-    { name: 'At-Risk',  rev: Math.round(bands['At-Risk']),  fill: RED },
-  ]
+
+  for (const a of accounts) {
+    if (!a.ghlDateAdded) continue
+    try {
+      const d = parseISO(a.ghlDateAdded)
+      if (!isValid(d)) continue
+      const key = format(d, 'yyyy-MM')
+      const bucket = months.find(m => m.key === key)
+      if (bucket) bucket.count++
+    } catch {}
+  }
 
   return (
-    <Card title="Revenue by Health Band" subtitle="Monthly charges by health segment" delay={660}
-      infoText="Monthly charges from the billing sheet grouped by client health band. A large At-Risk bar means significant revenue is at churn risk. Use the Needs Attention table to prioritize outreach.">
+    <Card title="Client Joins by Month" subtitle="New GHL sub-accounts over last 12 months" delay={660}
+      infoText="How many new client sub-accounts were created in GHL each month over the past year. Based on the GHL sub-account creation date (dateAdded), pulled live from the GoHighLevel API.">
       <ResponsiveContainer width="100%" height={160}>
-        <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+        <BarChart data={months} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={v => `$${(v/1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={40} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} interval={1} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={24} />
           <Tooltip
-            formatter={(v) => [fmt(v), 'Revenue']}
+            formatter={(v) => [v + ' accounts', 'New Clients']}
             contentStyle={TT_STYLE}
           />
-          <Bar dataKey="rev" radius={[6, 6, 0, 0]}>
-            {data.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-          </Bar>
+          <Bar dataKey="count" fill={G} radius={[4, 4, 0, 0]} fillOpacity={0.85} />
         </BarChart>
       </ResponsiveContainer>
     </Card>
   )
 }
 
-// ── 3. Transactions Histogram ─────────────────────────────────────────────────
-function TxnHistogram({ accounts }) {
+// ── 3. Activity Distribution histogram ───────────────────────────────────────
+function ActivityHistogram({ accounts }) {
   const buckets = [
-    { label: '0',      min: 0,     max: 500    },
-    { label: '500',    min: 500,   max: 1000   },
-    { label: '1k',     min: 1000,  max: 2000   },
-    { label: '2k',     min: 2000,  max: 3500   },
-    { label: '3.5k',   min: 3500,  max: 5000   },
-    { label: '5k',     min: 5000,  max: 8000   },
-    { label: '8k',     min: 8000,  max: 12000  },
-    { label: '12k+',   min: 12000, max: Infinity },
+    { label: 'Today',   min: 0,   max: 1   },
+    { label: '1–7d',    min: 1,   max: 7   },
+    { label: '8–14d',   min: 7,   max: 14  },
+    { label: '15–30d',  min: 14,  max: 30  },
+    { label: '31–60d',  min: 30,  max: 60  },
+    { label: '61–90d',  min: 60,  max: 90  },
+    { label: '90d+',    min: 90,  max: Infinity },
   ]
 
   const data = buckets.map(b => ({
     label: b.label,
-    count: accounts.filter(a => a.transactions >= b.min && a.transactions < b.max).length,
-    isRisk: b.max <= CHURN_TXN_THRESHOLD || b.min < CHURN_TXN_THRESHOLD,
-    fill: b.min < CHURN_TXN_THRESHOLD ? RED : G,
+    count: accounts.filter(a => {
+      const d = Number(a.ghlDaysSinceUpdate)
+      return !isNaN(d) && d >= b.min && d < b.max
+    }).length,
+    fill: b.min >= 30 ? RED : b.min >= 14 ? AMB : G,
   }))
 
-  // Find the bucket index where the threshold sits for the reference line
-  const thresholdBucket = buckets.findIndex(b => b.min <= CHURN_TXN_THRESHOLD && b.max > CHURN_TXN_THRESHOLD)
-
   return (
-    <Card title="Health Status Distribution" subtitle="DataHealthStatus score spread across accounts" delay={700}
-      infoText="Distribution of DataHealthStatus scores (1–5) from the billing sheet. Score ≤ 3 = at-risk zone (left of the dashed line). 'All Good!' accounts are mapped to score 5. Helps identify how many clients need follow-up.">
+    <Card title="Activity Distribution" subtitle="Days since last GHL update across all accounts" delay={700}
+      infoText="How many accounts fall into each activity recency bucket. Accounts updated today or within the last 7 days are in peak health. Red buckets (30d+) are stale — these need a check-in call.">
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
@@ -155,15 +153,8 @@ function TxnHistogram({ accounts }) {
           <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={28} />
           <Tooltip
             formatter={(v) => [v + ' accounts', 'Count']}
-            labelFormatter={(l) => `${l} transactions`}
+            labelFormatter={(l) => `Last active: ${l}`}
             contentStyle={TT_STYLE}
-          />
-          <ReferenceLine
-            x={data[thresholdBucket]?.label}
-            stroke={AMB}
-            strokeDasharray="4 3"
-            strokeWidth={2}
-            label={{ value: '3.5k threshold', position: 'insideTopRight', fontSize: 9, fill: AMB }}
           />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
             {data.map((entry, i) => <Cell key={i} fill={entry.fill} fillOpacity={0.85} />)}
@@ -174,14 +165,13 @@ function TxnHistogram({ accounts }) {
   )
 }
 
-// ── Composed export ───────────────────────────────────────────────────────────
 export default function HealthCharts({ accounts }) {
   if (!accounts.length) return null
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
       <HealthDistribution accounts={accounts} />
-      <RevenueByBand      accounts={accounts} />
-      <TxnHistogram       accounts={accounts} />
+      <JoinTimeline       accounts={accounts} />
+      <ActivityHistogram  accounts={accounts} />
     </div>
   )
 }

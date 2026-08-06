@@ -8,8 +8,6 @@ const AMB = '#EAB308'
 const HIGHLY_NEEDED_COUNT = 10
 const PAGE_SIZE           = 20
 
-function fmt(n) { return '$' + Math.round(n).toLocaleString() }
-
 function bandColor(band) {
   if (band === 'healthy') return G
   if (band === 'watch')   return AMB
@@ -35,15 +33,28 @@ function HealthPill({ score, band }) {
         style={{ color: c, background: `${c}12`, borderColor: `${c}28` }}>
         {score}
       </span>
-      <div className="w-12 h-1 rounded-full bg-brand-border overflow-hidden">
+      <div className="w-10 h-1 rounded-full bg-brand-border overflow-hidden">
         <div className="h-full score-bar-fill rounded-full" style={{ width: `${score}%`, background: c }} />
       </div>
     </div>
   )
 }
 
+function ActivityBadge({ days }) {
+  if (days === null || days === undefined) return <span className="text-brand-muted text-[11px]">—</span>
+  const d = Number(days)
+  const color = d <= 7 ? G : d <= 30 ? AMB : RED
+  const label = d === 0 ? 'Today' : `${d}d ago`
+  return (
+    <span className="num inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border"
+      style={{ color, background: `${color}12`, borderColor: `${color}28` }}>
+      {label}
+    </span>
+  )
+}
+
 function StatusBadge({ status }) {
-  if (status === 'resolved')   return (
+  if (status === 'resolved')    return (
     <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap"
       style={{ color: G, background: `${G}10`, borderColor: `${G}28` }}>✓ Resolved</span>
   )
@@ -54,7 +65,7 @@ function StatusBadge({ status }) {
   )
   return (
     <span className="inline-flex items-center gap-1 text-red-500 text-[11px] font-semibold bg-red-50 border border-red-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" /> Action Required
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" /> Needs Outreach
     </span>
   )
 }
@@ -87,46 +98,50 @@ function ActionButtons({ id, status, setStatus }) {
   )
 }
 
+const TABLE_HEADERS = [
+  { label: 'Account Name',       tip: null },
+  { label: 'Location',           tip: 'City and state from the GHL sub-account profile.' },
+  { label: 'Email',              tip: 'Contact email on file in GHL.' },
+  { label: 'Last Activity',      tip: 'Days since the GHL sub-account record was last updated — the best available proxy for platform activity.' },
+  { label: 'Health Score',       tip: 'Composite score: 50% tenure (how long in GHL) + 50% activity (days since last update). Below 40 = Stale.' },
+  { label: 'Recommended Action', tip: 'Rule-based next step generated from the account\'s activity data.' },
+  { label: 'Status',             tip: 'Your team\'s outreach status. Tracked per-browser.' },
+  { label: 'Actions',            tip: null },
+]
+
 function AccountRow({ a, i, getStatus, getResolvedAt, setStatus, onAccountClick }) {
   const status     = getStatus(a.id)
   const resolvedAt = getResolvedAt(a.id)
   const isResolved = status === 'resolved'
 
   return (
-    <tr key={a.id}
+    <tr
       className={`animate-slide-in-row border-b border-brand-border/60 transition-all duration-200 ${isResolved ? 'opacity-50' : 'hover:bg-red-50/30'}`}
       style={{ animationDelay: `${i * 30}ms`, borderLeft: `2px solid ${isResolved ? '#E5E7E5' : RED}` }}>
 
       <td className="pl-5 pr-3 py-3">
-        <button
-          onClick={() => onAccountClick?.(a)}
+        <button onClick={() => onAccountClick?.(a)}
           className="text-[12px] font-semibold hover:underline text-left"
-          style={{ color: RED }}
-        >
+          style={{ color: RED }}>
           {a.accountName}
         </button>
       </td>
-      <td className="px-3 sm:px-4 py-3">
-        <span className="text-[11px] bg-brand-bg border border-brand-border px-2 py-0.5 rounded whitespace-nowrap text-brand-muted">
-          {a.accountType}
-        </span>
+      <td className="px-3 py-3 text-[11px] text-brand-muted whitespace-nowrap">
+        {[a.ghlCity, a.ghlState].filter(Boolean).join(', ') || '—'}
       </td>
-      <td className="px-3 sm:px-4 py-3">
-        <span className="num text-[12px] font-semibold text-brand-text">{a.transactions.toLocaleString()}</span>
+      <td className="px-3 py-3 text-[11px] text-brand-muted max-w-[160px] truncate">
+        {a.ghlEmail || '—'}
       </td>
-      <td className="px-3 sm:px-4 py-3">
-        <span className="num text-[12px] text-brand-text">{a.users}</span>
+      <td className="px-3 py-3">
+        <ActivityBadge days={a.ghlDaysSinceUpdate} />
       </td>
-      <td className="px-3 sm:px-4 py-3">
-        <span className="num text-[12px] font-semibold text-brand-text">{fmt(a.totalRev)}</span>
-      </td>
-      <td className="px-3 sm:px-4 py-3">
+      <td className="px-3 py-3">
         <HealthPill score={a._health?.score ?? 0} band={a._health?.band ?? 'at_risk'} />
       </td>
-      <td className="px-3 sm:px-4 py-3 max-w-[200px]">
-        <p className="text-[11px] text-brand-muted leading-snug">{a._health?.action ?? ''}</p>
+      <td className="px-3 py-3 max-w-[200px]">
+        <p className="text-[11px] text-brand-muted leading-snug">{a._health?.action ?? '—'}</p>
       </td>
-      <td className="px-3 sm:px-4 py-3">
+      <td className="px-3 py-3">
         <div className="flex flex-col gap-1">
           <StatusBadge status={status} />
           {isResolved && resolvedAt && (
@@ -134,24 +149,12 @@ function AccountRow({ a, i, getStatus, getResolvedAt, setStatus, onAccountClick 
           )}
         </div>
       </td>
-      <td className="px-3 sm:px-4 py-3 pr-5">
+      <td className="px-3 py-3 pr-5">
         <ActionButtons id={a.id} status={status} setStatus={setStatus} />
       </td>
     </tr>
   )
 }
-
-const TABLE_HEADERS = [
-  { label: 'Account Name',       tip: null },
-  { label: 'Type',               tip: 'DM = Digital Marketing, Agent = Conversational AI.' },
-  { label: 'Transactions',       tip: 'DataHealthStatus score (1–5 scale × 1000). A score ≤ 3,000 means the client has low platform activity — the primary at-risk trigger. "All Good!" = 5,000.' },
-  { label: 'Users',              tip: 'GHL Adjusted User Count — the number of active user seats on this sub-account as reported by GoHighLevel.' },
-  { label: 'Total Rev',          tip: 'Total Monthly Charges — sum of Plan Price + User Seat Fees + Add-ons + LC Platform Usage + Annual Subs.' },
-  { label: 'Health',             tip: 'Composite health score out of 100. Weighted: DataHealthStatus 40%, Users 20%, Revenue 15%, Tenure 15%, Activity 10%. Below 50 = At-Risk.' },
-  { label: 'Recommended Action', tip: 'Rule-based suggestion generated from the account\'s health data — e.g. schedule a check-in call, offer an add-on, or flag for churn risk review.' },
-  { label: 'Status',             tip: 'Your team\'s outreach status for this account. Tracked per-browser — use "In Progress" when outreach has started, "Mark Complete" when resolved.' },
-  { label: 'Actions',            tip: null },
-]
 
 function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClick }) {
   return (
@@ -160,7 +163,7 @@ function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClic
         <thead>
           <tr className="border-b border-brand-border bg-brand-bg/50">
             {TABLE_HEADERS.map(({ label, tip }) => (
-              <th key={label} className="px-3 sm:px-4 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
+              <th key={label} className="px-3 py-3 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-brand-muted whitespace-nowrap">
                 <span className="flex items-center gap-1">
                   {label}
                   {tip && <InfoTip text={tip} position="bottom-end" />}
@@ -171,7 +174,9 @@ function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClic
         </thead>
         <tbody>
           {rows.map((a, i) => (
-            <AccountRow key={a.id} a={a} i={i} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
+            <AccountRow key={a.id} a={a} i={i}
+              getStatus={getStatus} getResolvedAt={getResolvedAt}
+              setStatus={setStatus} onAccountClick={onAccountClick} />
           ))}
         </tbody>
       </table>
@@ -181,8 +186,6 @@ function AccountTable({ rows, getStatus, getResolvedAt, setStatus, onAccountClic
 
 export default function NeedsAttentionTable({ accounts, statuses, setStatus, onAccountClick }) {
   const [page, setPage] = useState(1)
-
-  // Reset to page 1 whenever the incoming accounts list changes (filters applied upstream)
   const accountsKey = accounts.length
   useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -193,19 +196,16 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
   const inProgress     = accounts.filter(a => getStatus(a.id) === 'in_progress').length
   const resolved       = accounts.filter(a => getStatus(a.id) === 'resolved').length
 
-  // Accounts arrive pre-sorted worst-health-first — the first N are the most urgent.
   const highlyNeeded = accounts.slice(0, HIGHLY_NEEDED_COUNT)
-  const todo          = accounts.slice(HIGHLY_NEEDED_COUNT)
-
-  const totalPages = Math.max(1, Math.ceil(todo.length / PAGE_SIZE))
-  const pageData   = useMemo(() => todo.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [todo, page])
+  const todo         = accounts.slice(HIGHLY_NEEDED_COUNT)
+  const totalPages   = Math.max(1, Math.ceil(todo.length / PAGE_SIZE))
+  const pageData     = useMemo(() => todo.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [todo, page])
 
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
       style={{ animationDelay: '540ms', boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}
     >
-      {/* Header */}
       <div className="px-4 sm:px-6 py-4 border-b border-brand-border flex items-start sm:items-center justify-between flex-wrap gap-3">
         <div className="flex items-start gap-2">
           <div>
@@ -216,19 +216,19 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
             </h2>
             <p className="text-brand-muted text-[11px] mt-0.5">
               {accounts.length === 0
-                ? 'No at-risk accounts — all clear'
-                : `${accounts.length} accounts · ${actionRequired} pending · ${inProgress} in progress · ${resolved} resolved`}
+                ? 'No stale accounts — all clients active'
+                : `${accounts.length} stale accounts · ${actionRequired} pending outreach · ${inProgress} in progress · ${resolved} resolved`}
             </p>
           </div>
           <InfoTip
-            text="At-risk accounts sorted worst-first (lowest health score first). An account is at-risk if its DataHealthStatus ≤ 3 (out of 5) OR its composite health score is below 50. The top 10 are highlighted as 'Highly Needed' — fix those first. Use the status buttons to track your team's outreach progress."
+            text="Accounts with no GHL activity in 30+ days, sorted worst-first (longest inactive first). The top 10 are flagged as 'Highly Needed' — reach out to those first. Use the status buttons to track your team's progress."
             position="top-end"
           />
         </div>
         {accounts.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            {resolved    > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border" style={{ color: G,   background: `${G}10`,   borderColor: `${G}25`   }}>✓ {resolved} resolved</span>}
-            {inProgress  > 0 && <span className="text-amber-700 text-[11px] font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">◌ {inProgress} in progress</span>}
+            {resolved     > 0 && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border" style={{ color: G, background: `${G}10`, borderColor: `${G}25` }}>✓ {resolved} resolved</span>}
+            {inProgress   > 0 && <span className="text-amber-700 text-[11px] font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">◌ {inProgress} in progress</span>}
             {actionRequired > 0 && <span className="text-red-500 text-[11px] font-bold bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">⚠ {actionRequired} pending</span>}
           </div>
         )}
@@ -238,15 +238,14 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
         <div className="py-14 text-center">
           <div className="flex flex-col items-center gap-3">
             <span className="text-4xl">✅</span>
-            <p className="text-brand-muted text-sm">No at-risk accounts — portfolio looking healthy</p>
+            <p className="text-brand-muted text-sm">No stale accounts — every client has recent GHL activity</p>
           </div>
         </div>
       ) : (
         <>
-          {/* Highly Needed — worst accounts, always visible, no pagination */}
           <div className="px-4 sm:px-6 pt-4 pb-1.5">
             <p className="text-[10px] font-bold uppercase tracking-widest text-red-500 flex items-center gap-1.5">
-              🔴 Highly Needed — fix these first ({highlyNeeded.length})
+              🔴 Highly Needed — reach out to these first ({highlyNeeded.length})
             </p>
           </div>
           <AccountTable rows={highlyNeeded} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
@@ -255,32 +254,18 @@ export default function NeedsAttentionTable({ accounts, statuses, setStatus, onA
             <>
               <div className="px-4 sm:px-6 pt-4 pb-1.5 border-t border-brand-border">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-brand-muted flex items-center gap-1.5">
-                  🟡 To-Do — {todo.length} more, lower priority
+                  🟡 To-Do — {todo.length} more accounts
                 </p>
               </div>
               <AccountTable rows={pageData} getStatus={getStatus} getResolvedAt={getResolvedAt} setStatus={setStatus} onAccountClick={onAccountClick} />
-
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="px-5 py-3 border-t border-brand-border flex items-center justify-between">
-                  <span className="text-[11px] text-brand-muted">
-                    Page {page} of {totalPages} · {todo.length} accounts
-                  </span>
+                  <span className="text-[11px] text-brand-muted">Page {page} of {totalPages} · {todo.length} accounts</span>
                   <div className="flex items-center gap-1">
-                    <button
-                      disabled={page === 1}
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
-                    >
-                      ← Prev
-                    </button>
-                    <button
-                      disabled={page === totalPages}
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg"
-                    >
-                      Next →
-                    </button>
+                    <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg">← Prev</button>
+                    <button disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      className="px-2.5 py-1 rounded-lg border text-[11px] font-semibold disabled:opacity-40 text-brand-muted border-brand-border hover:bg-brand-bg">Next →</button>
                   </div>
                 </div>
               )}

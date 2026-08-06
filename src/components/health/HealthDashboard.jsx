@@ -1,19 +1,23 @@
 import { useState, useMemo, useEffect } from 'react'
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { useMergedHealthData } from '../../hooks/useMergedHealthData'
-import { useAccountStatus }    from '../../hooks/useAccountStatus'
-import { scoreAccount, classify, isAtRisk, recommendAction, activeAccounts } from '../../lib/healthEngine'
-import HealthFilterBar    from './HealthFilterBar'
-import HealthSummaryCards from './HealthSummaryCards'
-import MasterAccountsTable from './MasterAccountsTable'
-import AccountModal       from './AccountModal'
+import { format, subDays, startOfMonth, endOfMonth, subMonths, differenceInDays, parseISO, isValid } from 'date-fns'
+import { useMergedHealthData }    from '../../hooks/useMergedHealthData'
+import { useAccountStatus }       from '../../hooks/useAccountStatus'
+import { scoreAccount, classify, isAtRisk, recommendAction } from '../../lib/healthEngine'
+import HealthFilterBar            from './HealthFilterBar'
+import HealthSummaryCards         from './HealthSummaryCards'
+import ResolutionTrackerHealth    from './ResolutionTrackerHealth'
+import NeedsAttentionTable        from './NeedsAttentionTable'
+import MasterAccountsTable        from './MasterAccountsTable'
+import HealthCharts               from './HealthCharts'
+import QuickWins                  from './QuickWins'
+import AccountModal               from './AccountModal'
 
 const G = '#8CC63F'
 
 function getDateWindow(dateRange) {
   if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
   const today = new Date()
-  if (dateRange.type === 'last_7')    return { from: format(subDays(today, 7),  'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
+  if (dateRange.type === 'last_7')     return { from: format(subDays(today, 7), 'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
   if (dateRange.type === 'this_month') return { from: format(startOfMonth(today), 'yyyy-MM-dd'), to: format(endOfMonth(today), 'yyyy-MM-dd') }
   if (dateRange.type === 'last_month') {
     const prev = subMonths(today, 1)
@@ -68,8 +72,7 @@ function ErrorBanner({ message, onRetry }) {
       <p className="text-3xl mb-3">⚠️</p>
       <h3 className="text-brand-heading font-bold text-base mb-2">Could not load GHL data</h3>
       <p className="text-brand-muted text-sm mb-5">{message}</p>
-      <button onClick={onRetry}
-        className="px-5 py-2 rounded-xl text-white text-sm font-semibold"
+      <button onClick={onRetry} className="px-5 py-2 rounded-xl text-white text-sm font-semibold"
         style={{ background: G, boxShadow: `0 2px 8px ${G}35` }}>
         Try Again
       </button>
@@ -79,6 +82,7 @@ function ErrorBanner({ message, onRetry }) {
 
 export default function HealthDashboard({ filters, setFilters }) {
   const { accounts: raw, loading, error, lastUpdated, refetch } = useMergedHealthData()
+  const { statuses, setStatus } = useAccountStatus()
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
 
@@ -110,7 +114,6 @@ export default function HealthDashboard({ filters, setFilters }) {
   const filteredAccounts = useMemo(() => {
     const { from, to } = getDateWindow(filters.dateRange)
     const srch = filters.search.toLowerCase().trim()
-
     return accounts.filter(a => {
       if (srch && !a.accountName.toLowerCase().includes(srch) &&
           !(a.ghlEmail || '').toLowerCase().includes(srch) &&
@@ -124,12 +127,17 @@ export default function HealthDashboard({ filters, setFilters }) {
     })
   }, [accounts, filters])
 
-  // KPI calculations
-  const activeAccts = useMemo(() => activeAccounts(accounts), [accounts])
-  const staleAccts  = useMemo(() => accounts.filter(a => {
-    const d = Number(a.ghlDaysSinceUpdate)
-    return !isNaN(d) && d > 30
-  }), [accounts])
+  // KPIs — derived from full account list (not filtered by date)
+  const activeAccounts = useMemo(() =>
+    accounts.filter(a => { const d = Number(a.ghlDaysSinceUpdate); return !isNaN(d) && d <= 30 }),
+    [accounts]
+  )
+  const staleAccounts = useMemo(() =>
+    accounts.filter(isAtRisk).sort((a, b) =>
+      (Number(b.ghlDaysSinceUpdate) || 0) - (Number(a.ghlDaysSinceUpdate) || 0)
+    ),
+    [accounts]
+  )
 
   const { newAccounts, newPeriodLabel } = useMemo(() => {
     const today = new Date()
@@ -140,12 +148,36 @@ export default function HealthDashboard({ filters, setFilters }) {
       last_7: 'last 7 days', this_month: 'this month', last_month: 'last month',
       last_30: 'last 30 days', last_90: 'last 90 days',
     }[filters.dateRange.type] || 'selected period')
-    const list = accounts.filter(a => {
-      const d = a.ghlDateAdded || ''
-      return d && d >= from && d <= to
-    })
+    const list = accounts.filter(a => { const d = a.ghlDateAdded || ''; return d && d >= from && d <= to })
     return { newAccounts: list, newPeriodLabel: label }
   }, [accounts, filters.dateRange])
+
+  const avgScore = useMemo(() => {
+    if (!accounts.length) return 0
+    return accounts.reduce((s, a) => s + (a._health?.score ?? 0), 0) / accounts.length
+  }, [accounts])
+
+  const avgTenureDays = useMemo(() => {
+    const withDate = accounts.filter(a => a.ghlDateAdded)
+    if (!withDate.length) return 0
+    const total = withDate.reduce((s, a) => {
+      try {
+        const d = parseISO(a.ghlDateAdded)
+        return isValid(d) ? s + differenceInDays(new Date(), d) : s
+      } catch { return s }
+    }, 0)
+    return total / withDate.length
+  }, [accounts])
+
+  // QuickWins: top 3 most stale + top 3 newest
+  const top3Stale = staleAccounts.slice(0, 3)
+  const top3New   = useMemo(() =>
+    [...accounts]
+      .filter(a => a.ghlDateAdded)
+      .sort((a, b) => (b.ghlDateAdded || '').localeCompare(a.ghlDateAdded || ''))
+      .slice(0, 3),
+    [accounts]
+  )
 
   if (loading && raw.length === 0) return <LoadingScreen />
   if (error   && raw.length === 0) return <ErrorBanner message={error} onRetry={refetch} />
@@ -158,17 +190,15 @@ export default function HealthDashboard({ filters, setFilters }) {
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
         <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse flex-shrink-0" />
         <span>
-          <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · Live from GoHighLevel Agency API · No billing sheet
+          <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · Live from GoHighLevel Agency API · Updated every 5 minutes
         </span>
         <span className="ml-auto text-brand-muted/60">{lastUpdated ? `Synced ${elapsed}` : 'Syncing…'}</span>
       </div>
 
       {/* Sub-header */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={refetch}
-          className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg text-brand-muted hover:text-brand-text border-brand-border"
-        >
+        <button onClick={refetch}
+          className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border bg-brand-bg text-brand-muted hover:text-brand-text border-brand-border">
           <RefreshIcon spinning={loading} />
           <span>{loading ? 'Refreshing…' : 'Refresh'}</span>
         </button>
@@ -188,35 +218,45 @@ export default function HealthDashboard({ filters, setFilters }) {
         totalAll={accounts.length}
       />
 
-      {/* KPI cards */}
+      {/* 1. KPI summary cards */}
       <HealthSummaryCards
         total={accounts.length}
+        activeCount={activeAccounts.length}
+        staleCount={staleAccounts.length}
         newCount={newAccounts.length}
         newPeriodLabel={newPeriodLabel}
-        activeCount={activeAccts.length}
-        staleCount={staleAccts.length}
+        avgScore={avgScore}
+        avgTenureDays={avgTenureDays}
       />
 
-      {/* Stale accounts callout */}
-      {staleAccts.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-800 flex items-start gap-3">
-          <span className="text-base flex-shrink-0 mt-0.5">⚠️</span>
-          <div>
-            <p className="font-semibold mb-0.5">{staleAccts.length} accounts have had no GHL activity in 30+ days</p>
-            <p className="text-red-700 text-[11px]">
-              Sorted to the top of the table below. These need a check-in.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* 2. Quick Wins — do these today */}
+      <QuickWins
+        topStale={top3Stale}
+        topNew={top3New}
+        onAccountClick={setSelectedAccount}
+      />
 
-      {/* Master table */}
+      {/* 3. Resolution tracker */}
+      <ResolutionTrackerHealth accounts={staleAccounts} statuses={statuses} />
+
+      {/* 4. Needs Attention — stale accounts with outreach tracking */}
+      <NeedsAttentionTable
+        accounts={staleAccounts}
+        statuses={statuses}
+        setStatus={setStatus}
+        onAccountClick={setSelectedAccount}
+      />
+
+      {/* 5. Charts — health distribution, join timeline, activity histogram */}
+      <HealthCharts accounts={filteredAccounts} />
+
+      {/* 6. Master accounts table — full portfolio */}
       <MasterAccountsTable
         accounts={filteredAccounts}
         onAccountClick={setSelectedAccount}
       />
 
-      {/* Account modal */}
+      {/* Account detail modal */}
       {selectedAccount && (
         <AccountModal
           account={selectedAccount}
