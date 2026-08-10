@@ -22,6 +22,22 @@ function StatLine({ dot, label, count, rev, pct }) {
   )
 }
 
+function BillingShimmer() {
+  return (
+    <div className="px-5 sm:px-6 py-6 animate-pulse">
+      <div className="flex gap-6">
+        <div className="w-28 h-28 rounded-full bg-brand-border/30 flex-shrink-0" />
+        <div className="flex-1 space-y-3 pt-2">
+          <div className="h-3 bg-brand-border/30 rounded w-3/4" />
+          <div className="h-3 bg-brand-border/30 rounded w-1/2" />
+          <div className="h-3 bg-brand-border/30 rounded w-2/3" />
+          <div className="h-3 bg-brand-border/30 rounded w-2/5" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PendingBanner() {
   return (
     <div className="px-5 sm:px-6 py-8 flex flex-col items-center gap-3 text-center">
@@ -51,7 +67,7 @@ function PendingBanner() {
   )
 }
 
-export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent, hasBilling = false }) {
+export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent, hasBilling = false, stripeLoading = false }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
@@ -68,7 +84,7 @@ export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgen
         />
       </div>
 
-      {!hasBilling ? <PendingBanner /> : (
+      {stripeLoading ? <BillingShimmer /> : !hasBilling ? <PendingBanner /> : (
         <div className="px-5 sm:px-6 py-5 flex flex-col sm:flex-row gap-6 items-center">
           {/* Donut */}
           <div className="w-28 h-28 flex-shrink-0">

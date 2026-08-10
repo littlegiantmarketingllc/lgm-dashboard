@@ -110,7 +110,7 @@ function UpsellRows({ rows, isContacted, toggleContacted, getContactedAt, onAcco
   )
 }
 
-export default function UpsellTable({ accounts, isContacted, toggleContacted, getContactedAt, onAccountClick, potentialMRR }) {
+export default function UpsellTable({ accounts, stripeLoading = false, isContacted, toggleContacted, getContactedAt, onAccountClick, potentialMRR }) {
   const [page, setPage] = useState(1)
 
   const sorted = useMemo(() =>
@@ -160,6 +160,20 @@ export default function UpsellTable({ accounts, isContacted, toggleContacted, ge
       </div>
 
       {sorted.length === 0 ? (
+        stripeLoading ? (
+          <div className="px-5 sm:px-6 py-6 animate-pulse space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-brand-border/30 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-brand-border/30 rounded w-2/3" />
+                  <div className="h-2.5 bg-brand-border/20 rounded w-1/3" />
+                </div>
+                <div className="w-16 h-6 bg-brand-border/20 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">📈</div>
           <div>
@@ -174,6 +188,7 @@ export default function UpsellTable({ accounts, isContacted, toggleContacted, ge
             <span>Data not received — connect Stripe or billing sheet to unlock this section</span>
           </div>
         </div>
+        )
       ) : (
         <>
           {/* Top Opportunities — biggest $ potential, always visible, no pagination */}

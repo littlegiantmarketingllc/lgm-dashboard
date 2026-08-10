@@ -87,7 +87,7 @@ function DrilldownPanel({ item, accounts, onClose }) {
   )
 }
 
-export default function TransactionBreakdown({ accounts }) {
+export default function TransactionBreakdown({ accounts, stripeLoading = false }) {
   const [expanded, setExpanded] = useState(null)
 
   if (!accounts.length) return (
@@ -100,6 +100,16 @@ export default function TransactionBreakdown({ accounts }) {
         </div>
         <InfoTip position="top-end" text="Breakdown of monthly revenue by billing component. Requires billing sheet or Stripe connection." />
       </div>
+      {stripeLoading ? (
+        <div className="px-5 sm:px-6 py-6 animate-pulse space-y-3">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-2">
+              <div className="h-3 bg-brand-border/30 rounded w-1/2" />
+              <div className="h-3 bg-brand-border/20 rounded w-16" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
         <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">💳</div>
         <div>
@@ -122,6 +132,7 @@ export default function TransactionBreakdown({ accounts }) {
           <span>Data not received — connect Stripe or billing sheet to unlock this section</span>
         </div>
       </div>
+      )}
     </div>
   )
 

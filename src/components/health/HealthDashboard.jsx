@@ -92,7 +92,7 @@ function ErrorBanner({ message, onRetry }) {
 
 
 export default function HealthDashboard({ filters, setFilters }) {
-  const { accounts: raw, loading, error, lastUpdated, refetch } = useMergedHealthData()
+  const { accounts: raw, loading, stripeLoading, error, lastUpdated, refetch } = useMergedHealthData()
   const { statuses, setStatus } = useAccountStatus()
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
@@ -287,16 +287,21 @@ export default function HealthDashboard({ filters, setFilters }) {
         <span>
           <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · GoHighLevel Agency API
         </span>
-        {billedAccounts.length > 0 && (
+        <span className="text-brand-border">·</span>
+        {stripeLoading ? (
           <>
-            <span className="text-brand-border">·</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-pulse flex-shrink-0" />
+            <span className="text-brand-muted/60 animate-pulse">Loading Stripe billing…</span>
+          </>
+        ) : billedAccounts.length > 0 ? (
+          <>
             <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
             <span>
               <strong className="text-brand-text">{billedAccounts.length} matched</strong> to Stripe ·{' '}
               <span className="text-amber-600">{accounts.length - billedAccounts.length} unmatched</span>
             </span>
           </>
-        )}
+        ) : null}
         <span className="ml-auto text-brand-muted/60">{lastUpdated ? `Synced ${elapsed}` : 'Syncing…'}</span>
       </div>
 
@@ -346,6 +351,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* 3. DM vs Agent breakdown */}
       <DmAgentBreakdown
         hasBilling={billedAccounts.length > 0}
+        stripeLoading={stripeLoading}
         breakdown={dmAgentBreakdown}
         avgHealthDm={avgHealthDm}
         avgHealthAgent={avgHealthAgent}
@@ -365,6 +371,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* 6. Upsell table */}
       <UpsellTable
         accounts={upsellAccounts}
+        stripeLoading={stripeLoading}
         isContacted={() => false}
         toggleContacted={() => {}}
         getContactedAt={() => null}
@@ -373,10 +380,10 @@ export default function HealthDashboard({ filters, setFilters }) {
       />
 
       {/* 7. Charts — health distribution, join timeline, activity + billing-pending panels */}
-      <HealthCharts accounts={filteredAccounts} />
+      <HealthCharts accounts={filteredAccounts} stripeLoading={stripeLoading} />
 
       {/* 8. Billing breakdown by charge type */}
-      <TransactionBreakdown accounts={billedAccounts} />
+      <TransactionBreakdown accounts={billedAccounts} stripeLoading={stripeLoading} />
 
       {/* 9. Master accounts table — full portfolio with all original columns */}
       <MasterAccountsTable

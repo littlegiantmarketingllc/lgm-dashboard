@@ -166,7 +166,7 @@ function ActivityHistogram({ accounts }) {
 }
 
 // ── 4. Revenue by Health Band (billing-pending) ──────────────────────────────
-function RevenueByBand() {
+function RevenueByBand({ stripeLoading = false }) {
   const bands = [
     { name: 'Active (80+)',    color: G   },
     { name: 'Watch (50–79)',   color: AMB },
@@ -175,25 +175,43 @@ function RevenueByBand() {
   return (
     <Card title="Revenue by Health Band" subtitle="Monthly revenue split by account health — billing data required" delay={740}
       infoText="Will show total monthly charges grouped by health band: Active, Watch, and At-Risk accounts. Helps quantify how much revenue is in jeopardy from stale clients. Requires billing sheet or Stripe connection.">
-      <div className="flex flex-col items-center justify-center h-[160px] gap-3">
-        <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-sm">💰</div>
-        <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
-        <div className="flex items-center gap-4">
-          {bands.map(b => (
-            <div key={b.name} className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full opacity-30" style={{ background: b.color }} />
-              <span className="text-[10px] text-brand-muted opacity-60">{b.name}: —</span>
-            </div>
-          ))}
+      {stripeLoading ? (
+        <div className="h-[160px] flex flex-col justify-center gap-3 animate-pulse px-2">
+          <div className="flex items-end gap-2 h-20">
+            {[60, 90, 45, 75, 55].map((h, i) => (
+              <div key={i} className="flex-1 bg-brand-border/25 rounded-t" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+          <div className="flex gap-4">
+            {bands.map(b => (
+              <div key={b.name} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full opacity-20" style={{ background: b.color }} />
+                <div className="h-2 bg-brand-border/25 rounded w-14" />
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
-      </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-[160px] gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-sm">💰</div>
+          <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
+          <div className="flex items-center gap-4">
+            {bands.map(b => (
+              <div key={b.name} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full opacity-30" style={{ background: b.color }} />
+                <span className="text-[10px] text-brand-muted opacity-60">{b.name}: —</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
+        </div>
+      )}
     </Card>
   )
 }
 
 // ── 5. Transaction / DataHealthStatus Histogram (billing-pending) ─────────────
-function TxnHistogram() {
+function TxnHistogram({ stripeLoading = false }) {
   const THRESHOLD = 3_500
   const buckets = [
     { label: '0–999',      min: 0,    max: 1000 },
@@ -218,15 +236,24 @@ function TxnHistogram() {
           </BarChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[1px] rounded-b-xl gap-1">
-          <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
-          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires billing sheet or Stripe</p>
+          {stripeLoading ? (
+            <div className="animate-pulse flex flex-col items-center gap-2">
+              <div className="h-3 bg-brand-border/30 rounded w-32" />
+              <div className="h-2.5 bg-brand-border/20 rounded w-20" />
+            </div>
+          ) : (
+            <>
+              <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
+              <p className="text-[10px] text-amber-600 font-medium">⚠ Requires billing sheet or Stripe</p>
+            </>
+          )}
         </div>
       </div>
     </Card>
   )
 }
 
-export default function HealthCharts({ accounts }) {
+export default function HealthCharts({ accounts, stripeLoading = false }) {
   if (!accounts.length) return null
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -236,8 +263,8 @@ export default function HealthCharts({ accounts }) {
         <ActivityHistogram  accounts={accounts} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-        <RevenueByBand />
-        <TxnHistogram />
+        <RevenueByBand stripeLoading={stripeLoading} />
+        <TxnHistogram  stripeLoading={stripeLoading} />
       </div>
     </div>
   )
