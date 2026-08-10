@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths, differenceInDays, parseISO, isValid } from 'date-fns'
 import { useMergedHealthData }    from '../../hooks/useMergedHealthData'
 import { useAccountStatus }       from '../../hooks/useAccountStatus'
-import { scoreAccount, classify, isAtRisk, recommendAction } from '../../lib/healthEngine'
+import { scoreAccount, classify, isAtRisk, recommendAction, isUpsellReady, suggestAddon } from '../../lib/healthEngine'
 import HealthFilterBar            from './HealthFilterBar'
 import HealthSummaryCards         from './HealthSummaryCards'
 import ResolutionTrackerHealth    from './ResolutionTrackerHealth'
@@ -16,6 +16,13 @@ import UpsellTable                from './UpsellTable'
 import TransactionBreakdown       from './TransactionBreakdown'
 
 const G = '#8CC63F'
+
+function median(arr) {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m]
+}
 
 function getDateWindow(dateRange) {
   if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
@@ -83,22 +90,6 @@ function ErrorBanner({ message, onRetry }) {
   )
 }
 
-// Billing data not yet connected — all billing fields return 0 / null
-const BILLING = {
-  billedCount:  0,
-  atRisk:       0,
-  healthy:      0,
-  upsellReady:  0,
-  riskRevenue:  0,
-  upsellMRR:    0,
-  avgSub:       0,
-  medianSub:    0,
-  avgUsers:     0,
-  avgWallet:    0,
-  medianWallet: 0,
-  walletCount:  0,
-  newMRR:       0,
-}
 
 export default function HealthDashboard({ filters, setFilters }) {
   const { accounts: raw, loading, error, lastUpdated, refetch } = useMergedHealthData()
@@ -199,6 +190,90 @@ export default function HealthDashboard({ filters, setFilters }) {
     [accounts]
   )
 
+  // ── Stripe billing aggregates ────────────────────────────────────────────
+  const billedAccounts = useMemo(() =>
+    accounts.filter(a => a._stripeBound && a.totalRev > 0),
+    [accounts]
+  )
+
+  const BILLING = useMemo(() => {
+    if (!billedAccounts.length) {
+      return {
+        billedCount: 0, atRisk: 0, healthy: 0, upsellReady: 0,
+        riskRevenue: 0, upsellMRR: 0, avgSub: 0, medianSub: 0,
+        avgUsers: 0, avgWallet: 0, medianWallet: 0, walletCount: 0, newMRR: 0,
+      }
+    }
+    const today   = new Date()
+    const cutoff  = format(subDays(today, 30), 'yyyy-MM-dd')
+
+    const atRiskList   = billedAccounts.filter(a =>
+      a._health?.band === 'at_risk' || a.stripeStatus === 'past_due'
+    )
+    const healthyList  = billedAccounts.filter(a => a._health?.band === 'healthy')
+    const upsellList   = billedAccounts.filter(isUpsellReady)
+    const newList      = billedAccounts.filter(a => (a.stripeStartDate || '') >= cutoff)
+    const withUsers    = billedAccounts.filter(a => a.users > 0)
+    const withWallet   = billedAccounts.filter(a => a.lcWalletCharges > 0)
+
+    return {
+      billedCount:  billedAccounts.length,
+      atRisk:       atRiskList.length,
+      healthy:      healthyList.length,
+      upsellReady:  upsellList.length,
+      riskRevenue:  atRiskList.reduce((s, a) => s + a.totalRev, 0),
+      upsellMRR:    upsellList.reduce((s, a) => s + (suggestAddon(a)?.estExtra || 0), 0),
+      avgSub:       billedAccounts.reduce((s, a) => s + a.totalRev, 0) / billedAccounts.length,
+      medianSub:    median(billedAccounts.map(a => a.totalRev)),
+      avgUsers:     withUsers.length
+        ? withUsers.reduce((s, a) => s + a.users, 0) / withUsers.length
+        : 0,
+      avgWallet:    withWallet.length
+        ? withWallet.reduce((s, a) => s + a.lcWalletCharges, 0) / withWallet.length
+        : 0,
+      medianWallet: withWallet.length ? median(withWallet.map(a => a.lcWalletCharges)) : 0,
+      walletCount:  withWallet.length,
+      newMRR:       newList.reduce((s, a) => s + a.totalRev, 0),
+    }
+  }, [billedAccounts])
+
+  // ── DM vs Agent breakdown ────────────────────────────────────────────────
+  const dmAgentBreakdown = useMemo(() => {
+    const dm    = billedAccounts.filter(a => a.accountType === 'DM')
+    const agent = billedAccounts.filter(a => a.accountType !== 'DM')
+    const dmRev    = dm.reduce((s, a) => s + a.totalRev, 0)
+    const agentRev = agent.reduce((s, a) => s + a.totalRev, 0)
+    const total    = dmRev + agentRev
+    return {
+      dm:    { count: dm.length,    rev: dmRev,    pct: total ? Math.round(dmRev    / total * 100) : 0 },
+      agent: { count: agent.length, rev: agentRev, pct: total ? Math.round(agentRev / total * 100) : 0 },
+      total,
+    }
+  }, [billedAccounts])
+
+  const avgHealthDm = useMemo(() => {
+    const dm = accounts.filter(a => a.accountType === 'DM' && a._health?.score != null)
+    return dm.length ? Math.round(dm.reduce((s, a) => s + a._health.score, 0) / dm.length) : null
+  }, [accounts])
+
+  const avgHealthAgent = useMemo(() => {
+    const ag = accounts.filter(a => a.accountType !== 'DM' && a._stripeBound && a._health?.score != null)
+    return ag.length ? Math.round(ag.reduce((s, a) => s + a._health.score, 0) / ag.length) : null
+  }, [accounts])
+
+  // ── Upsell candidates ────────────────────────────────────────────────────
+  const upsellAccounts = useMemo(() =>
+    billedAccounts
+      .filter(isUpsellReady)
+      .sort((a, b) => (suggestAddon(b)?.estExtra || 0) - (suggestAddon(a)?.estExtra || 0)),
+    [billedAccounts]
+  )
+
+  const top3Upsell = useMemo(() =>
+    upsellAccounts.slice(0, 3).map(a => ({ ...a, _upsell: suggestAddon(a) })),
+    [upsellAccounts]
+  )
+
   if (loading && raw.length === 0) return <LoadingScreen />
   if (error   && raw.length === 0) return <ErrorBanner message={error} onRetry={refetch} />
 
@@ -206,12 +281,22 @@ export default function HealthDashboard({ filters, setFilters }) {
     <div className="max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
       {/* Data source badge */}
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-brand-border bg-white text-[11px] text-brand-muted"
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-xl border border-brand-border bg-white text-[11px] text-brand-muted"
         style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
         <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse flex-shrink-0" />
         <span>
-          <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · Live from GoHighLevel Agency API · Updated every 5 minutes
+          <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · GoHighLevel Agency API
         </span>
+        {billedAccounts.length > 0 && (
+          <>
+            <span className="text-brand-border">·</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
+            <span>
+              <strong className="text-brand-text">{billedAccounts.length} matched</strong> to Stripe ·{' '}
+              <span className="text-amber-600">{accounts.length - billedAccounts.length} unmatched</span>
+            </span>
+          </>
+        )}
         <span className="ml-auto text-brand-muted/60">{lastUpdated ? `Synced ${elapsed}` : 'Syncing…'}</span>
       </div>
 
@@ -250,16 +335,21 @@ export default function HealthDashboard({ filters, setFilters }) {
         {...BILLING}
       />
 
-      {/* 2. Quick Wins — stale, upsell (pending), newest */}
+      {/* 2. Quick Wins — stale, upsell, newest */}
       <QuickWins
         topStale={top3Stale}
         topNew={top3New}
-        topUpsell={[]}
+        topUpsell={top3Upsell}
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 3. DM vs Agent breakdown — billing pending */}
-      <DmAgentBreakdown hasBilling={false} breakdown={null} avgHealthDm={null} avgHealthAgent={null} />
+      {/* 3. DM vs Agent breakdown */}
+      <DmAgentBreakdown
+        hasBilling={billedAccounts.length > 0}
+        breakdown={dmAgentBreakdown}
+        avgHealthDm={avgHealthDm}
+        avgHealthAgent={avgHealthAgent}
+      />
 
       {/* 4. Resolution tracker */}
       <ResolutionTrackerHealth accounts={staleAccounts} statuses={statuses} />
@@ -272,21 +362,21 @@ export default function HealthDashboard({ filters, setFilters }) {
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 6. Upsell table — billing pending */}
+      {/* 6. Upsell table */}
       <UpsellTable
-        accounts={[]}
+        accounts={upsellAccounts}
         isContacted={() => false}
         toggleContacted={() => {}}
         getContactedAt={() => null}
         onAccountClick={setSelectedAccount}
-        potentialMRR={0}
+        potentialMRR={BILLING.upsellMRR}
       />
 
       {/* 7. Charts — health distribution, join timeline, activity + billing-pending panels */}
       <HealthCharts accounts={filteredAccounts} />
 
-      {/* 8. Billing breakdown by charge type — pending */}
-      <TransactionBreakdown accounts={[]} />
+      {/* 8. Billing breakdown by charge type */}
+      <TransactionBreakdown accounts={billedAccounts} />
 
       {/* 9. Master accounts table — full portfolio with all original columns */}
       <MasterAccountsTable

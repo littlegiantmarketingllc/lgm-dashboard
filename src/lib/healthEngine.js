@@ -112,9 +112,31 @@ export function isWatch(account) {
   return d > 14 && d <= 30
 }
 
-// We can't detect upsell without billing data — keep stub returning false
-export function isUpsellReady() { return false }
-export function suggestAddon()  { return null }
+export function isUpsellReady(account) {
+  if (!account?.planPrice || account.planPrice <= 0) return false
+  const days = Number(account.lastActivity ?? account.ghlDaysSinceUpdate)
+  if (isNaN(days) || days > 60) return false // inactive accounts aren't upsell candidates
+  // Has upsell headroom: fewer than 4 users, or no add-ons yet
+  return (account.users ?? 0) < 4 || (account.addOns ?? 0) === 0
+}
+
+export function suggestAddon(account) {
+  if (!account?.planPrice || account.planPrice <= 0) {
+    return { label: 'Connect billing to identify opportunities', estExtra: 0 }
+  }
+  // No add-ons yet → LeadFlow AI is the obvious first add-on
+  if ((account.addOns ?? 0) === 0) {
+    return { label: 'LeadFlow AI Assistant', estExtra: 50 }
+  }
+  // Few users → suggest adding seats
+  const seats = account.users ?? 0
+  if (seats < 3) {
+    const add = 3 - seats
+    return { label: `Add ${add} User Seat${add > 1 ? 's' : ''} ($64/ea)`, estExtra: add * 64 }
+  }
+  // General plan upgrade
+  return { label: 'Plan upgrade', estExtra: Math.round(account.planPrice * 0.2) }
+}
 
 export function recommendAction(account) {
   const days = account.lastActivity ?? account.ghlDaysSinceUpdate
