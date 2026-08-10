@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths, differenceInDays, parseISO, isValid } from 'date-fns'
 import { useMergedHealthData }    from '../../hooks/useMergedHealthData'
 import { useAccountStatus }       from '../../hooks/useAccountStatus'
@@ -96,6 +96,8 @@ export default function HealthDashboard({ filters, setFilters }) {
   const { statuses, setStatus } = useAccountStatus()
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [elapsed, setElapsed] = useState('—')
+  const [stripeElapsed, setStripeElapsed] = useState(0)
+  const stripeStartRef = useRef(null)
 
   useEffect(() => {
     const tick = () => setElapsed(timeAgo(lastUpdated))
@@ -103,6 +105,22 @@ export default function HealthDashboard({ filters, setFilters }) {
     const id = setInterval(tick, 15_000)
     return () => clearInterval(id)
   }, [lastUpdated])
+
+  // Count up while Stripe is fetching so the user can see progress
+  useEffect(() => {
+    if (!stripeLoading) {
+      stripeStartRef.current = null
+      return
+    }
+    stripeStartRef.current = Date.now()
+    setStripeElapsed(0)
+    const id = setInterval(() => {
+      if (stripeStartRef.current) {
+        setStripeElapsed(Math.floor((Date.now() - stripeStartRef.current) / 1000))
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [stripeLoading])
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setSelectedAccount(null) }
@@ -327,6 +345,31 @@ export default function HealthDashboard({ filters, setFilters }) {
         totalShowing={filteredAccounts.length}
         totalAll={accounts.length}
       />
+
+      {/* Stripe sync progress banner */}
+      {stripeLoading && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-100 bg-purple-50 text-[12px]"
+          style={{ boxShadow: '0 1px 6px rgba(139,92,246,0.07)' }}>
+          <div className="w-4 h-4 rounded-full border-2 border-purple-200 border-t-purple-500 animate-spin flex-shrink-0" />
+          <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold text-purple-800">Syncing Stripe billing</span>
+            <span className="text-purple-400">·</span>
+            <span className="text-purple-700 font-mono tabular-nums font-bold">{stripeElapsed}s</span>
+            <span className="text-purple-400 hidden sm:inline">·</span>
+            <span className="text-purple-500 hidden sm:inline">Billing sections will fill in automatically</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-4 ml-auto flex-shrink-0">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: '#8CC63F' }}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#8CC63F' }} />
+              GHL · {accounts.length} accounts ✓
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
+              Stripe · fetching…
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 1. KPI summary cards — live + billing-pending */}
       <HealthSummaryCards
