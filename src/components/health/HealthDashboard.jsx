@@ -371,6 +371,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* 6. Upsell table */}
       <UpsellTable
         accounts={upsellAccounts}
+        hasBilling={billedAccounts.length > 0}
         stripeLoading={stripeLoading}
         isContacted={() => false}
         toggleContacted={() => {}}

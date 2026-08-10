@@ -1,6 +1,6 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, ReferenceLine,
+  PieChart, Pie, Cell,
 } from 'recharts'
 import { format, parseISO, isValid } from 'date-fns'
 import InfoTip from './InfoTip'
@@ -165,16 +165,28 @@ function ActivityHistogram({ accounts }) {
   )
 }
 
-// ── 4. Revenue by Health Band (billing-pending) ──────────────────────────────
-function RevenueByBand({ stripeLoading = false }) {
+// ── 4. Revenue by Health Band ────────────────────────────────────────────────
+function RevenueByBand({ accounts = [], stripeLoading = false }) {
+  const billedAccounts = accounts.filter(a => (a.totalRev || 0) > 0)
+
   const bands = [
-    { name: 'Active (80+)',    color: G   },
-    { name: 'Watch (50–79)',   color: AMB },
-    { name: 'At-Risk (<50)',   color: RED },
+    { name: 'Active',    band: 'healthy', color: G   },
+    { name: 'Slowing',   band: 'watch',   color: AMB },
+    { name: 'Stale',     band: 'at_risk', color: RED },
   ]
+
+  const chartData = bands.map(d => ({
+    name:  d.name,
+    rev:   billedAccounts.filter(a => a._health?.band === d.band).reduce((s, a) => s + a.totalRev, 0),
+    count: billedAccounts.filter(a => a._health?.band === d.band).length,
+    color: d.color,
+  }))
+
+  const fmtRev = (n) => n >= 1000 ? `$${(n / 1000).toFixed(0)}k` : `$${Math.round(n)}`
+
   return (
-    <Card title="Revenue by Health Band" subtitle="Monthly revenue split by account health — billing data required" delay={740}
-      infoText="Will show total monthly charges grouped by health band: Active, Watch, and At-Risk accounts. Helps quantify how much revenue is in jeopardy from stale clients. Requires billing sheet or Stripe connection.">
+    <Card title="Revenue by Health Band" subtitle="Monthly revenue split by account health" delay={740}
+      infoText="Monthly revenue grouped by health band — Active, Slowing, and Stale. Shows how much of your MRR is at risk based on client engagement levels. Pulled from Stripe billing.">
       {stripeLoading ? (
         <div className="h-[160px] flex flex-col justify-center gap-3 animate-pulse px-2">
           <div className="flex items-end gap-2 h-20">
@@ -191,64 +203,93 @@ function RevenueByBand({ stripeLoading = false }) {
             ))}
           </div>
         </div>
-      ) : (
+      ) : billedAccounts.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[160px] gap-3">
           <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-sm">💰</div>
           <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
-          <div className="flex items-center gap-4">
-            {bands.map(b => (
-              <div key={b.name} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full opacity-30" style={{ background: b.color }} />
-                <span className="text-[10px] text-brand-muted opacity-60">{b.name}: —</span>
+          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={fmtRev} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={36} />
+              <Tooltip
+                formatter={(v, _n, props) => [fmtRev(v) + '/mo', `${props.payload?.name} — ${props.payload?.count} accounts`]}
+                contentStyle={TT_STYLE}
+              />
+              <Bar dataKey="rev" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry, i) => <Cell key={i} fill={entry.color} fillOpacity={0.85} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-5 px-1 mt-1">
+            {chartData.map(d => (
+              <div key={d.name} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                <span className="text-[11px] text-brand-muted">{d.name}</span>
+                <span className="text-[11px] font-bold" style={{ color: d.color }}>{fmtRev(d.rev)}</span>
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
-        </div>
+        </>
       )}
     </Card>
   )
 }
 
-// ── 5. Transaction / DataHealthStatus Histogram (billing-pending) ─────────────
-function TxnHistogram({ stripeLoading = false }) {
-  const THRESHOLD = 3_500
+// ── 5. MRR by Plan Tier ───────────────────────────────────────────────────────
+function TxnHistogram({ accounts = [], stripeLoading = false }) {
+  const billedAccounts = accounts.filter(a => (a.totalRev || 0) > 0)
+
   const buckets = [
-    { label: '0–999',      min: 0,    max: 1000 },
-    { label: '1k–1.9k',   min: 1000, max: 2000 },
-    { label: '2k–2.9k',   min: 2000, max: 3000 },
-    { label: '3k–3.5k',   min: 3000, max: 3500 },
-    { label: '3.5k+',     min: 3500, max: Infinity },
+    { label: '<$200',      min: 0,    max: 200  },
+    { label: '$200–299',   min: 200,  max: 300  },
+    { label: '$300–499',   min: 300,  max: 500  },
+    { label: '$500–999',   min: 500,  max: 1000 },
+    { label: '$1k+',       min: 1000, max: Infinity },
   ]
-  const data = buckets.map(b => ({ label: b.label, count: 0 }))
+
+  const data = buckets.map(b => ({
+    label: b.label,
+    count: billedAccounts.filter(a => a.totalRev >= b.min && (b.max === Infinity || a.totalRev < b.max)).length,
+  }))
 
   return (
-    <Card title="Transaction Distribution" subtitle="DataHealthStatus buckets — billing data required" delay={780}
-      infoText="Will show how accounts are distributed by DataHealthStatus (transaction count × 1000). The red reference line at 3,500 marks the churn threshold — accounts below this are at risk. Requires billing sheet.">
-      <div className="relative">
+    <Card title="Plan Tier Distribution" subtitle="Accounts grouped by monthly subscription amount" delay={780}
+      infoText="How many accounts fall in each monthly billing tier. Helps identify where the portfolio clusters and where there's room to grow toward higher-value plans. Based on live Stripe subscription data.">
+      {stripeLoading ? (
+        <div className="animate-pulse px-2 h-[160px] flex flex-col justify-end gap-3">
+          <div className="flex items-end gap-2 h-28">
+            {[30, 70, 55, 40, 20].map((h, i) => (
+              <div key={i} className="flex-1 bg-brand-border/25 rounded-t" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+          <div className="h-2 bg-brand-border/20 rounded w-3/4" />
+        </div>
+      ) : billedAccounts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-[160px] gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-sm">📊</div>
+          <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
+          <p className="text-[10px] text-amber-600 font-medium">⚠ Requires Stripe or billing sheet</p>
+        </div>
+      ) : (
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7E5" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
             <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} width={24} />
-            <ReferenceLine x="3.5k+" stroke={RED} strokeDasharray="4 4" label={{ value: 'Threshold', position: 'insideTopRight', fontSize: 9, fill: RED }} />
-            <Bar dataKey="count" fill={G} radius={[4, 4, 0, 0]} fillOpacity={0.3} />
+            <Tooltip
+              formatter={(v) => [v + ' accounts', 'Count']}
+              labelFormatter={(l) => `${l}/mo`}
+              contentStyle={TT_STYLE}
+            />
+            <Bar dataKey="count" fill={G} radius={[4, 4, 0, 0]} fillOpacity={0.85} />
           </BarChart>
         </ResponsiveContainer>
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[1px] rounded-b-xl gap-1">
-          {stripeLoading ? (
-            <div className="animate-pulse flex flex-col items-center gap-2">
-              <div className="h-3 bg-brand-border/30 rounded w-32" />
-              <div className="h-2.5 bg-brand-border/20 rounded w-20" />
-            </div>
-          ) : (
-            <>
-              <p className="text-[12px] font-semibold text-brand-heading">Billing data not connected</p>
-              <p className="text-[10px] text-amber-600 font-medium">⚠ Requires billing sheet or Stripe</p>
-            </>
-          )}
-        </div>
-      </div>
+      )}
     </Card>
   )
 }
@@ -263,8 +304,8 @@ export default function HealthCharts({ accounts, stripeLoading = false }) {
         <ActivityHistogram  accounts={accounts} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-        <RevenueByBand stripeLoading={stripeLoading} />
-        <TxnHistogram  stripeLoading={stripeLoading} />
+        <RevenueByBand accounts={accounts} stripeLoading={stripeLoading} />
+        <TxnHistogram  accounts={accounts} stripeLoading={stripeLoading} />
       </div>
     </div>
   )

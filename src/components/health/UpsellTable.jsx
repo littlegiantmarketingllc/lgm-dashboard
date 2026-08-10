@@ -110,7 +110,7 @@ function UpsellRows({ rows, isContacted, toggleContacted, getContactedAt, onAcco
   )
 }
 
-export default function UpsellTable({ accounts, stripeLoading = false, isContacted, toggleContacted, getContactedAt, onAccountClick, potentialMRR }) {
+export default function UpsellTable({ accounts, hasBilling = false, stripeLoading = false, isContacted, toggleContacted, getContactedAt, onAccountClick, potentialMRR }) {
   const [page, setPage] = useState(1)
 
   const sorted = useMemo(() =>
@@ -173,14 +173,25 @@ export default function UpsellTable({ accounts, stripeLoading = false, isContact
               </div>
             ))}
           </div>
+        ) : hasBilling ? (
+        <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
+          <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center text-lg">✅</div>
+          <div>
+            <p className="text-brand-heading font-semibold text-sm">No Upsell Candidates Right Now</p>
+            <p className="text-brand-muted text-[12px] mt-1.5 leading-relaxed max-w-[360px]">
+              Accounts qualify when they have high platform usage (DataHealthStatus) and 3+ users.
+              This will populate once DataHealthStatus data is synced from Cliff's system.
+            </p>
+          </div>
+        </div>
         ) : (
         <div className="py-10 flex flex-col items-center gap-3 text-center px-6">
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg">📈</div>
           <div>
             <p className="text-brand-heading font-semibold text-sm">Billing Data Not Connected</p>
             <p className="text-brand-muted text-[12px] mt-1.5 leading-relaxed max-w-[360px]">
-              Upsell-ready accounts (3,500+ transactions, 3+ users, no add-ons) will appear here once billing data is connected.
-              Requires: Stripe API key or the LGM billing sheet (plan price, DataHealthStatus, user counts, add-ons per client).
+              Upsell-ready accounts will appear here once billing data is connected.
+              Requires: Stripe API key or the LGM billing sheet.
             </p>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
