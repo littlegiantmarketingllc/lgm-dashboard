@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getFirebaseToken } from '../lib/firebase'
+import { sbRead, sbWrite } from '../lib/supabase'
 
-const DB     = 'https://lgm-dashboard-f3e78-default-rtdb.firebaseio.com/checkboxes'
 const KEY    = 'coaching_state'
 const LS_KEY = 'lgm-coaching-status'
 const POLL_MS = 10_000
@@ -13,22 +12,6 @@ function saveLocal(val) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(val)) } catch {}
 }
 
-async function fbRead() {
-  const token = await getFirebaseToken()
-  const res = await fetch(`${DB}/${KEY}.json?auth=${token}`)
-  if (!res.ok) throw new Error('read failed')
-  return (await res.json()) || {}
-}
-
-async function fbWrite(val) {
-  const token = await getFirebaseToken()
-  await fetch(`${DB}/${KEY}.json?auth=${token}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(val),
-  })
-}
-
 export function useCoachingStatus() {
   const [statuses, setStatuses] = useState(loadLocal)
 
@@ -38,7 +21,7 @@ export function useCoachingStatus() {
   }, [])
 
   const fetchRemote = useCallback(async () => {
-    try { applyRemote(await fbRead()) } catch {}
+    try { applyRemote(await sbRead(KEY)) } catch {}
   }, [applyRemote])
 
   useEffect(() => {
@@ -54,7 +37,7 @@ export function useCoachingStatus() {
         [employeeName]: { ...prev[employeeName], [recIdx]: !prev[employeeName]?.[recIdx] },
       }
       saveLocal(next)
-      fbWrite(next).catch(() => {})
+      sbWrite(KEY, next).catch(() => {})
       return next
     })
   }, [])
@@ -73,7 +56,7 @@ export function useCoachingStatus() {
       const next = { ...prev }
       delete next[employeeName]
       saveLocal(next)
-      fbWrite(next).catch(() => {})
+      sbWrite(KEY, next).catch(() => {})
       return next
     })
   }, [])
@@ -89,7 +72,7 @@ export function useCoachingStatus() {
         }
       }
       saveLocal(next)
-      fbWrite(next).catch(() => {})
+      sbWrite(KEY, next).catch(() => {})
       return next
     })
   }, [])
