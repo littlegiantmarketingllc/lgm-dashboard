@@ -90,6 +90,8 @@ export default function HealthSummaryCards({
   openTickets = 0,
   pendingTickets = 0,
   urgentTickets = 0,
+  onOpenTicketsClick,
+  onPendingTicketsClick,
 }) {
   const hasBilling = billedCount > 0
 
@@ -220,20 +222,24 @@ export default function HealthSummaryCards({
           <Card
             label="Open Tickets"
             value={openTickets}
-            sub={urgentTickets > 0 ? `${urgentTickets} urgent` : 'Across all accounts'}
+            sub={urgentTickets > 0 ? `${urgentTickets} urgent · click to view` : 'Across all accounts · click to view'}
             icon="🎫"
             accentColor={openTickets > 0 ? RED : G}
             delay={220}
-            infoText="Open support tickets across all client accounts, pulled live from Freshdesk. Open account modal for individual ticket subjects."
+            infoText="Open support tickets across all client accounts, pulled live from Freshdesk. Click to see subjects and which account each one belongs to."
+            clickable={!!onOpenTicketsClick}
+            onClick={onOpenTicketsClick}
           />
           <Card
             label="Pending Tickets"
             value={pendingTickets}
-            sub="Awaiting customer reply"
+            sub="Awaiting customer reply · click to view"
             icon="⏳"
             accentColor={AMB}
             delay={240}
-            infoText="Tickets waiting on a customer reply across all client accounts, pulled live from Freshdesk."
+            infoText="Tickets waiting on a customer reply across all client accounts, pulled live from Freshdesk. Click to see subjects and which account each one belongs to."
+            clickable={!!onPendingTicketsClick}
+            onClick={onPendingTicketsClick}
           />
         </>
       ) : (

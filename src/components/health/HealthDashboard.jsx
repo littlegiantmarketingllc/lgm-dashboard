@@ -14,6 +14,7 @@ import AccountModal               from './AccountModal'
 import DmAgentBreakdown           from './DmAgentBreakdown'
 import UpsellTable                from './UpsellTable'
 import TransactionBreakdown       from './TransactionBreakdown'
+import TicketsModal               from './TicketsModal'
 
 const G = '#8CC63F'
 
@@ -103,6 +104,7 @@ export default function HealthDashboard({ filters, setFilters }) {
   const needsAttentionRef = useRef(null)
   const masterTableRef = useRef(null)
   const [freshdesk, setFreshdesk] = useState(null)
+  const [ticketsModalFilter, setTicketsModalFilter] = useState(null) // null closed · 'open' | 'pending' | 'all'
 
   useEffect(() => {
     let cancelled = false
@@ -428,6 +430,8 @@ export default function HealthDashboard({ filters, setFilters }) {
         openTickets={freshdesk?.openCount ?? 0}
         pendingTickets={freshdesk?.pendingCount ?? 0}
         urgentTickets={freshdesk?.urgentCount ?? 0}
+        onOpenTicketsClick={() => setTicketsModalFilter('open')}
+        onPendingTicketsClick={() => setTicketsModalFilter('pending')}
         onNewClientsClick={() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onNeedsCheckinClick={() => needsAttentionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
@@ -447,6 +451,10 @@ export default function HealthDashboard({ filters, setFilters }) {
         breakdown={dmAgentBreakdown}
         avgHealthDm={avgHealthDm}
         avgHealthAgent={avgHealthAgent}
+        onTypeClick={(type) => {
+          setFilters(f => ({ ...f, typeFilter: type }))
+          setTimeout(() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+        }}
       />
 
       {/* 4. Resolution tracker */}
@@ -566,6 +574,16 @@ export default function HealthDashboard({ filters, setFilters }) {
         <AccountModal
           account={selectedAccount}
           onClose={() => setSelectedAccount(null)}
+        />
+      )}
+
+      {/* Freshdesk ticket drill-down */}
+      {ticketsModalFilter && (
+        <TicketsModal
+          tickets={freshdesk?.tickets ?? []}
+          filterStatus={ticketsModalFilter}
+          title={ticketsModalFilter === 'open' ? 'Open Tickets' : 'Pending Tickets'}
+          onClose={() => setTicketsModalFilter(null)}
         />
       )}
     </div>

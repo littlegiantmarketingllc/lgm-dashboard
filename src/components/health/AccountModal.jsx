@@ -141,6 +141,13 @@ export default function AccountModal({ account, onClose }) {
   const lcDays   = account.lastLcActivityMonth ? account.lastActivity : null
   const lcSource = account.lastLcActivityMonth ? `LC · ${account.lastLcActivityMonth}` : null
 
+  // The activity sub-score is real LC wallet data only when we actually have it for
+  // this account — otherwise it's silently using the GHL "record last updated" fallback,
+  // which can reflect LGM staff touching the sub-account rather than the client using it.
+  const activityLabel = account.lastLcActivityMonth
+    ? `LC Platform Activity (last wallet charge, ${account.lastLcActivityMonth})`
+    : 'GHL Sub-Account Activity (no LC data — record last updated, may not reflect real client usage)'
+
   // Real-time activity: most recently updated contact in this sub-account (loads with liveMetrics)
   // This is the true "client using their GHL" signal — contact/CRM changes by the client's own team
   const realtimeDays = liveMetrics?.lastContactUpdate
@@ -202,8 +209,8 @@ export default function AccountModal({ account, onClose }) {
               <div className="absolute top-2 right-2">
                 <InfoTip
                   text={isEnhanced
-                    ? "Enhanced score: Activity 30% (days since last LC wallet charge) · CRM Contacts 40% (how much data is in their system) · Pipeline Opportunities 30% (deals being tracked). Higher = more active client."
-                    : "Activity score: 100 = active today, 90 = last 7 days, 75 = last 2 weeks, 60 = last 30 days, 40 = last 60 days, 20 = last 90 days, 5 = 90+ days. Enhanced score (contacts + pipeline) loads automatically below."}
+                    ? `Enhanced score: Activity 30% (${account.lastLcActivityMonth ? 'days since last LC wallet charge' : 'no LC data — using GHL record-updated date instead'}) · CRM Contacts 40% (how much data is in their system) · Pipeline Opportunities 30% (deals being tracked). Higher = more active client.`
+                    : `Activity score: 100 = active today, 90 = last 7 days, 75 = last 2 weeks, 60 = last 30 days, 40 = last 60 days, 20 = last 90 days, 5 = 90+ days. ${account.lastLcActivityMonth ? 'Based on LC wallet data.' : 'No LC wallet data for this account yet — based on GHL record-updated date, which is not a reliable usage signal.'} Enhanced score (contacts + pipeline) loads automatically below.`}
                   position="top-end"
                 />
               </div>
@@ -232,12 +239,12 @@ export default function AccountModal({ account, onClose }) {
             </div>
             {isEnhanced ? (
               <>
-                <SubScoreBar label="LC Platform Activity (last wallet charge) — 30% of score" score={parts.activity} />
+                <SubScoreBar label={`${activityLabel} — 30% of score`} score={parts.activity} />
                 <SubScoreBar label="CRM Contacts in their system — 40% of score" score={parts.contacts} />
                 <SubScoreBar label="Opportunities / pipeline deals — 30% of score" score={parts.opps} />
               </>
             ) : (
-              <SubScoreBar label="LC Platform Activity (last wallet charge)" score={parts.activity} />
+              <SubScoreBar label={activityLabel} score={parts.activity} />
             )}
             <div className="mt-3 pt-3 border-t border-brand-border">
               <div className="flex items-center justify-between text-[11px] mb-1.5">

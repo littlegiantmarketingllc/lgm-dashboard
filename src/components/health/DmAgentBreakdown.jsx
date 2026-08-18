@@ -6,9 +6,12 @@ const AMB = '#EAB308'
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString() }
 
-function StatLine({ dot, label, count, rev, pct }) {
+function StatLine({ dot, label, count, rev, pct, onClick }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-brand-border/60 last:border-0">
+    <div
+      onClick={onClick}
+      className={`flex items-center justify-between py-2.5 border-b border-brand-border/60 last:border-0 ${onClick ? 'cursor-pointer hover:bg-brand-bg/60 rounded-lg -mx-1.5 px-1.5' : ''}`}
+    >
       <div className="flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dot }} />
         <span className="text-brand-heading font-semibold text-[13px]">{label}</span>
@@ -67,7 +70,7 @@ function PendingBanner() {
   )
 }
 
-export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent, hasBilling = false, stripeLoading = false }) {
+export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgent, hasBilling = false, stripeLoading = false, onTypeClick }) {
   return (
     <div
       className="animate-fade-in-up rounded-2xl border border-brand-border bg-white"
@@ -108,8 +111,8 @@ export default function DmAgentBreakdown({ breakdown, avgHealthDm, avgHealthAgen
 
           {/* Stats */}
           <div className="flex-1 min-w-0 w-full">
-            <StatLine dot={G}   label="DM"    count={breakdown?.dm?.count ?? 0}    rev={breakdown?.dm?.rev ?? 0}    pct={breakdown?.dm?.pct ?? 0}    />
-            <StatLine dot={AMB} label="Agent" count={breakdown?.agent?.count ?? 0} rev={breakdown?.agent?.rev ?? 0} pct={breakdown?.agent?.pct ?? 0} />
+            <StatLine dot={G}   label="DM"    count={breakdown?.dm?.count ?? 0}    rev={breakdown?.dm?.rev ?? 0}    pct={breakdown?.dm?.pct ?? 0}    onClick={onTypeClick ? () => onTypeClick('DM')    : undefined} />
+            <StatLine dot={AMB} label="Agent" count={breakdown?.agent?.count ?? 0} rev={breakdown?.agent?.rev ?? 0} pct={breakdown?.agent?.pct ?? 0} onClick={onTypeClick ? () => onTypeClick('Agent') : undefined} />
 
             <div className="flex items-center justify-between pt-2.5">
               <span className="text-brand-muted text-[11px] font-semibold">Total Revenue</span>
