@@ -160,7 +160,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
         </div>
       </div>
 
-      <div>
+      <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
@@ -225,9 +225,9 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   </td>
 
                   {/* Stripe Status */}
-                  <td className="px-2 py-2 text-center">
+                  <td className="px-2 py-2 text-center whitespace-nowrap">
                     {bound ? (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${
                         a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
                         a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
                         a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
@@ -271,19 +271,19 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                       : <span className="text-brand-border text-[10px]">—</span>}
                   </td>
 
+                  {/* Billed Users */}
+                  <td className="px-2 py-2 text-center">
+                    {bound
+                      ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
+                      : <span className="text-brand-border text-[10px]">—</span>}
+                  </td>
+
                   {/* Est. GP% */}
                   <td className="px-2 py-2 text-right">
                     {gp !== null
                       ? <span className="num text-[10px] font-medium" style={{ color: gp >= 70 ? G : gp >= 40 ? AMB : RED }}>
                           {gp}%
                         </span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Billed Users */}
-                  <td className="px-2 py-2 text-center">
-                    {bound
-                      ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
                       : <span className="text-brand-border text-[10px]">—</span>}
                   </td>
 
