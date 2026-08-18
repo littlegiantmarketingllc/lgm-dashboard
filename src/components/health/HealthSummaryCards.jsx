@@ -221,23 +221,23 @@ export default function HealthSummaryCards({
         <>
           <Card
             label="Open Tickets"
-            value={openTickets}
-            sub={urgentTickets > 0 ? `${urgentTickets} urgent · click to view` : 'Across all accounts · click to view'}
+            value={openTickets + pendingTickets}
+            sub="Open + pending · click to view"
             icon="🎫"
-            accentColor={openTickets > 0 ? RED : G}
+            accentColor={(openTickets + pendingTickets) > 0 ? RED : G}
             delay={220}
-            infoText="Open support tickets across all client accounts, pulled live from Freshdesk. Click to see subjects and which account each one belongs to."
+            infoText="All unresolved support tickets (open + pending customer reply) across every client account, pulled live from Freshdesk. Click to see subjects and which account each one belongs to."
             clickable={!!onOpenTicketsClick}
             onClick={onOpenTicketsClick}
           />
           <Card
-            label="Pending Tickets"
-            value={pendingTickets}
-            sub="Awaiting customer reply · click to view"
-            icon="⏳"
-            accentColor={AMB}
+            label="Urgent Tickets"
+            value={urgentTickets}
+            sub="High/urgent priority · needs action · click to view"
+            icon="🔥"
+            accentColor={urgentTickets > 0 ? RED : G}
             delay={240}
-            infoText="Tickets waiting on a customer reply across all client accounts, pulled live from Freshdesk. Click to see subjects and which account each one belongs to."
+            infoText="Open or pending tickets flagged High or Urgent priority in Freshdesk — the ones that actually need action now. Click to see subjects and which account each one belongs to."
             clickable={!!onPendingTicketsClick}
             onClick={onPendingTicketsClick}
           />

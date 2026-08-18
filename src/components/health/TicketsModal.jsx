@@ -19,8 +19,8 @@ export default function TicketsModal({ tickets, filterStatus, title, onClose }) 
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const shown = filterStatus === 'open' ? tickets.filter(t => t.status === 2)
-              : filterStatus === 'pending' ? tickets.filter(t => t.status === 3)
+  const shown = filterStatus === 'open' ? tickets // already open+pending only, per freshdesk-summary.js
+              : filterStatus === 'urgent' ? tickets.filter(t => t.priority >= 3)
               : tickets
 
   return (

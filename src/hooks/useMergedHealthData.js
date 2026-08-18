@@ -58,6 +58,8 @@ const EXCLUDED_NAMES = new Set([
   'lgm demo account',
   'little giant marketing',
   'little giant marketing agency',
+  'data forest lgm add-on',
+  'data forest lgm add on',
 ])
 
 // Normalize phone to 10 digits for matching

@@ -104,7 +104,7 @@ export default function HealthDashboard({ filters, setFilters }) {
   const needsAttentionRef = useRef(null)
   const masterTableRef = useRef(null)
   const [freshdesk, setFreshdesk] = useState(null)
-  const [ticketsModalFilter, setTicketsModalFilter] = useState(null) // null closed · 'open' | 'pending' | 'all'
+  const [ticketsModalFilter, setTicketsModalFilter] = useState(null) // null closed · 'open' | 'urgent' | 'all'
 
   useEffect(() => {
     let cancelled = false
@@ -431,7 +431,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         pendingTickets={freshdesk?.pendingCount ?? 0}
         urgentTickets={freshdesk?.urgentCount ?? 0}
         onOpenTicketsClick={() => setTicketsModalFilter('open')}
-        onPendingTicketsClick={() => setTicketsModalFilter('pending')}
+        onPendingTicketsClick={() => setTicketsModalFilter('urgent')}
         onNewClientsClick={() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onNeedsCheckinClick={() => needsAttentionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
@@ -582,7 +582,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         <TicketsModal
           tickets={freshdesk?.tickets ?? []}
           filterStatus={ticketsModalFilter}
-          title={ticketsModalFilter === 'open' ? 'Open Tickets' : 'Pending Tickets'}
+          title={ticketsModalFilter === 'open' ? 'Open Tickets' : 'Urgent Tickets'}
           onClose={() => setTicketsModalFilter(null)}
         />
       )}
