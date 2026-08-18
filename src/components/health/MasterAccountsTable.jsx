@@ -160,7 +160,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
@@ -169,7 +169,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   key={col.key}
                   onClick={() => handleSort(col.key)}
                   className={`px-2 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap select-none text-${col.align} ${
-                    col.sortable ? 'cursor-pointer hover:text-brand-heading text-brand-muted' : 'text-brand-border cursor-default'
+                    col.sortable ? 'cursor-pointer hover:text-brand-heading text-brand-muted' : 'text-brand-muted cursor-default'
                   }`}
                 >
                   <span className="inline-flex items-center gap-0.5">
@@ -225,9 +225,9 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   </td>
 
                   {/* Stripe Status */}
-                  <td className="px-2 py-2 text-center whitespace-nowrap">
+                  <td className="px-2 py-2 text-center">
                     {bound ? (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
                         a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
                         a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
                         a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
@@ -271,19 +271,19 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                       : <span className="text-brand-border text-[10px]">—</span>}
                   </td>
 
-                  {/* Billed Users */}
-                  <td className="px-2 py-2 text-center">
-                    {bound
-                      ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
                   {/* Est. GP% */}
                   <td className="px-2 py-2 text-right">
                     {gp !== null
                       ? <span className="num text-[10px] font-medium" style={{ color: gp >= 70 ? G : gp >= 40 ? AMB : RED }}>
                           {gp}%
                         </span>
+                      : <span className="text-brand-border text-[10px]">—</span>}
+                  </td>
+
+                  {/* Billed Users */}
+                  <td className="px-2 py-2 text-center">
+                    {bound
+                      ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
                       : <span className="text-brand-border text-[10px]">—</span>}
                   </td>
 

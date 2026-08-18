@@ -83,11 +83,13 @@ export default function HealthSummaryCards({
   medianSub = 0,
   avgUsers = 0,
   newMRR = 0,
-  totalMRR = 0,
-  upsellReady = 0,
-  upsellMRR = 0,
   onNewClientsClick,
   onNeedsCheckinClick,
+  // Freshdesk ticket totals — agency-wide, independent of billing data
+  freshdeskLoaded = false,
+  openTickets = 0,
+  pendingTickets = 0,
+  urgentTickets = 0,
 }) {
   const hasBilling = billedCount > 0
 
@@ -202,25 +204,6 @@ export default function HealthSummaryCards({
             delay={180}
             infoText="Average billed GHL user seats per Stripe-matched account. Low seat count = upsell opportunity. Seats are billed through Stripe — total GHL members (including free seats) will show once Cliff's daily sync is live."
           />
-          <Card
-            label="Total MRR"
-            value={Math.round(totalMRR)}
-            sub={`Across ${billedCount} Stripe-matched accounts`}
-            icon="💵"
-            prefix="$"
-            accentColor={G}
-            delay={200}
-            infoText="Total monthly recurring revenue across all Stripe-matched accounts — base plan + billed user seats + add-ons. Unmatched accounts not included."
-          />
-          <Card
-            label="Upsell Ready"
-            value={upsellReady}
-            sub={`Est. +${fmt(upsellMRR)}/mo additional revenue`}
-            icon="🚀"
-            accentColor={G}
-            delay={220}
-            infoText="Active accounts flagged as upsell-ready: strong GHL usage but low seat count or low add-on spend. Open account modal for the specific recommendation."
-          />
         </>
       ) : (
         <>
@@ -228,8 +211,35 @@ export default function HealthSummaryCards({
           <PendingCard label="Healthy Accounts (by Score)"    icon="✅" delay={140} pendingNote="Health band available — revenue breakdown needs billing data" infoText="Count of accounts scoring 70+ is computable now; revenue split needs billing sheet." />
           <PendingCard label="Avg Monthly Subscription (MRR)" icon="💰" delay={160} pendingNote="Requires billing data — connect Stripe or billing sheet" infoText="Will show: average monthly charges per client (plan + seats + add-ons). Requires Stripe or the LGM billing sheet." />
           <PendingCard label="Avg Users / Account"            icon="👥" delay={180} pendingNote="Available per account via OAuth — bulk aggregate pending" infoText="Billed user seat average. Available per account in the detail modal now; bulk average requires Stripe matching." />
-          <PendingCard label="Total MRR"                      icon="💵" delay={200} pendingNote="Requires Stripe billing to compute total portfolio revenue" infoText="Will show: total monthly recurring revenue across all matched accounts." />
-          <PendingCard label="Upsell Ready"                   icon="🚀" delay={220} pendingNote="Requires billing data to identify upsell candidates" infoText="Will show: count of active accounts flagged for upsell with estimated additional MRR." />
+        </>
+      )}
+
+      {/* ── Freshdesk support tickets — agency-wide ─────────────────────────── */}
+      {freshdeskLoaded ? (
+        <>
+          <Card
+            label="Open Tickets"
+            value={openTickets}
+            sub={urgentTickets > 0 ? `${urgentTickets} urgent` : 'Across all accounts'}
+            icon="🎫"
+            accentColor={openTickets > 0 ? RED : G}
+            delay={220}
+            infoText="Open support tickets across all client accounts, pulled live from Freshdesk. Open account modal for individual ticket subjects."
+          />
+          <Card
+            label="Pending Tickets"
+            value={pendingTickets}
+            sub="Awaiting customer reply"
+            icon="⏳"
+            accentColor={AMB}
+            delay={240}
+            infoText="Tickets waiting on a customer reply across all client accounts, pulled live from Freshdesk."
+          />
+        </>
+      ) : (
+        <>
+          <PendingCard label="Open Tickets"    icon="🎫" delay={220} pendingNote="Loading Freshdesk ticket data…" infoText="Will show: open support tickets across all client accounts." />
+          <PendingCard label="Pending Tickets" icon="⏳" delay={240} pendingNote="Loading Freshdesk ticket data…" infoText="Will show: tickets awaiting customer reply across all client accounts." />
         </>
       )}
 

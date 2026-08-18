@@ -102,6 +102,18 @@ export default function HealthDashboard({ filters, setFilters }) {
   const stripeStartRef = useRef(null)
   const needsAttentionRef = useRef(null)
   const masterTableRef = useRef(null)
+  const [freshdesk, setFreshdesk] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = () => fetch('/api/freshdesk-summary')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && !d.error) setFreshdesk(d) })
+      .catch(() => {})
+    load()
+    const id = setInterval(load, 300_000) // 5 min, matches other billing/LC polls
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
 
   useEffect(() => {
     const tick = () => setElapsed(timeAgo(lastUpdated))
@@ -276,7 +288,6 @@ export default function HealthDashboard({ filters, setFilters }) {
       upsellReady:  upsellList.length,
       riskRevenue:  atRiskList.reduce((s, a) => s + a.totalRev, 0),
       upsellMRR:    upsellList.reduce((s, a) => s + (suggestAddon(a)?.estExtra || 0), 0),
-      totalMRR:     billedAccounts.reduce((s, a) => s + a.totalRev, 0),
       avgSub:       billedAccounts.reduce((s, a) => s + a.totalRev, 0) / billedAccounts.length,
       medianSub:    median(billedAccounts.map(a => a.totalRev)),
       avgUsers:     withUsers.length
@@ -413,6 +424,10 @@ export default function HealthDashboard({ filters, setFilters }) {
         avgTenureDays={avgTenureDays}
         dateFiltered={!!activeDateLabel}
         {...BILLING}
+        freshdeskLoaded={!!freshdesk}
+        openTickets={freshdesk?.openCount ?? 0}
+        pendingTickets={freshdesk?.pendingCount ?? 0}
+        urgentTickets={freshdesk?.urgentCount ?? 0}
         onNewClientsClick={() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onNeedsCheckinClick={() => needsAttentionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
