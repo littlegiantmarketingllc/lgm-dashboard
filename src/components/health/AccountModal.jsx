@@ -49,6 +49,12 @@ export default function AccountModal({ account, onClose }) {
   const [liveMetricsLoading, setLiveMetricsLoading] = useState(true)
   const [liveMetricsError,   setLiveMetricsError]   = useState(null)
 
+  const [fdTickets,        setFdTickets]        = useState(null)
+  const [fdLoading,        setFdLoading]        = useState(true)
+
+  const [lcCharges,        setLcCharges]        = useState(null)
+  const [lcLoading,        setLcLoading]        = useState(true)
+
   const fetchGHLInfo = useCallback(async () => {
     if (ghlLoading) return
     setGhlLoading(true)
@@ -76,6 +82,26 @@ export default function AccountModal({ account, onClose }) {
       .then(r => r.json())
       .then(data => { setLiveMetrics(data); setLiveMetricsLoading(false) })
       .catch(err => { setLiveMetricsError(err.message); setLiveMetricsLoading(false) })
+  }, [account.ghlId])
+
+  // Auto-fetch Freshdesk support ticket summary
+  useEffect(() => {
+    if (!account.ghlId) { setFdLoading(false); return }
+    setFdLoading(true)
+    fetch(`/api/freshdesk-data?locationId=${encodeURIComponent(account.ghlId)}`)
+      .then(r => r.json())
+      .then(data => { setFdTickets(data); setFdLoading(false) })
+      .catch(() => { setFdLoading(false) })
+  }, [account.ghlId])
+
+  // Auto-fetch LC wallet charges from Cliff's migrated data
+  useEffect(() => {
+    if (!account.ghlId) { setLcLoading(false); return }
+    setLcLoading(true)
+    fetch(`/api/lc-charges?locationId=${encodeURIComponent(account.ghlId)}`)
+      .then(r => r.json())
+      .then(data => { setLcCharges(data); setLcLoading(false) })
+      .catch(() => { setLcLoading(false) })
   }, [account.ghlId])
 
   useEffect(() => {
@@ -110,8 +136,9 @@ export default function AccountModal({ account, onClose }) {
   }
 
   const initials = account.accountName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const days     = account.ghlDaysSinceUpdate
-  const actColor = days <= 7 ? G : days <= 30 ? AMB : RED
+  const days     = account.lastLcActivityMonth ? account.lastActivity : null
+  const actColor = days !== null ? (days <= 7 ? G : days <= 30 ? AMB : RED) : undefined
+  const actSource = account.lastLcActivityMonth ? `LC · ${account.lastLcActivityMonth}` : null
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
@@ -158,8 +185,8 @@ export default function AccountModal({ account, onClose }) {
               <div className="absolute top-2 right-2">
                 <InfoTip
                   text={isEnhanced
-                    ? "Enhanced score: 20% tenure · 20% activity · 15% team size · 25% contacts · 20% opportunities. Updates once live metrics load."
-                    : "Basic score: 50% tenure · 50% activity. Loads instantly for all 278 accounts. Enhanced score appears once live metrics load."}
+                    ? "Enhanced score: Activity 30% (days since last LC wallet charge) · CRM Contacts 40% (how much data is in their system) · Pipeline Opportunities 30% (deals being tracked). Higher = more active client."
+                    : "Activity score: 100 = active today, 90 = last 7 days, 75 = last 2 weeks, 60 = last 30 days, 40 = last 60 days, 20 = last 90 days, 5 = 90+ days. Enhanced score (contacts + pipeline) loads automatically below."}
                   position="top-end"
                 />
               </div>
@@ -170,9 +197,9 @@ export default function AccountModal({ account, onClose }) {
             </div>
             <div className="bg-brand-bg rounded-xl p-3 border border-brand-border text-center">
               <p className="num text-base font-bold text-brand-text">
-                {tenureDays !== null ? `${tenureDays}d` : '—'}
+                {joinFormatted || '—'}
               </p>
-              <p className="text-[10px] text-brand-muted uppercase tracking-wider mt-0.5">Tenure in GHL</p>
+              <p className="text-[10px] text-brand-muted uppercase tracking-wider mt-0.5">Joined GHL</p>
             </div>
           </div>
 
@@ -188,17 +215,12 @@ export default function AccountModal({ account, onClose }) {
             </div>
             {isEnhanced ? (
               <>
-                <SubScoreBar label="Tenure (how long in GHL) — 20%" score={parts.tenure} />
-                <SubScoreBar label="Activity (days since last update) — 20%" score={parts.activity} />
-                <SubScoreBar label="Team Members (users) — 15%" score={parts.users} />
-                <SubScoreBar label="Contacts (CRM size) — 25%" score={parts.contacts} />
-                <SubScoreBar label="Opportunities (pipeline) — 20%" score={parts.opps} />
+                <SubScoreBar label="LC Platform Activity (last wallet charge) — 30% of score" score={parts.activity} />
+                <SubScoreBar label="CRM Contacts in their system — 40% of score" score={parts.contacts} />
+                <SubScoreBar label="Opportunities / pipeline deals — 30% of score" score={parts.opps} />
               </>
             ) : (
-              <>
-                <SubScoreBar label="Tenure (how long in GHL) — 50%" score={parts.tenure} />
-                <SubScoreBar label="Activity (days since last update) — 50%" score={parts.activity} />
-              </>
+              <SubScoreBar label="LC Platform Activity (last wallet charge)" score={parts.activity} />
             )}
             <div className="mt-3 pt-3 border-t border-brand-border">
               <div className="flex items-center justify-between text-[11px] mb-1.5">
@@ -223,14 +245,30 @@ export default function AccountModal({ account, onClose }) {
 
           {/* GHL location details */}
           <div className="rounded-xl border border-brand-border p-4 grid grid-cols-2 gap-3 text-[12px]">
+            {account.ghlId && (
+              <div className="col-span-2">
+                <a
+                  href={`https://app.gohighlevel.com/v2/location/${account.ghlId}/dashboard`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors"
+                  style={{ color: G, background: `${G}10`, borderColor: `${G}30` }}
+                >
+                  Open in GHL →
+                </a>
+              </div>
+            )}
             <div>
-              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Joined GHL</p>
-              <p className="font-medium text-brand-text mt-0.5">{joinFormatted || '—'}</p>
+              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Last Active</p>
+              <p className="num font-medium mt-0.5" style={{ color: days !== null ? actColor : undefined }}>
+                {days !== null ? (days === 0 ? 'Today' : `${days} days ago`) : '—'}
+              </p>
+              {actSource && <p className="text-[9px] text-brand-muted/50 mt-0.5 leading-none">{actSource}</p>}
             </div>
             <div>
-              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Last Updated</p>
-              <p className="num font-medium mt-0.5" style={{ color: actColor }}>
-                {days !== null && days !== undefined ? (days === 0 ? 'Today' : `${days} days ago`) : '—'}
+              <p className="text-[10px] text-brand-muted uppercase tracking-wider">Tenure</p>
+              <p className="num font-medium text-brand-text mt-0.5">
+                {tenureDays !== null ? `${tenureDays} days` : '—'}
               </p>
             </div>
             <div>
@@ -280,11 +318,12 @@ export default function AccountModal({ account, onClose }) {
                 OAuth token not yet available for this location. Once the marketplace app is installed for this account, metrics will appear here automatically.
               </div>
             ) : liveMetrics ? (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { label: 'Team Members', value: liveMetrics.users,         icon: '👤' },
-                  { label: 'Contacts',     value: liveMetrics.contacts,      icon: '📋' },
-                  { label: 'Opportunities',value: liveMetrics.opportunities,  icon: '🎯' },
+                  { label: 'Team Members',   value: liveMetrics.users,         icon: '👤' },
+                  { label: 'Contacts',       value: liveMetrics.contacts,      icon: '📋' },
+                  { label: 'Opportunities',  value: liveMetrics.opportunities,  icon: '🎯' },
+                  { label: 'Conversations',  value: liveMetrics.conversations,  icon: '💬' },
                 ].map(({ label, value, icon }) => (
                   <div key={label} className="bg-brand-bg rounded-xl border border-brand-border p-3 text-center">
                     <div className="text-base mb-0.5">{icon}</div>
@@ -297,6 +336,221 @@ export default function AccountModal({ account, onClose }) {
               </div>
             ) : null}
           </div>
+
+          {/* Freshdesk Support Tickets */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
+              Support Tickets
+              <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
+                style={{ background: '#22c55e12', color: '#15803d', border: '1px solid #22c55e30' }}>
+                Freshdesk
+              </span>
+            </p>
+            {fdLoading ? (
+              <div className="rounded-xl border border-brand-border p-4 flex items-center gap-2 text-[11px] text-brand-muted">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-border border-t-brand-green animate-spin flex-shrink-0" />
+                Loading support tickets…
+              </div>
+            ) : !fdTickets || !fdTickets.found ? (
+              <div className="rounded-xl border border-brand-border bg-brand-bg p-3 text-[11px] text-brand-muted">
+                No support account found in Freshdesk for this client.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-brand-border overflow-hidden">
+                <div className="grid grid-cols-4 divide-x divide-brand-border">
+                  {[
+                    { label: 'Open', value: fdTickets.openCount, color: fdTickets.openCount > 0 ? RED : G },
+                    { label: 'Pending', value: fdTickets.pendingCount, color: fdTickets.pendingCount > 0 ? AMB : null },
+                    { label: 'Urgent', value: fdTickets.urgentCount, color: fdTickets.urgentCount > 0 ? RED : null },
+                    { label: 'Total', value: fdTickets.totalCount, color: null },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="px-3 py-2.5 text-center bg-brand-bg/40">
+                      <p className="num text-sm font-bold" style={{ color: color || 'inherit' }}>{value}</p>
+                      <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {fdTickets.avgSentiment !== null && (
+                  <div className="px-4 py-2.5 border-t border-brand-border flex items-center justify-between bg-white">
+                    <span className="text-[11px] text-brand-muted">Avg Sentiment</span>
+                    <span className="num text-[11px] font-bold" style={{
+                      color: fdTickets.avgSentiment >= 70 ? G : fdTickets.avgSentiment >= 40 ? AMB : RED
+                    }}>
+                      {fdTickets.avgSentiment}/100
+                    </span>
+                  </div>
+                )}
+                {fdTickets.lastTicketAt && (
+                  <div className="px-4 py-2 border-t border-brand-border flex items-center justify-between bg-brand-bg/30">
+                    <span className="text-[10px] text-brand-muted">Last ticket</span>
+                    <span className="text-[10px] text-brand-muted">
+                      {new Date(fdTickets.lastTicketAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+                {fdTickets.recentOpen?.length > 0 && (
+                  <div className="border-t border-brand-border/50">
+                    <p className="px-4 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider text-brand-muted/70">
+                      Open / Pending Tickets
+                    </p>
+                    <div className="divide-y divide-brand-border/30">
+                      {fdTickets.recentOpen.map(t => (
+                        <div key={t.id} className="px-4 py-2 flex items-center justify-between gap-2 bg-white hover:bg-brand-bg/30 transition-colors">
+                          <p className="text-[11px] text-brand-text leading-snug flex-1 min-w-0 truncate">{t.subject}</p>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {t.priority >= 3 && (
+                              <span className="text-[8px] font-bold px-1 py-0.5 rounded border"
+                                style={{ color: RED, background: '#EF444412', borderColor: '#EF444430' }}>
+                                {t.priority === 4 ? 'URGENT' : 'HIGH'}
+                              </span>
+                            )}
+                            <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${t.status === 2 ? 'text-red-600' : 'text-amber-600'}`}>
+                              {t.status === 2 ? 'Open' : 'Pending'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* LC Platform Usage */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
+              LC Platform Usage
+              <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
+                style={{ background: '#8CC63F12', color: '#3a6b10', border: '1px solid #8CC63F30' }}>
+                Wallet charges
+              </span>
+            </p>
+            {lcLoading ? (
+              <div className="rounded-xl border border-brand-border p-4 flex items-center gap-2 text-[11px] text-brand-muted">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-border border-t-brand-green animate-spin flex-shrink-0" />
+                Loading LC charges…
+              </div>
+            ) : !lcCharges || !lcCharges.hasData ? (
+              <div className="rounded-xl border border-brand-border bg-brand-bg p-3 text-[11px] text-brand-muted">
+                No LC wallet charges found for this account.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-brand-border overflow-hidden">
+                <div className="px-4 py-2.5 bg-brand-bg/60 border-b border-brand-border flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-brand-text">Total charges (all time)</span>
+                  <span className="num text-[13px] font-bold text-brand-text">${lcCharges.totalAmount.toLocaleString()}</span>
+                </div>
+                <div className="divide-y divide-brand-border">
+                  {lcCharges.breakdown.map(row => (
+                    <div key={row.type} className="px-4 py-2 flex items-center justify-between bg-white hover:bg-brand-bg/30 transition-colors">
+                      <div>
+                        <p className="text-[11px] font-medium text-brand-text">{row.type}</p>
+                        <p className="text-[10px] text-brand-muted">{row.count.toLocaleString()} transactions · latest {row.latestMonth}</p>
+                      </div>
+                      <span className="num text-[12px] font-bold text-brand-text">${row.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Call Intelligence */}
+          {account.callStats ? (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
+                Call Intelligence
+                <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
+                  style={{ background: '#8CC63F12', color: '#3a6b10', border: '1px solid #8CC63F30' }}>
+                  AI Team Assistant
+                </span>
+              </p>
+              <div className="rounded-xl border border-brand-border overflow-hidden">
+                {/* Summary stats */}
+                <div className="grid grid-cols-3 divide-x divide-brand-border border-b border-brand-border">
+                  {[
+                    { label: 'Total Calls',  value: account.callStats.totalCalls,     color: null },
+                    { label: 'Avg Score',    value: account.callStats.avgScore > 0 ? `${account.callStats.avgScore}/10` : '—', color: account.callStats.avgScore >= 7 ? G : account.callStats.avgScore >= 5 ? AMB : RED },
+                    { label: 'Frustrated',   value: account.callStats.frustratedCount > 0 ? account.callStats.frustratedCount : '0', color: account.callStats.frustratedCount > 0 ? RED : G },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="px-3 py-2.5 text-center bg-brand-bg/40">
+                      <p className="num text-sm font-bold" style={{ color: color || 'inherit' }}>{value}</p>
+                      <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Last call + risk */}
+                <div className="px-4 py-2.5 flex items-center justify-between gap-2 text-[11px] border-b border-brand-border/50 bg-white">
+                  <div>
+                    <span className="text-brand-muted">Last call:</span>
+                    <span className="font-semibold text-brand-text ml-1">{account.callStats.lastCallDate || '—'}</span>
+                    <span className="text-brand-muted ml-1">by</span>
+                    <span className="text-brand-text ml-1">{account.callStats.lastCallEmployee}</span>
+                    <span className="ml-1 text-brand-muted">· {account.callStats.lastCallCategory}</span>
+                  </div>
+                  {account.callStats.riskLevel && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0"
+                      style={{
+                        color:       account.callStats.riskLevel === 'High' ? RED : account.callStats.riskLevel === 'Medium' ? AMB : G,
+                        background:  account.callStats.riskLevel === 'High' ? '#EF444412' : account.callStats.riskLevel === 'Medium' ? '#EAB30812' : '#8CC63F12',
+                        borderColor: account.callStats.riskLevel === 'High' ? '#EF444430' : account.callStats.riskLevel === 'Medium' ? '#EAB30830' : '#8CC63F30',
+                      }}>
+                      {account.callStats.riskLevel} Risk
+                    </span>
+                  )}
+                </div>
+                {/* Category breakdown */}
+                {Object.keys(account.callStats.categories).length > 0 && (
+                  <div className="px-4 py-2.5 flex flex-wrap gap-1.5 border-b border-brand-border/50 bg-white">
+                    {Object.entries(account.callStats.categories).sort((a,b) => b[1]-a[1]).map(([cat, cnt]) => (
+                      <span key={cat} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-bg border border-brand-border text-brand-muted">
+                        {cat} ×{cnt}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* Recent calls */}
+                <div className="divide-y divide-brand-border/50">
+                  {account.callStats.recentCalls.map((c, i) => (
+                    <div key={c.meetingId || i} className="px-4 py-2.5 bg-white">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className="text-[11px] font-semibold text-brand-text">{c.date}</span>
+                        <div className="flex items-center gap-1.5">
+                          {c.score > 0 && (
+                            <span className="num text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                              style={{ color: c.score >= 7 ? G : c.score >= 5 ? AMB : RED,
+                                       background: c.score >= 7 ? '#8CC63F12' : c.score >= 5 ? '#EAB30812' : '#EF444412' }}>
+                              {c.score}/10
+                            </span>
+                          )}
+                          {c.frustrated && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-600">
+                              Frustrated
+                            </span>
+                          )}
+                          <span className="text-[10px] text-brand-muted">{c.category}</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-brand-muted leading-relaxed line-clamp-2">{c.summary}</p>
+                      {c.actionItems && (
+                        <p className="text-[10px] text-amber-700 mt-1 leading-relaxed line-clamp-1">
+                          Action: {c.actionItems}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">Call Intelligence</p>
+              <div className="rounded-xl border border-brand-border px-4 py-3 text-[11px] text-brand-muted bg-brand-bg/40">
+                No call records found for this account. Calls are matched by client name from the AI Team Assistant dashboard.
+              </div>
+            </div>
+          )}
 
           {/* Live GHL CRM */}
           <div>

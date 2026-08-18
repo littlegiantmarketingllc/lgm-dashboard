@@ -1,8 +1,6 @@
 import { differenceInDays, parseISO, isValid } from 'date-fns'
 
-// Score based purely on what the GHL Agency API gives us:
-//   50% tenure (how long have they been a sub-account)
-//   50% activity (how recently was their sub-account record updated)
+// Score based purely on GHL activity recency (tenure removed per John's feedback).
 
 function tenureScore(dateAdded) {
   if (!dateAdded) return 30
@@ -34,17 +32,15 @@ function activityScore(daysSinceUpdate) {
 }
 
 export function scoreAccount(account) {
-  const tenure   = tenureScore(account.ghlDateAdded || account.stripeStartDate)
   const activity = activityScore(account.lastActivity ?? account.ghlDaysSinceUpdate)
-  const score    = Math.round(tenure * 0.5 + activity * 0.5)
   return {
-    score: Math.min(100, Math.max(0, score)),
-    parts: { tenure, activity },
+    score: Math.min(100, Math.max(0, activity)),
+    parts: { activity },
   }
 }
 
-// Enhanced score used in AccountModal once live metrics (contacts, opps, users) are loaded.
-// Weights: tenure 20% · activity 20% · users 15% · contacts 25% · opportunities 20%
+// Enhanced score used in AccountModal once live metrics load.
+// Weights: activity 30% · contacts 40% · opportunities 30% (tenure + team members removed per John)
 function contactScore(n) {
   if (!n || n <= 0)      return 0
   if (n < 100)           return 10 + (n / 100) * 20           // 10–30
@@ -73,21 +69,17 @@ function userScore(n) {
 }
 
 export function enhancedScoreAccount(account, liveMetrics) {
-  const tenure   = tenureScore(account.ghlDateAdded || account.stripeStartDate)
   const activity = activityScore(account.lastActivity ?? account.ghlDaysSinceUpdate)
   const contacts = contactScore(liveMetrics?.contacts)
   const opps     = opportunityScore(liveMetrics?.opportunities)
-  const users    = userScore(liveMetrics?.users)
   const score    = Math.round(
-    tenure   * 0.20 +
-    activity * 0.20 +
-    users    * 0.15 +
-    contacts * 0.25 +
-    opps     * 0.20
+    activity * 0.30 +
+    contacts * 0.40 +
+    opps     * 0.30
   )
   return {
     score: Math.min(100, Math.max(0, score)),
-    parts: { tenure, activity, users, contacts, opps },
+    parts: { activity, contacts, opps },
   }
 }
 
@@ -115,7 +107,10 @@ export function isWatch(account) {
 export function isUpsellReady(account) {
   if (!account?.planPrice || account.planPrice <= 0) return false
   const days = Number(account.lastActivity ?? account.ghlDaysSinceUpdate)
-  if (isNaN(days) || days > 60) return false // inactive accounts aren't upsell candidates
+  if (isNaN(days) || days > 60) return false
+  // Must show engagement: users billed OR LC wallet activity
+  const engaged = (account.users ?? 0) >= 1 || (account.lcWalletCharges ?? 0) > 0
+  if (!engaged) return false
   // Has upsell headroom: fewer than 4 users, or no add-ons yet
   return (account.users ?? 0) < 4 || (account.addOns ?? 0) === 0
 }
@@ -124,18 +119,33 @@ export function suggestAddon(account) {
   if (!account?.planPrice || account.planPrice <= 0) {
     return { label: 'Connect billing to identify opportunities', estExtra: 0 }
   }
-  // No add-ons yet → LeadFlow AI is the obvious first add-on
-  if ((account.addOns ?? 0) === 0) {
+
+  const lc        = account.lcWalletCharges ?? 0
+  const addOns    = account.addOns ?? 0
+  const seats     = account.users ?? 0
+  const rev       = account.planPrice ?? 0
+  const isMonthly = (account.planInterval ?? 'month') === 'month'
+  const isDM      = account.accountType === 'DM'
+
+  // High LC spend + no add-ons → AI automation is a clear fit
+  if (lc > 100 && addOns === 0) {
+    return { label: 'LeadFlow AI (active LC user — ready for automation)', estExtra: 50 }
+  }
+  // No add-ons → LeadFlow AI first pitch
+  if (addOns === 0) {
     return { label: 'LeadFlow AI Assistant', estExtra: 50 }
   }
-  // Few users → suggest adding seats
-  const seats = account.users ?? 0
-  if (seats < 3) {
+  // Has add-ons, low seat count → expand seats
+  if (seats > 0 && seats < 3) {
     const add = 3 - seats
     return { label: `Add ${add} User Seat${add > 1 ? 's' : ''} ($64/ea)`, estExtra: add * 64 }
   }
-  // General plan upgrade
-  return { label: 'Plan upgrade', estExtra: Math.round(account.planPrice * 0.2) }
+  // Monthly DM account → annual plan upgrade
+  if (isDM && isMonthly && rev >= 200) {
+    const annualSavings = Math.round(rev * 0.16 * 12)
+    return { label: `Annual plan (save ~$${annualSavings}/yr)`, estExtra: Math.round(rev * 0.20) }
+  }
+  return { label: 'Seat expansion or plan upgrade', estExtra: Math.round(rev * 0.20) }
 }
 
 export function recommendAction(account) {

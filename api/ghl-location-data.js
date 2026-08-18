@@ -3,7 +3,7 @@
 // Tokens are written by the goals-dashboard marketplace OAuth flow and shared via the
 // same Upstash KV store (both projects connected to the same store in Vercel Storage).
 
-import { kv } from '@vercel/kv'
+import { kv } from './_supabase.js'
 
 const GHL_BASE   = 'https://services.leadconnectorhq.com'
 const GHL_VER    = '2021-07-28'
@@ -137,21 +137,24 @@ export default async function handler(req, res) {
     })
   }
 
-  const [usersR, contactsR, oppsR] = await Promise.allSettled([
+  const [usersR, contactsR, oppsR, convoR] = await Promise.allSettled([
     ghlFetch(`/users/?locationId=${locationId}`, token),
     ghlFetch(`/contacts/?locationId=${locationId}&limit=1`, token),
     // opportunities/search is a POST endpoint — GHL requires "locationId" (not "location_id")
     ghlFetch(`/opportunities/search`, token, 'POST', { locationId, limit: 1 }),
+    ghlFetch(`/conversations/search?locationId=${locationId}&limit=1`, token),
   ])
 
   const users    = usersR.status    === 'fulfilled' ? usersR.value    : null
   const contacts = contactsR.status === 'fulfilled' ? contactsR.value : null
   const opps     = oppsR.status     === 'fulfilled' ? oppsR.value     : null
+  const convos   = convoR.status    === 'fulfilled' ? convoR.value    : null
 
   // Extract counts, trying multiple known GHL response shapes
   const userCount    = users?.json?.users?.length            ?? null
   const contactCount = contacts?.json?.total ?? contacts?.json?.meta?.total ?? contacts?.json?.count ?? null
   const oppsCount    = opps?.json?.total    ?? opps?.json?.meta?.total     ?? opps?.json?.opportunities?.total ?? null
+  const convoCount   = convos?.json?.total  ?? convos?.json?.meta?.total   ?? null
 
   res.json({
     locationId,
@@ -159,5 +162,6 @@ export default async function handler(req, res) {
     users:         userCount,
     contacts:      contactCount,
     opportunities: oppsCount,
+    conversations: convoCount,
   })
 }

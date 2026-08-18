@@ -231,12 +231,12 @@ export default function TransactionBreakdown({ accounts, stripeLoading = false }
         </table>
       </div>
 
-      {/* GHL API pending note */}
-      <div className="px-5 sm:px-6 py-3 border-t border-brand-border flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 rounded-b-2xl">
-        <span>⚠</span>
+      {/* LC wallet note — this data is not in the GHL API */}
+      <div className="px-5 sm:px-6 py-3 border-t border-brand-border flex items-center gap-2 text-[11px] text-brand-muted bg-brand-bg/60 rounded-b-2xl">
+        <span className="flex-shrink-0">ℹ</span>
         <span>
-          <strong>Detailed GHL transaction types</strong> (Conversation AI, SMS, phone calls, email, etc.) will appear here once the GHL Agency API is connected.
-          The breakdown above reflects billing sheet data only.
+          <strong>LC Platform Usage</strong> reflects all-time cumulative wallet charges from Cliff's migrated data.
+          Per-account monthly breakdowns (SMS, AI, phone, email) are available in each account's detail modal.
         </span>
       </div>
     </div>

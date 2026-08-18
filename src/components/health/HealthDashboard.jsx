@@ -27,6 +27,8 @@ function median(arr) {
 function getDateWindow(dateRange) {
   if (dateRange.type === 'all') return { from: '0000-01-01', to: '9999-12-31' }
   const today = new Date()
+  if (dateRange.type === 'today')      { const d = format(today, 'yyyy-MM-dd'); return { from: d, to: d } }
+  if (dateRange.type === 'yesterday')  { const d = format(subDays(today, 1), 'yyyy-MM-dd'); return { from: d, to: d } }
   if (dateRange.type === 'last_7')     return { from: format(subDays(today, 7), 'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
   if (dateRange.type === 'this_month') return { from: format(startOfMonth(today), 'yyyy-MM-dd'), to: format(endOfMonth(today), 'yyyy-MM-dd') }
   if (dateRange.type === 'last_month') {
@@ -98,6 +100,8 @@ export default function HealthDashboard({ filters, setFilters }) {
   const [elapsed, setElapsed] = useState('—')
   const [stripeElapsed, setStripeElapsed] = useState(0)
   const stripeStartRef = useRef(null)
+  const needsAttentionRef = useRef(null)
+  const masterTableRef = useRef(null)
 
   useEffect(() => {
     const tick = () => setElapsed(timeAgo(lastUpdated))
@@ -128,6 +132,15 @@ export default function HealthDashboard({ filters, setFilters }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
+  // Auto-scroll master table into view 800ms after user starts searching
+  useEffect(() => {
+    if (!filters.search.trim()) return
+    const timer = setTimeout(() => {
+      masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [filters.search])
+
   // Enrich with health scores
   const accounts = useMemo(() =>
     raw.map(a => {
@@ -147,6 +160,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       if (srch && !a.accountName.toLowerCase().includes(srch) &&
           !(a.ghlEmail || '').toLowerCase().includes(srch) &&
           !(a.ghlCity  || '').toLowerCase().includes(srch)) return false
+      if (filters.typeFilter !== 'all' && a.accountType !== filters.typeFilter) return false
       if (filters.bandFilter !== 'all' && a._health?.band !== filters.bandFilter) return false
       if (filters.dateRange.type !== 'all') {
         const d = a.ghlDateAdded || ''
@@ -156,14 +170,32 @@ export default function HealthDashboard({ filters, setFilters }) {
     })
   }, [accounts, filters])
 
+  // Accounts whose Stripe subscription was cancelled within the active date window
+  const cancelledInPeriod = useMemo(() => {
+    if (filters.dateRange.type === 'all') return []
+    const { from, to } = getDateWindow(filters.dateRange)
+    return accounts
+      .filter(a => { const d = a.canceledAt || ''; return d && d >= from && d <= to })
+      .sort((a, b) => (b.canceledAt || '').localeCompare(a.canceledAt || ''))
+  }, [accounts, filters.dateRange])
+
+  const DATE_FILTER_LABELS = {
+    today: 'Today', yesterday: 'Yesterday',
+    last_7: 'Last 7 Days', this_month: 'This Month', last_month: 'Last Month',
+    last_30: 'Last 30 Days', last_90: 'Last 90 Days', custom: 'Custom Range',
+  }
+  const activeDateLabel = filters.dateRange.type !== 'all'
+    ? (DATE_FILTER_LABELS[filters.dateRange.type] || 'Selected Period')
+    : null
+
   // KPIs — derived from full account list (not filtered by date)
   const activeAccounts = useMemo(() =>
-    accounts.filter(a => { const d = Number(a.ghlDaysSinceUpdate); return !isNaN(d) && d <= 30 }),
+    accounts.filter(a => { const d = Number(a.lastActivity ?? a.ghlDaysSinceUpdate); return !isNaN(d) && d <= 30 }),
     [accounts]
   )
   const staleAccounts = useMemo(() =>
     accounts.filter(isAtRisk).sort((a, b) =>
-      (Number(b.ghlDaysSinceUpdate) || 0) - (Number(a.ghlDaysSinceUpdate) || 0)
+      (Number(b.lastActivity ?? b.ghlDaysSinceUpdate) || 0) - (Number(a.lastActivity ?? a.ghlDaysSinceUpdate) || 0)
     ),
     [accounts]
   )
@@ -174,6 +206,7 @@ export default function HealthDashboard({ filters, setFilters }) {
     const from  = isAllTime ? format(subDays(today, 30), 'yyyy-MM-dd') : getDateWindow(filters.dateRange).from
     const to    = isAllTime ? format(today, 'yyyy-MM-dd')              : getDateWindow(filters.dateRange).to
     const label = isAllTime ? 'last 30 days' : ({
+      today: 'today', yesterday: 'yesterday',
       last_7: 'last 7 days', this_month: 'this month', last_month: 'last month',
       last_30: 'last 30 days', last_90: 'last 90 days',
     }[filters.dateRange.type] || 'selected period')
@@ -232,7 +265,6 @@ export default function HealthDashboard({ filters, setFilters }) {
     const upsellList   = billedAccounts.filter(isUpsellReady)
     const newList      = billedAccounts.filter(a => (a.stripeStartDate || '') >= cutoff)
     const withUsers    = billedAccounts.filter(a => a.users > 0)
-    const withWallet   = billedAccounts.filter(a => a.lcWalletCharges > 0)
 
     return {
       billedCount:  billedAccounts.length,
@@ -246,11 +278,6 @@ export default function HealthDashboard({ filters, setFilters }) {
       avgUsers:     withUsers.length
         ? withUsers.reduce((s, a) => s + a.users, 0) / withUsers.length
         : 0,
-      avgWallet:    withWallet.length
-        ? withWallet.reduce((s, a) => s + a.lcWalletCharges, 0) / withWallet.length
-        : 0,
-      medianWallet: withWallet.length ? median(withWallet.map(a => a.lcWalletCharges)) : 0,
-      walletCount:  withWallet.length,
       newMRR:       newList.reduce((s, a) => s + a.totalRev, 0),
     }
   }, [billedAccounts])
@@ -380,7 +407,10 @@ export default function HealthDashboard({ filters, setFilters }) {
         newPeriodLabel={newPeriodLabel}
         avgScore={avgScore}
         avgTenureDays={avgTenureDays}
+        dateFiltered={!!activeDateLabel}
         {...BILLING}
+        onNewClientsClick={() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        onNeedsCheckinClick={() => needsAttentionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       />
 
       {/* 2. Quick Wins — stale, upsell, newest */}
@@ -404,12 +434,14 @@ export default function HealthDashboard({ filters, setFilters }) {
       <ResolutionTrackerHealth accounts={staleAccounts} statuses={statuses} />
 
       {/* 5. Needs Attention — stale accounts with outreach tracking */}
-      <NeedsAttentionTable
-        accounts={staleAccounts}
-        statuses={statuses}
-        setStatus={setStatus}
-        onAccountClick={setSelectedAccount}
-      />
+      <div ref={needsAttentionRef}>
+        <NeedsAttentionTable
+          accounts={staleAccounts}
+          statuses={statuses}
+          setStatus={setStatus}
+          onAccountClick={setSelectedAccount}
+        />
+      </div>
 
       {/* 6. Upsell table */}
       <UpsellTable
@@ -423,17 +455,92 @@ export default function HealthDashboard({ filters, setFilters }) {
         potentialMRR={BILLING.upsellMRR}
       />
 
-      {/* 7. Charts — health distribution, join timeline, activity + billing-pending panels */}
-      <HealthCharts accounts={filteredAccounts} stripeLoading={stripeLoading} />
+      {/* 7. Charts — health distribution, join timeline, activity + billing panels */}
+      {activeDateLabel && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+          style={{ background: '#8CC63F12', border: '1px solid #8CC63F30', color: '#3a6b10' }}>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#8CC63F' }} />
+          Charts &amp; account table below reflect <strong>{activeDateLabel}</strong> · {filteredAccounts.length} of {accounts.length} accounts
+        </div>
+      )}
+      <div className="transition-all duration-300" style={activeDateLabel ? { borderRadius: '1rem', outline: '2px solid rgba(140,198,63,0.45)', outlineOffset: '2px' } : {}}>
+        <HealthCharts accounts={filteredAccounts} stripeLoading={stripeLoading} />
+      </div>
 
       {/* 8. Billing breakdown by charge type */}
       <TransactionBreakdown accounts={billedAccounts} stripeLoading={stripeLoading} />
 
-      {/* 9. Master accounts table — full portfolio with all original columns */}
-      <MasterAccountsTable
-        accounts={filteredAccounts}
-        onAccountClick={setSelectedAccount}
-      />
+      {/* Churned this period — only visible when a date filter is active */}
+      {cancelledInPeriod.length > 0 && (
+        <div className="animate-fade-in-up rounded-2xl border border-red-200 bg-white overflow-hidden"
+          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
+          <div className="px-5 sm:px-6 py-4 border-b border-red-100 flex items-center justify-between gap-3 bg-red-50/40">
+            <div>
+              <h2 className="text-red-700 font-semibold text-sm flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                Churned — {activeDateLabel}
+              </h2>
+              <p className="text-red-500 text-[11px] mt-0.5">
+                {cancelledInPeriod.length} subscription{cancelledInPeriod.length !== 1 ? 's' : ''} cancelled in this period
+                · ${Math.round(cancelledInPeriod.reduce((s, a) => s + a.totalRev, 0)).toLocaleString()}/mo lost
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-red-100 bg-red-50/20">
+                  {['Account', 'Cancelled On', 'Last Plan', 'MRR Lost', 'Type', 'Health'].map(h => (
+                    <th key={h} className="px-4 py-2.5 first:pl-5 last:pr-5 text-left text-[10px] font-bold uppercase tracking-widest text-red-400">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-50">
+                {cancelledInPeriod.map(a => (
+                  <tr key={a.id} className="hover:bg-red-50/30 transition-colors">
+                    <td className="pl-5 pr-3 py-2.5">
+                      <button onClick={() => setSelectedAccount(a)} className="font-medium text-brand-text hover:underline text-left">
+                        {a.accountName}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-brand-muted">{a.canceledAt || '—'}</td>
+                    <td className="px-4 py-2.5 text-brand-muted">{a.planNickname || '—'}</td>
+                    <td className="px-4 py-2.5 font-semibold text-red-600">${Math.round(a.totalRev).toLocaleString()}/mo</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                        a.accountType === 'DM'
+                          ? 'bg-blue-50 border-blue-200 text-blue-700'
+                          : 'bg-purple-50 border-purple-200 text-purple-700'
+                      }`}>{a.accountType || '—'}</span>
+                    </td>
+                    <td className="px-4 pr-5 py-2.5">
+                      <span className="num text-[11px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ color: a._health?.band === 'healthy' ? '#8CC63F' : a._health?.band === 'watch' ? '#EAB308' : '#EF4444',
+                                 background: a._health?.band === 'healthy' ? '#8CC63F12' : a._health?.band === 'watch' ? '#EAB30812' : '#EF444412' }}>
+                        {a._health?.score ?? 0}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 9. Master accounts table */}
+      <div
+        ref={masterTableRef}
+        className="transition-all duration-300"
+        style={activeDateLabel ? { borderRadius: '1rem', outline: '2px solid rgba(140,198,63,0.45)', outlineOffset: '2px' } : {}}
+      >
+        <MasterAccountsTable
+          accounts={filteredAccounts}
+          dateFiltered={!!activeDateLabel}
+          dateLabel={activeDateLabel}
+          onAccountClick={setSelectedAccount}
+        />
+      </div>
 
       {/* Account detail modal */}
       {selectedAccount && (

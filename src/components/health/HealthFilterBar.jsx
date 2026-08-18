@@ -4,6 +4,8 @@ const G = '#8CC63F'
 
 const DATE_OPTIONS = [
   { label: 'All Dates',    value: 'all'        },
+  { label: 'Today',        value: 'today'      },
+  { label: 'Yesterday',    value: 'yesterday'  },
   { label: 'Last 7 Days',  value: 'last_7'     },
   { label: 'This Month',   value: 'this_month' },
   { label: 'Last Month',   value: 'last_month' },
@@ -43,6 +45,28 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
           />
           <InfoTip
             text="Search by account name. Case-insensitive partial match — type any part of the name to filter."
+            position="bottom-end"
+          />
+        </div>
+
+        {/* Account type filter (DM / Agent) */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <select
+            value={typeFilter}
+            onChange={e => set({ typeFilter: e.target.value })}
+            className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer transition-colors duration-150"
+            style={{
+              color:       typeFilter !== 'all' ? '#3a6b10' : '#6B7280',
+              background:  typeFilter !== 'all' ? `${G}10`  : '#F4F6F4',
+              borderColor: typeFilter !== 'all' ? `${G}50`  : '#E5E7E5',
+            }}
+          >
+            <option value="all">DM + Agent</option>
+            <option value="DM">DM Only</option>
+            <option value="Agent">Agent Only</option>
+          </select>
+          <InfoTip
+            text="Filter by account type. DM = Digital Marketing clients (base plan ~$250/mo). Agent = Conversational AI clients. Requires Stripe billing to classify."
             position="bottom-end"
           />
         </div>

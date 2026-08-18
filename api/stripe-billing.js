@@ -1,10 +1,27 @@
 // Vercel serverless function — fetches all active Stripe subscriptions for LGM.
 // Expands customer inline to avoid N+1 calls.
-// Returns { byEmail: { [email]: billingData } } for the frontend to merge with GHL data.
+// Returns { byEmail, byPhone, byNormName } lookup maps for the frontend to merge with GHL data.
 //
 // Env var required: STRIPE_SECRET_KEY (set in Vercel project settings)
 
 const STRIPE_BASE = 'https://api.stripe.com/v1'
+
+// Normalize company name for fuzzy matching — must mirror useMergedHealthData.js exactly
+function normalizeName(n) {
+  return (n || '')
+    .toLowerCase()
+    .replace(/'s\b/g, '')
+    .replace(/\b(llc|inc|corp|ltd|l\.l\.c\.|incorporated|limited|company|the|agency|marketing|services|group|associates|account|insurance|at)\b\.?/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Normalize phone to 10 digits (strip country code if present)
+function normalizePhone(p) {
+  const d = (p || '').replace(/\D/g, '')
+  return d.length === 11 && d[0] === '1' ? d.slice(1) : d
+}
 
 async function stripeGet(path, key) {
   const encoded = Buffer.from(`${key}:`).toString('base64')
@@ -71,6 +88,7 @@ export default async function handler(req, res) {
       let primaryStatus = 'canceled'
       let primarySubId = null
       let startDate = null
+      let canceledAt = null
 
       for (const sub of subs) {
         // Track the highest-priority (best) status across all subscriptions
@@ -80,7 +98,7 @@ export default async function handler(req, res) {
         }
 
         // Earliest subscription start = when this client first paid us
-        const subDate = new Date(sub.created * 1000).toISOString().slice(0, 10)
+        const subDate = new Date(sub.created * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
         if (!startDate || subDate < startDate) startDate = subDate
 
         for (const item of sub.items?.data || []) {
@@ -117,15 +135,44 @@ export default async function handler(req, res) {
 
       const totalRev = planPrice + monthlyUserSub + addOns
 
+      // canceledAt — ISO date if primary subscription is cancelled, else null
+      const primarySub = subs.find(s => s.id === primarySubId) ?? subs[0]
+      if (primarySub?.status === 'canceled' && primarySub?.canceled_at) {
+        canceledAt = new Date(primarySub.canceled_at * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+      }
+
       // DM detection: monthly plan ≈ $250, or annual plan where monthly equiv ≈ $208 ($2500/yr)
       const monthlyBase = planInterval === 'month' ? planPrice : planPrice / 12
       const isDM =
         (monthlyBase >= 245 && monthlyBase <= 255) ||
         (planInterval === 'year' && monthlyBase >= 205 && monthlyBase <= 215)
 
-      byEmail[email] = {
+      const stripePhone    = normalizePhone(customer.phone)
+      const stripeNormName = normalizeName(customer.name)
+
+      // Cliff's Postman script "Stripe – Enrich Active Subs with GHL Location Id"
+      // stores the GHL location ID on subscription metadata (not customer metadata).
+      // Check sub metadata first across all subs, then fall back to customer metadata.
+      const META_KEYS = ['location_id', 'ghl_location_id', 'locationId', 'ghlLocationId', 'GHL_Location_ID']
+      let metaLocId = null
+      for (const sub of subs) {
+        for (const k of META_KEYS) {
+          if (sub.metadata?.[k]) { metaLocId = sub.metadata[k]; break }
+        }
+        if (metaLocId) break
+      }
+      if (!metaLocId) {
+        for (const k of META_KEYS) {
+          if (customer.metadata?.[k]) { metaLocId = customer.metadata[k]; break }
+        }
+      }
+
+      const record = {
         stripeCustomerId:     customer.id,
         stripeCustomerName:   customer.name || '',
+        stripePhone,
+        stripeNormName,
+        stripeGhlLocationId:  metaLocId,
         stripeStatus:         primaryStatus,
         stripeSubscriptionId: primarySubId,
         stripeStartDate:      startDate,
@@ -137,16 +184,45 @@ export default async function handler(req, res) {
         totalRev:        Math.round(totalRev        * 100) / 100,
         users:           userCount,
         accountType:     isDM ? 'DM' : 'Agent',
-        // Still pending from Cliff's LC data or GHL Payments API
+        canceledAt,
         lcWalletCharges: 0,
         transactions:    0,
         gp:              0,
       }
+
+      byEmail[email] = record
     }
 
-    res.setHeader('Cache-Control', 'no-store')
+    // Build secondary lookup maps — phone and normalized name (unique only, skip collisions)
+    const byPhone    = {}
+    const byNormName = {}
+    const phoneDupes = new Set()
+    const nameDupes  = new Set()
+    const byLocId    = {}
+
+    for (const rec of Object.values(byEmail)) {
+      if (rec.stripePhone && rec.stripePhone.length >= 10) {
+        if (byPhone[rec.stripePhone]) phoneDupes.add(rec.stripePhone)
+        else byPhone[rec.stripePhone] = rec
+      }
+      if (rec.stripeNormName) {
+        if (byNormName[rec.stripeNormName]) nameDupes.add(rec.stripeNormName)
+        else byNormName[rec.stripeNormName] = rec
+      }
+      if (rec.stripeGhlLocationId) {
+        byLocId[rec.stripeGhlLocationId] = rec
+      }
+    }
+    for (const p of phoneDupes)   delete byPhone[p]
+    for (const n of nameDupes)    delete byNormName[n]
+
+    // Stripe billing data changes infrequently — cache at edge for 10 min, serve stale up to 1 hour
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=3600')
     return res.json({
       byEmail,
+      byPhone,
+      byNormName,
+      byLocId,
       count:     Object.keys(byEmail).length,
       totalSubs: allSubs.length,
       syncedAt:  new Date().toISOString(),

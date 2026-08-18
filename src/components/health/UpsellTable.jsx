@@ -24,35 +24,56 @@ function UpsellRow({ a, i, isContacted, toggleContacted, getContactedAt, onAccou
   const { label, estExtra } = suggestAddon(a)
   const contacted           = isContacted(a.id)
   const contactedAt         = getContactedAt(a.id)
+  const lcWallet            = a.lcWalletCharges ?? 0
 
   return (
     <tr key={a.id}
       className={`animate-slide-in-row border-b border-brand-border/60 transition-all duration-200 ${contacted ? 'opacity-55 bg-brand-bg/40' : 'hover:bg-green-50/20'}`}
       style={{ animationDelay: `${i * 30}ms`, borderLeft: `2px solid ${contacted ? '#E5E7E5' : G}` }}>
 
+      {/* Account + Type */}
       <td className="pl-5 pr-3 py-3">
-        <button
-          onClick={() => onAccountClick?.(a)}
-          className="text-[12px] font-semibold text-brand-text hover:underline text-left"
-        >
-          {a.accountName}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => onAccountClick?.(a)}
+            className="text-[12px] font-semibold text-brand-text hover:underline text-left">
+            {a.accountName}
+          </button>
+          {a.accountType && (
+            <span className={`text-[9px] font-bold px-1 py-0.5 rounded border flex-shrink-0 ${
+              a.accountType === 'DM' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-purple-50 border-purple-200 text-purple-700'
+            }`}>{a.accountType}</span>
+          )}
+        </div>
       </td>
+
+      {/* LC Wallet — actual platform usage signal */}
       <td className="px-3 sm:px-4 py-3">
-        <span className="num text-[12px] text-brand-text">{a.transactions.toLocaleString()}</span>
+        {lcWallet > 0
+          ? <span className="num text-[12px] font-semibold" style={{ color: '#7c3aed' }}>${Math.round(lcWallet).toLocaleString()}</span>
+          : <span className="text-brand-muted text-[11px]">—</span>}
       </td>
+
+      {/* Users */}
       <td className="px-3 sm:px-4 py-3">
-        <span className="num text-[12px] text-brand-text">{a.users}</span>
+        <span className="num text-[12px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
       </td>
+
+      {/* Current Rev */}
       <td className="px-3 sm:px-4 py-3">
         <span className="num text-[12px] font-semibold text-brand-text">{fmt(a.totalRev)}</span>
       </td>
+
+      {/* Suggested Add-on */}
       <td className="px-3 sm:px-4 py-3 max-w-[180px]">
         <span className="text-[11px] text-brand-heading">{label}</span>
       </td>
+
+      {/* Est. Extra */}
       <td className="px-3 sm:px-4 py-3">
         <span className="num text-[12px] font-bold" style={{ color: G }}>+{fmt(estExtra)}</span>
       </td>
+
+      {/* Action */}
       <td className="px-3 sm:px-4 py-3 pr-5">
         <div className="flex flex-col gap-1 items-start">
           <button
@@ -75,13 +96,13 @@ function UpsellRow({ a, i, isContacted, toggleContacted, getContactedAt, onAccou
 }
 
 const UPSELL_HEADERS = [
-  { label: 'Account Name',    tip: null },
-  { label: 'Transactions',    tip: 'DataHealthStatus × 1000. Accounts here all have 3,500+ = active platform usage — a prerequisite for upsell.' },
-  { label: 'Users',           tip: 'Current GHL Adjusted User Count. Accounts with 3+ users have room to upsell additional seats or advanced features.' },
-  { label: 'Current Rev',     tip: 'Total Monthly Charges currently billed — the baseline before any upsell.' },
-  { label: 'Suggested Add-on', tip: 'Rule-based suggestion for the most likely upsell product based on this account\'s current usage and size.' },
-  { label: 'Est. Extra/mo',   tip: 'Estimated additional monthly revenue if the suggested add-on is sold. Based on current pricing tiers.' },
-  { label: 'Action',          tip: 'Track whether your team has reached out to this account. Marked contacts are dimmed so you focus on uncontacted ones first.' },
+  { label: 'Account',        tip: 'Account name + plan type (DM = Digital Marketing, Agent = AI platform).' },
+  { label: 'LC Wallet',      tip: 'Cumulative LC platform spend (SMS, AI, calls, email). High spend = actively using the platform = strongest upsell signal.' },
+  { label: 'Users',          tip: 'Current billed user seat count from Stripe. Fewer than 4 = room to grow seats.' },
+  { label: 'Current Rev',    tip: 'Total monthly charges currently billed — the baseline before any upsell.' },
+  { label: 'Suggested Add-on', tip: 'Best upsell based on LC usage, seat count, add-on gaps, and plan type.' },
+  { label: 'Est. Extra/mo',  tip: 'Estimated MRR increase if the suggested add-on or upgrade is sold.' },
+  { label: 'Action',         tip: 'Track whether your team has reached out. Marked contacts are dimmed so you focus on fresh opportunities.' },
 ]
 
 function UpsellRows({ rows, isContacted, toggleContacted, getContactedAt, onAccountClick }) {
@@ -147,7 +168,7 @@ export default function UpsellTable({ accounts, hasBilling = false, stripeLoadin
             </p>
           </div>
           <InfoTip
-            text="Accounts that qualify for an upsell conversation: DataHealthStatus > 3,000 (active platform usage), more than 3 user seats, and no add-ons currently purchased. Sorted by estimated additional MRR — highest potential first. Mark accounts as 'Contacted' to track your team's outreach."
+            text="Accounts qualified for an upsell conversation: active within 60 days, with user seats billed OR LC wallet spend (proving real platform usage), and room to grow (fewer than 4 users OR no add-ons yet). Sorted by estimated additional MRR — highest potential first. LC wallet spend is the strongest upsell signal — these clients are already paying for usage."
             position="top-end"
           />
         </div>

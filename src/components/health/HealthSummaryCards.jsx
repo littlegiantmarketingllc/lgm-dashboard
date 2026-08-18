@@ -7,13 +7,23 @@ const AMB = '#EAB308'
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString() }
 
-function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefix = '', suffix = '', infoText, onClick, clickable }) {
+function Card({ label, value, sub, icon, accentColor, delay, decimals = 0, prefix = '', suffix = '', infoText, onClick, clickable, highlighted }) {
   const displayed = useCountUp(typeof value === 'number' ? value : 0, { duration: 1200, delay, decimals })
   return (
     <div
       onClick={onClick}
-      className={`card-hover animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6 flex flex-col gap-2 ${clickable ? 'cursor-pointer' : ''}`}
-      style={{ animationDelay: `${delay}ms`, boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)', borderLeft: accentColor ? `3px solid ${accentColor}` : undefined }}
+      className={`card-hover animate-fade-in-up rounded-2xl border bg-white p-5 sm:p-6 flex flex-col gap-2 ${clickable ? 'cursor-pointer' : ''}`}
+      style={{
+        animationDelay: `${delay}ms`,
+        boxShadow: highlighted
+          ? '0 4px 24px rgba(140,198,63,0.18), 0 1px 4px rgba(140,198,63,0.10)'
+          : '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)',
+        borderLeft:  accentColor ? `3px solid ${accentColor}` : undefined,
+        borderColor: highlighted ? 'rgba(140,198,63,0.55)' : undefined,
+        outline:     highlighted ? '2px solid rgba(140,198,63,0.35)' : undefined,
+        outlineOffset: highlighted ? '2px' : undefined,
+        transition: 'box-shadow 0.3s, border-color 0.3s, outline 0.3s',
+      }}
     >
       <div className="flex items-start justify-between gap-1">
         <span className="text-brand-muted text-[10px] font-bold uppercase tracking-[0.18em] leading-tight">{label}</span>
@@ -63,21 +73,18 @@ export default function HealthSummaryCards({
   newPeriodLabel = 'last 30 days',
   avgScore = 0,
   avgTenureDays = 0,
+  dateFiltered = false,
   // billing fields — all 0 until Stripe / billing sheet connected
   billedCount = 0,
   atRisk = 0,
   healthy = 0,
-  upsellReady = 0,
   riskRevenue = 0,
-  upsellMRR = 0,
   avgSub = 0,
   medianSub = 0,
   avgUsers = 0,
-  avgWallet = 0,
-  medianWallet = 0,
-  walletCount = 0,
   newMRR = 0,
-  onWalletDrilldown,
+  onNewClientsClick,
+  onNeedsCheckinClick,
 }) {
   const hasBilling = billedCount > 0
 
@@ -97,31 +104,39 @@ export default function HealthSummaryCards({
       <Card
         label="Active Accounts"
         value={activeCount}
-        sub={`${total ? Math.round(activeCount / total * 100) : 0}% of portfolio · GHL updated in last 30 days`}
+        sub={`${total ? Math.round(activeCount / total * 100) : 0}% of portfolio · active in last 30 days`}
         icon="🟢"
         accentColor={G}
         delay={20}
-        infoText="Accounts whose GHL sub-account record was updated within the last 30 days — best available proxy for platform activity."
+        infoText="Accounts with real platform activity in the last 30 days — measured from their most recent LC wallet transaction. Accounts with no LC data fall back to GHL sub-account settings updates."
       />
 
       <Card
-        label="New Clients"
+        label={dateFiltered ? 'New Clients' : 'New Clients — Last 30 Days'}
         value={newCount}
         sub={`Joined GHL in ${newPeriodLabel}${hasBilling && newMRR ? ` · ${fmt(newMRR)}/mo` : ''}`}
         icon="✨"
         accentColor={G}
         delay={40}
-        infoText="Clients whose GHL sub-account was created within the selected date range. Defaults to last 30 days when no date filter is active."
+        highlighted={dateFiltered}
+        infoText={dateFiltered
+          ? `Clients whose GHL sub-account was created in the ${newPeriodLabel} selected above. Click to jump to the accounts table.`
+          : "Showing clients joined in the last 30 days by default. Use the 'Today' or 'Yesterday' date filter above to reconcile new sign-ups daily. Click to jump to the accounts table."
+        }
+        clickable={!!onNewClientsClick}
+        onClick={onNewClientsClick}
       />
 
       <Card
         label="Needs Check-in"
         value={staleCount}
-        sub={`${total ? Math.round(staleCount / total * 100) : 0}% of portfolio · no GHL activity in 30+ days`}
+        sub={`${total ? Math.round(staleCount / total * 100) : 0}% of portfolio · no activity in 30+ days`}
         icon="⚠️"
         accentColor={RED}
         delay={60}
-        infoText="Accounts with no GHL sub-account activity in over 30 days. These clients need a proactive check-in. Sorted worst-first in the Needs Attention table."
+        infoText="Accounts with no platform activity in over 30 days — based on LC wallet transactions where available, or GHL settings date as fallback. These clients need a proactive check-in. Click to jump to the Needs Attention table."
+        clickable={!!onNeedsCheckinClick}
+        onClick={onNeedsCheckinClick}
       />
 
       <Card
@@ -132,7 +147,7 @@ export default function HealthSummaryCards({
         suffix="/100"
         accentColor={avgScore >= 70 ? G : avgScore >= 40 ? AMB : RED}
         delay={80}
-        infoText="Average composite health score. 50% tenure (how long in GHL) + 50% activity (days since last update). Opens to 5-factor enhanced score per account."
+        infoText="Average health score across all accounts (0–100). Based on real LC platform activity recency (falls back to GHL settings date when no LC data). Enhanced score per account (activity 30% · CRM contacts 40% · pipeline 30%) appears when you open each account's detail modal."
       />
 
       <Card
@@ -155,25 +170,16 @@ export default function HealthSummaryCards({
             icon="🚨"
             accentColor={RED}
             delay={120}
-            infoText="Accounts with health score below 50 or DataHealthStatus ≤ 3. Most likely to churn."
+            infoText="Accounts inactive in GHL for 30+ days with an active Stripe subscription. These are churn risks — flag for a check-in call."
           />
           <Card
             label="Healthy Accounts"
             value={healthy}
-            sub={`Score 80+ · ${billedCount ? Math.round(healthy / billedCount * 100) : 0}% of billed`}
+            sub={`Score 70+ · ${billedCount ? Math.round(healthy / billedCount * 100) : 0}% of billed`}
             icon="✅"
             accentColor={G}
             delay={140}
-            infoText="Accounts with composite health score ≥ 80."
-          />
-          <Card
-            label="Upsell Opportunities"
-            value={upsellReady}
-            sub={`Potential +${fmt(upsellMRR)}/mo`}
-            icon="📈"
-            accentColor={G}
-            delay={160}
-            infoText="Healthy accounts with 3+ users and no add-ons — prime upsell candidates."
+            infoText="Accounts scoring 70+ on the activity-based health score. Active in GHL recently and in good standing."
           />
           <Card
             label="Avg Subscription"
@@ -181,38 +187,25 @@ export default function HealthSummaryCards({
             sub={`Median ${fmt(medianSub)}/mo per billed account`}
             icon="💰"
             prefix="$"
-            delay={180}
-            infoText="Average total monthly charges per billed account — plan price + user fees + add-ons + LC charges."
+            delay={160}
+            infoText="Average total monthly charges per Stripe-matched account — base plan + billed user seats + add-ons. Does not include LC wallet usage."
           />
           <Card
             label="Avg Users / Account"
             value={+avgUsers}
-            sub="Across accounts with ≥ 1 user seat"
+            sub="Billed seat count · across accounts with ≥ 1 user"
             icon="👥"
             decimals={1}
-            delay={200}
-            infoText="Average GHL user seats per billed account. Tracks seat adoption and upsell headroom."
-          />
-          <Card
-            label="Avg Wallet Spend"
-            value={Math.round(avgWallet || 0)}
-            sub={`${walletCount || 0} accounts with LC charges · median ${fmt(medianWallet || 0)}`}
-            icon="💳"
-            prefix="$"
-            delay={220}
-            infoText="Average LC platform charges per account with wallet activity."
-            clickable={!!onWalletDrilldown}
-            onClick={onWalletDrilldown}
+            delay={180}
+            infoText="Average billed GHL user seats per Stripe-matched account. Low seat count = upsell opportunity. Seats are billed through Stripe — total GHL members (including free seats) will show once Cliff's daily sync is live."
           />
         </>
       ) : (
         <>
-          <PendingCard label="At-Risk Accounts (by Revenue)"  icon="🚨" delay={120} pendingNote="Requires billing data to calculate revenue at risk" infoText="Will show: accounts with health score < 50 and total revenue at churn risk. Needs Stripe or billing sheet." />
-          <PendingCard label="Healthy Accounts (by Score)"    icon="✅" delay={140} pendingNote="Health band available — revenue breakdown needs billing data" infoText="Count of accounts scoring 80+ is computable now; revenue split needs billing sheet." />
-          <PendingCard label="Upsell Opportunities"           icon="📈" delay={160} pendingNote="Requires billing data to identify upsell-ready accounts" infoText="Will show: accounts with 3+ users and no add-ons. Needs Stripe or billing sheet to confirm plan details." />
-          <PendingCard label="Avg Monthly Subscription (MRR)" icon="💰" delay={180} pendingNote="Requires billing data — connect Stripe or billing sheet" infoText="Will show: average monthly charges per client. Requires plan price and add-on data from Stripe or the LGM billing sheet." />
-          <PendingCard label="Avg Users / Account"            icon="👥" delay={200} pendingNote="Available per account via OAuth — bulk aggregate pending" infoText="User count is available per account when you open the detail modal (via GHL OAuth). Bulk average across all 278 requires pre-fetching all locations." />
-          <PendingCard label="Avg LC Wallet Spend"            icon="💳" delay={220} pendingNote="Requires billing data — not available from GHL Agency API" infoText="Will show: average GoHighLevel platform usage charges (SMS, AI, phone) per account. Needs billing sheet or GHL Payments API access." />
+          <PendingCard label="At-Risk Accounts (by Revenue)"  icon="🚨" delay={120} pendingNote="Requires billing data to calculate revenue at risk" infoText="Will show: accounts inactive 30+ days with revenue at churn risk. Needs Stripe or billing sheet." />
+          <PendingCard label="Healthy Accounts (by Score)"    icon="✅" delay={140} pendingNote="Health band available — revenue breakdown needs billing data" infoText="Count of accounts scoring 70+ is computable now; revenue split needs billing sheet." />
+          <PendingCard label="Avg Monthly Subscription (MRR)" icon="💰" delay={160} pendingNote="Requires billing data — connect Stripe or billing sheet" infoText="Will show: average monthly charges per client (plan + seats + add-ons). Requires Stripe or the LGM billing sheet." />
+          <PendingCard label="Avg Users / Account"            icon="👥" delay={180} pendingNote="Available per account via OAuth — bulk aggregate pending" infoText="Billed user seat average. Available per account in the detail modal now; bulk average requires Stripe matching." />
         </>
       )}
 

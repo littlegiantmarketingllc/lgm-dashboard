@@ -59,9 +59,9 @@ export default async function handler(req, res) {
         ghlWebsite:         loc.website         || '',
         ghlTimezone:        loc.timezone        || '',
         ghlDateAdded:       loc.dateAdded
-          ? new Date(loc.dateAdded).toISOString().slice(0, 10) : null,
+          ? new Date(loc.dateAdded).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null,
         ghlDateUpdated:     loc.dateUpdated
-          ? new Date(loc.dateUpdated).toISOString().slice(0, 10) : null,
+          ? new Date(loc.dateUpdated).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null,
         ghlDaysSinceUpdate: daysSinceUpdate,
         ghlPermissions:     loc.permissions     || {},
         ghlSnapshotId:      loc.snapshotId      || '',
@@ -75,8 +75,8 @@ export default async function handler(req, res) {
       }
     })
 
-    // No caching — always fetch live data from GHL on every dashboard load
-    res.setHeader('Cache-Control', 'no-store')
+    // Cache at Vercel edge for 5 minutes, serve stale for up to 1 hour — reduces serverless invocations
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600')
     res.json({ accounts, total: accounts.length, rawTotal: all.length, syncedAt: now.toISOString() })
   } catch (err) {
     console.error('GHL accounts fetch error:', err.message)
