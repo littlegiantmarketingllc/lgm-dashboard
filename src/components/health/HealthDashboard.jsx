@@ -276,6 +276,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       upsellReady:  upsellList.length,
       riskRevenue:  atRiskList.reduce((s, a) => s + a.totalRev, 0),
       upsellMRR:    upsellList.reduce((s, a) => s + (suggestAddon(a)?.estExtra || 0), 0),
+      totalMRR:     billedAccounts.reduce((s, a) => s + a.totalRev, 0),
       avgSub:       billedAccounts.reduce((s, a) => s + a.totalRev, 0) / billedAccounts.length,
       medianSub:    median(billedAccounts.map(a => a.totalRev)),
       avgUsers:     withUsers.length
