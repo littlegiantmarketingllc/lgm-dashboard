@@ -220,7 +220,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   {/* Joined GHL */}
                   <td className="px-2 py-2 text-[10px] text-brand-muted whitespace-nowrap">
                     {a.ghlDateAdded
-                      ? new Date(a.ghlDateAdded + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+                      ? new Date(a.ghlDateAdded + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                       : '—'}
                   </td>
 

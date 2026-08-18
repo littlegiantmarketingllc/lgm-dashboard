@@ -57,7 +57,9 @@ export default function QuickWins({ topStale, topNew, topUpsell = [], onAccountC
               <p className="text-brand-muted text-[12px]">No stale accounts — all clients active.</p>
             )}
             {topStale.map((a, i) => {
-              const days = Number(a.ghlDaysSinceUpdate)
+              // No LC data → the only fallback is GHL's record-updated date, which isn't
+              // a real usage signal and can show absurd values for untouched legacy accounts.
+              const days = a.lastLcActivityMonth ? Number(a.lastActivity) : NaN
               return (
                 <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl border border-brand-border bg-brand-bg/50">
                   <span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center flex-shrink-0 text-white mt-0.5"

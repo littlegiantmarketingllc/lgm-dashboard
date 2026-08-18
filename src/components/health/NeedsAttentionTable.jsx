@@ -40,8 +40,11 @@ function HealthPill({ score, band }) {
   )
 }
 
-function ActivityBadge({ days }) {
-  if (days === null || days === undefined) return <span className="text-brand-muted text-[11px]">—</span>
+function ActivityBadge({ days, source }) {
+  // No LC wallet data for this account — the only fallback is GHL's record-updated
+  // date, which can reflect LGM staff touching the sub-account, not client usage.
+  // Legacy accounts untouched for years render nonsense like "1919d ago" — hide it.
+  if (source === 'ghl' || days === null || days === undefined) return <span className="text-brand-muted text-[11px]">—</span>
   const d = Number(days)
   const color = d <= 7 ? G : d <= 30 ? AMB : RED
   const label = d === 0 ? 'Today' : `${d}d ago`
@@ -133,7 +136,7 @@ function AccountRow({ a, i, getStatus, getResolvedAt, setStatus, onAccountClick 
         {a.ghlEmail || '—'}
       </td>
       <td className="px-3 py-3">
-        <ActivityBadge days={a.ghlDaysSinceUpdate} />
+        <ActivityBadge days={a.lastActivity ?? a.ghlDaysSinceUpdate} source={a.lastLcActivityMonth ? 'lc' : 'ghl'} />
       </td>
       <td className="px-3 py-3">
         <HealthPill score={a._health?.score ?? 0} band={a._health?.band ?? 'at_risk'} />
