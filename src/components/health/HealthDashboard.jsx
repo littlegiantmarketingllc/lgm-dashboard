@@ -156,12 +156,15 @@ export default function HealthDashboard({ filters, setFilters }) {
   const filteredAccounts = useMemo(() => {
     const { from, to } = getDateWindow(filters.dateRange)
     const srch = filters.search.toLowerCase().trim()
+    const billing = filters.billingFilter || 'all'
     return accounts.filter(a => {
       if (srch && !a.accountName.toLowerCase().includes(srch) &&
           !(a.ghlEmail || '').toLowerCase().includes(srch) &&
           !(a.ghlCity  || '').toLowerCase().includes(srch)) return false
       if (filters.typeFilter !== 'all' && a.accountType !== filters.typeFilter) return false
       if (filters.bandFilter !== 'all' && a._health?.band !== filters.bandFilter) return false
+      if (billing === 'matched'   && !a._stripeBound) return false
+      if (billing === 'unmatched' &&  a._stripeBound) return false
       if (filters.dateRange.type !== 'all') {
         const d = a.ghlDateAdded || ''
         if (!d || d < from || d > to) return false

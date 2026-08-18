@@ -51,7 +51,7 @@ export default function HealthStandaloneApp() {
   const [authed, setAuthed] = useState(!loginForced && hasCookie)
 
   const [healthFilters, setHealthFilters] = useState({
-    search: '', typeFilter: 'all', bandFilter: 'all',
+    search: '', typeFilter: 'all', bandFilter: 'all', billingFilter: 'all',
     dateRange: { type: 'all', from: '', to: '' },
   })
 

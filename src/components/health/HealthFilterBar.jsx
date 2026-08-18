@@ -18,14 +18,14 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY = { search: '', typeFilter: 'all', bandFilter: 'all', dateRange: { type: 'all', from: '', to: '' } }
+const EMPTY = { search: '', typeFilter: 'all', bandFilter: 'all', billingFilter: 'all', dateRange: { type: 'all', from: '', to: '' } }
 
 export default function HealthFilterBar({ filters, setFilters, accountTypes, totalShowing, totalAll }) {
-  const { search, typeFilter, bandFilter, dateRange } = filters
+  const { search, typeFilter, bandFilter, billingFilter = 'all', dateRange } = filters
 
   const set    = (patch) => setFilters(f => ({ ...f, ...patch }))
   const setDR  = (patch) => setFilters(f => ({ ...f, dateRange: { ...f.dateRange, ...patch } }))
-  const isDirty = search || typeFilter !== 'all' || bandFilter !== 'all' || dateRange.type !== 'all'
+  const isDirty = search || typeFilter !== 'all' || bandFilter !== 'all' || billingFilter !== 'all' || dateRange.type !== 'all'
 
   return (
     <div
@@ -90,6 +90,28 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
           </select>
           <InfoTip
             text="Filter by activity band. Active = score 70+ (recent GHL activity + good tenure). Slowing = 40–69. Stale = below 40 (30+ days no GHL activity)."
+            position="bottom-end"
+          />
+        </div>
+
+        {/* Billing / Stripe filter */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <select
+            value={billingFilter}
+            onChange={e => set({ billingFilter: e.target.value })}
+            className="text-[11px] font-semibold border border-brand-border rounded-lg px-2.5 py-1.5 bg-brand-bg focus:outline-none cursor-pointer transition-colors duration-150"
+            style={{
+              color:       billingFilter !== 'all' ? '#7c3aed' : '#6B7280',
+              background:  billingFilter !== 'all' ? '#7c3aed10' : '#F4F6F4',
+              borderColor: billingFilter !== 'all' ? '#7c3aed50' : '#E5E7E5',
+            }}
+          >
+            <option value="all">All Billing</option>
+            <option value="matched">Stripe Matched</option>
+            <option value="unmatched">Unmatched (no Stripe)</option>
+          </select>
+          <InfoTip
+            text="Filter by Stripe billing match. 'Unmatched' shows accounts not yet linked to a Stripe customer — coordinate with Cliff to resolve these via his mapping sheet."
             position="bottom-end"
           />
         </div>
