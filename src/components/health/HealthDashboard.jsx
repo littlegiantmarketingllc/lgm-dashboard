@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { format, subDays, startOfMonth, endOfMonth, subMonths, differenceInDays, parseISO, isValid } from 'date-fns'
 import { useMergedHealthData }    from '../../hooks/useMergedHealthData'
 import { useAccountStatus }       from '../../hooks/useAccountStatus'
+import { useDmAgentMap }          from '../../hooks/useDmAgentMap'
 import { scoreAccount, classify, isAtRisk, recommendAction, isUpsellReady, suggestAddon } from '../../lib/healthEngine'
 import HealthFilterBar            from './HealthFilterBar'
 import HealthSummaryCards         from './HealthSummaryCards'
@@ -15,6 +16,7 @@ import DmAgentBreakdown           from './DmAgentBreakdown'
 import UpsellTable                from './UpsellTable'
 import TransactionBreakdown       from './TransactionBreakdown'
 import TicketsModal               from './TicketsModal'
+import DmFootprintTab             from './DmFootprintTab'
 
 const G = '#8CC63F'
 
@@ -97,7 +99,9 @@ function ErrorBanner({ message, onRetry }) {
 export default function HealthDashboard({ filters, setFilters }) {
   const { accounts: raw, loading, stripeLoading, error, lastUpdated, refetch } = useMergedHealthData()
   const { statuses, setStatus } = useAccountStatus()
+  const { dmMap, dmLoaded }     = useDmAgentMap()
   const [selectedAccount, setSelectedAccount] = useState(null)
+  const [activeSubTab, setActiveSubTab]       = useState('overview')
   const [elapsed, setElapsed] = useState('—')
   const [stripeElapsed, setStripeElapsed] = useState(0)
   const stripeStartRef = useRef(null)
@@ -155,15 +159,15 @@ export default function HealthDashboard({ filters, setFilters }) {
     return () => clearTimeout(timer)
   }, [filters.search])
 
-  // Enrich with health scores
+  // Enrich with health scores + DM map lookup
   const accounts = useMemo(() =>
     raw.map(a => {
       const { score, parts } = scoreAccount(a)
       const band   = classify(score)
       const action = recommendAction(a)
-      return { ...a, _health: { score, parts, band, action } }
+      return { ...a, _health: { score, parts, band, action }, _dm: dmMap[a.id] || null }
     }),
-    [raw]
+    [raw, dmMap]
   )
 
   // Apply filters
@@ -390,6 +394,38 @@ export default function HealthDashboard({ filters, setFilters }) {
         totalAll={accounts.length}
       />
 
+      {/* Sub-tab switcher */}
+      <div className="flex items-center gap-1 p-0.5 rounded-xl border border-brand-border bg-white w-fit"
+        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        {[
+          { key: 'overview',     label: 'Overview' },
+          { key: 'dm-footprint', label: `DM Footprint${dmLoaded && Object.keys(dmMap).length > 0 ? '' : ''}` },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSubTab(tab.key)}
+            className="px-4 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-100"
+            style={activeSubTab === tab.key
+              ? { background: G, color: '#fff', boxShadow: `0 1px 6px ${G}40` }
+              : { color: '#6B7280' }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── DM Footprint sub-tab ─────────────────────────────────── */}
+      {activeSubTab === 'dm-footprint' && (
+        <DmFootprintTab
+          accounts={filteredAccounts}
+          dmMap={dmMap}
+          onAccountClick={setSelectedAccount}
+        />
+      )}
+
+      {/* ── Overview sub-tab ─────────────────────────────────────── */}
+      {activeSubTab === 'overview' && <>
+
       {/* Stripe sync progress banner */}
       {stripeLoading && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-100 bg-purple-50 text-[12px]"
@@ -569,7 +605,9 @@ export default function HealthDashboard({ filters, setFilters }) {
         />
       </div>
 
-      {/* Account detail modal */}
+      </> /* end Overview sub-tab */}
+
+      {/* Account detail modal — shared across both sub-tabs */}
       {selectedAccount && (
         <AccountModal
           account={selectedAccount}
