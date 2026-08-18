@@ -214,6 +214,14 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                       {churned && (
                         <span className="text-[8px] font-bold px-1 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 flex-shrink-0">CHR</span>
                       )}
+                      {!bound && (
+                        <span
+                          title="No Stripe match found for this account — billing columns can't populate until Cliff reconciles it. Not a $0 or broken account, just an unmatched data gap."
+                          className="text-[8px] font-bold px-1 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0"
+                        >
+                          UNMATCHED
+                        </span>
+                      )}
                     </div>
                   </td>
 
