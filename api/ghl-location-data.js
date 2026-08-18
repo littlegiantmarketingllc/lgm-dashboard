@@ -137,31 +137,37 @@ export default async function handler(req, res) {
     })
   }
 
-  const [usersR, contactsR, oppsR, convoR] = await Promise.allSettled([
+  const [usersR, contactsR, convoR, oppsR] = await Promise.allSettled([
     ghlFetch(`/users/?locationId=${locationId}`, token),
-    ghlFetch(`/contacts/?locationId=${locationId}&limit=1`, token),
+    // Sort by date_updated desc — first result is the most recently touched contact
+    ghlFetch(`/contacts/?locationId=${locationId}&sortBy=date_updated&sortOrder=desc&limit=1`, token),
+    ghlFetch(`/conversations/search?locationId=${locationId}&limit=1`, token),
     // opportunities/search is a POST endpoint — GHL requires "locationId" (not "location_id")
     ghlFetch(`/opportunities/search`, token, 'POST', { locationId, limit: 1 }),
-    ghlFetch(`/conversations/search?locationId=${locationId}&limit=1`, token),
   ])
 
   const users    = usersR.status    === 'fulfilled' ? usersR.value    : null
   const contacts = contactsR.status === 'fulfilled' ? contactsR.value : null
-  const opps     = oppsR.status     === 'fulfilled' ? oppsR.value     : null
   const convos   = convoR.status    === 'fulfilled' ? convoR.value    : null
+  const opps     = oppsR.status     === 'fulfilled' ? oppsR.value     : null
 
   // Extract counts, trying multiple known GHL response shapes
   const userCount    = users?.json?.users?.length            ?? null
   const contactCount = contacts?.json?.total ?? contacts?.json?.meta?.total ?? contacts?.json?.count ?? null
-  const oppsCount    = opps?.json?.total    ?? opps?.json?.meta?.total     ?? opps?.json?.opportunities?.total ?? null
   const convoCount   = convos?.json?.total  ?? convos?.json?.meta?.total   ?? null
+  const oppsCount    = opps?.json?.total    ?? opps?.json?.meta?.total     ?? opps?.json?.opportunities?.total ?? null
+
+  // Most recently updated contact — best proxy for "client is using their GHL account"
+  // This is a real-time signal: when client agents update contacts/CRM, dateUpdated changes.
+  const lastContactUpdate = contacts?.json?.contacts?.[0]?.dateUpdated || null
 
   res.json({
     locationId,
     oauthConnected: true,
-    users:         userCount,
-    contacts:      contactCount,
-    opportunities: oppsCount,
-    conversations: convoCount,
+    users:              userCount,
+    contacts:           contactCount,
+    opportunities:      oppsCount,
+    conversations:      convoCount,
+    lastContactUpdate,  // ISO — most recently updated contact in this sub-account
   })
 }
