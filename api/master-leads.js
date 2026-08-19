@@ -74,33 +74,22 @@ async function fetchAllContacts(token, locationId) {
 
 async function fetchAllOpportunities(token, locationId) {
   const all = []
-  let startAfter = null
-  let startAfterId = null
   let pagesFetched = 0
   let firstMeta = null
 
-  // Opportunity objects don't carry a dateAdded field (unlike contacts), so a
-  // cursor derived from the last item doesn't work — use the meta block GHL
-  // returns on the response itself instead. skip is explicitly rejected by
-  // this endpoint's schema (HTTP 422), so that's not an option either.
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const body = { locationId, limit: 100 }
-    if (startAfter && startAfterId) {
-      body.startAfter = startAfter
-      body.startAfterId = startAfterId
-    }
-    const { ok, json, text } = await ghlFetch(`/opportunities/search`, token, 'POST', body)
-    if (!ok) throw new Error(`Failed to fetch opportunities (page ${page}): ${text}`)
-    if (page === 0) firstMeta = json?.meta || null
+  // Per GHL's docs, page/startAfter/startAfterId are query-string params, not
+  // POST body fields — passing them in the body (as this used to) meant they
+  // were silently ignored and every "page" returned the same first 100 results.
+  for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
+    const path = `/opportunities/search?location_id=${locationId}&limit=100&page=${pageNum}`
+    const { ok, json, text } = await ghlFetch(path, token)
+    if (!ok) throw new Error(`Failed to fetch opportunities (page ${pageNum}): ${text}`)
+    if (pageNum === 1) firstMeta = json?.meta || null
 
     const batch = json?.opportunities || []
     all.push(...batch)
     pagesFetched++
     if (batch.length < 100) break
-
-    startAfter   = json?.meta?.startAfter   || null
-    startAfterId = json?.meta?.startAfterId || null
-    if (!startAfter || !startAfterId) break
   }
 
   return { opportunities: all, pagesFetched, firstMeta }
