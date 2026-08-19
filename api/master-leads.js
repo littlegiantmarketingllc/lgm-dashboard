@@ -12,6 +12,9 @@
 
 import { getLocationAccessToken, ghlFetch } from './_ghlAuth.js'
 
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+const PAGE_DELAY_MS = 120 // small gap between pagination requests to avoid tripping GHL's rate limit at all
+
 const CONTACTS_MAX_PAGES = 200 // hard backstop; the date-range early-stop below is the real limiter
 // GHL's page=N pagination on /opportunities/search only works up to page 100 (10,000 records) —
 // beyond that it requires startAfter/startAfterId cursor pagination instead (HTTP 400 otherwise).
@@ -63,6 +66,7 @@ async function fetchAllContacts(token, locationId, fromMs) {
   // is older than the requested `from` date, every later page is even older —
   // stop there instead of relying on a fixed page cap to bound the fetch.
   for (let page = 0; page < CONTACTS_MAX_PAGES; page++) {
+    if (page > 0) await sleep(PAGE_DELAY_MS)
     let path = `/contacts/?locationId=${locationId}&limit=100`
     if (startAfter && startAfterId) {
       path += `&startAfter=${startAfter}&startAfterId=${startAfterId}`
@@ -99,6 +103,7 @@ async function fetchAllOpportunities(token, locationId) {
   // were silently ignored and every "page" returned the same first 100 results.
   let hitPageCap = false
   for (let pageNum = 1; pageNum <= OPPS_MAX_PAGES; pageNum++) {
+    if (pageNum > 1) await sleep(PAGE_DELAY_MS)
     const path = `/opportunities/search?location_id=${locationId}&limit=100&page=${pageNum}`
     const { ok, json, text } = await ghlFetch(path, token)
     if (!ok) throw new Error(`Failed to fetch opportunities (page ${pageNum}): ${text}`)

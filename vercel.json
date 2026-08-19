@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/master-leads.js": {
+      "maxDuration": 90
+    }
+  }
+}

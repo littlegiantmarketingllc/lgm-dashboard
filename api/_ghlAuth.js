@@ -120,13 +120,25 @@ export async function getLocationAccessToken(locationId) {
   }
 }
 
-export async function ghlFetch(path, token, method = 'GET', body = null) {
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+export async function ghlFetch(path, token, method = 'GET', body = null, retriesLeft = 3) {
   const opts = {
     method,
     headers: { Authorization: `Bearer ${token}`, Version: GHL_VER, 'Content-Type': 'application/json' },
   }
   if (body) opts.body = JSON.stringify(body)
   const res = await fetch(`${GHL_BASE}${path}`, opts)
+
+  // GHL rate limits (429) on deep pagination loops — back off and retry rather
+  // than failing the whole request over one transient limit.
+  if (res.status === 429 && retriesLeft > 0) {
+    const retryAfterHeader = res.headers.get('retry-after')
+    const waitMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : (4 - retriesLeft) * 1000
+    await sleep(waitMs)
+    return ghlFetch(path, token, method, body, retriesLeft - 1)
+  }
+
   const text = await res.text()
   let json = null
   try { json = JSON.parse(text) } catch {}
