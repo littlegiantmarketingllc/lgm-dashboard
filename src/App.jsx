@@ -1,5 +1,5 @@
 import HealthStandaloneApp from './HealthStandaloneApp'
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 
 // VITE_APP_MODE=health is set on the lgm-customer-health Vercel project.
 // When that build runs, this file short-circuits and exports the health-only app.
@@ -15,8 +15,6 @@ import {
   calcTopPerformer, buildChartData, calcQuickStats, getFrustratedCalls,
 } from './lib/ehUtils'
 
-import TabSwitcher         from './components/TabSwitcher'
-import HealthDashboard     from './components/health/HealthDashboard'
 import Header              from './components/Header'
 import SummaryCards        from './components/SummaryCards'
 import QuickStats          from './components/QuickStats'
@@ -92,16 +90,7 @@ export default function App() {
   const { statuses, setStatus } = useCallStatus()
   const { statuses: coachingStatuses, toggleRec: toggleCoachingRec, isCoachingComplete, resetEmployee: resetCoaching, markAllComplete: markAllCoachingComplete } = useCoachingStatus()
 
-  const [activeTab, setActiveTab] = useState(() =>
-    localStorage.getItem('lgm-active-tab') || 'health'
-  )
-  const [healthFilters, setHealthFilters] = useState({
-    search: '', typeFilter: 'all', bandFilter: 'all', billingFilter: 'all',
-    dateRange: { type: 'all', from: '', to: '' },
-  })
-  useEffect(() => { localStorage.setItem('lgm-active-tab', activeTab) }, [activeTab])
-
-  const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
+const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHealthSheet()
 
   // ── QC derived data ─────────────────────────────────────────────────────────
   const allCategories = useMemo(() => {
@@ -160,8 +149,8 @@ export default function App() {
     frustrated: canCompare ? (summary.frustrated - prevSummary.frustrated) : null,
   }), [summary, prevSummary, canCompare])
 
-  if (activeTab === 'qc' && loading && calls.length === 0) return <LoadingScreen />
-  if (activeTab === 'qc' && error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
+  if (loading && calls.length === 0) return <LoadingScreen />
+  if (error   && calls.length === 0) return <ErrorScreen message={error} onRetry={refetch} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -175,16 +164,7 @@ export default function App() {
         isRefreshing={loading}     retrying={retrying} dataError={error}
       />
 
-      <TabSwitcher activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {/* ── Health tab ───────────────────────────────────────────────────── */}
-      {activeTab === 'health' && (
-        <HealthDashboard filters={healthFilters} setFilters={setHealthFilters} />
-      )}
-
-      {/* ── QC Dashboard ─────────────────────────────────────────────────── */}
-      {activeTab === 'qc' && (
-        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
           {error && calls.length > 0 && (
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
@@ -254,10 +234,9 @@ export default function App() {
             </aside>
           </div>
         </div>
-      )}
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
-        Little Giant Marketing &mdash; {activeTab === 'health' ? 'Customer Health Dashboard' : 'Team AI Assistant'}
+        Little Giant Marketing &mdash; Team AI Assistant
       </footer>
 
       {/* ── Modal stack (QC tab) ───────────────────────────────────────────── */}
