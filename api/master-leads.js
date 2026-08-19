@@ -13,7 +13,12 @@
 import { getLocationAccessToken, ghlFetch } from './_ghlAuth.js'
 
 const CONTACTS_MAX_PAGES = 200 // hard backstop; the date-range early-stop below is the real limiter
-const OPPS_MAX_PAGES     = 200 // no early-stop available for opportunities (see fetchAllOpportunities) — real cap
+// GHL's page=N pagination on /opportunities/search only works up to page 100 (10,000 records) —
+// beyond that it requires startAfter/startAfterId cursor pagination instead (HTTP 400 otherwise).
+// Real accounts can have 10k+ opportunities across their full history, most of it older than any
+// report window we care about — capping here rather than building cursor pagination for a "canvas"
+// that isn't computing anything yet. hitPageCap surfaces this in the response so it's visible.
+const OPPS_MAX_PAGES = 100
 
 // Target fields we need values for. Matched against GHL custom field names/fieldKeys
 // by case-insensitive substring — GHL naming may not be an exact match per account.
