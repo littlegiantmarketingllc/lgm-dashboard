@@ -12,7 +12,8 @@
 
 import { getLocationAccessToken, ghlFetch } from './_ghlAuth.js'
 
-const MAX_PAGES = 50 // safety cap: 50 * 100 = 5,000 records per dataset
+const CONTACTS_MAX_PAGES = 200 // hard backstop; the date-range early-stop below is the real limiter
+const OPPS_MAX_PAGES     = 200 // no early-stop available for opportunities (see fetchAllOpportunities) — real cap
 
 // Target fields we need values for. Matched against GHL custom field names/fieldKeys
 // by case-insensitive substring — GHL naming may not be an exact match per account.
@@ -46,12 +47,17 @@ function readCustomFieldValue(contact, fieldMatch) {
   return cf?.value ?? cf?.fieldValue ?? null
 }
 
-async function fetchAllContacts(token, locationId) {
+async function fetchAllContacts(token, locationId, fromMs) {
   const all = []
   let startAfter = null
   let startAfterId = null
+  let pagesFetched = 0
+  let hitPageCap = false
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  // GHL returns contacts newest-first by default. Once a page's oldest contact
+  // is older than the requested `from` date, every later page is even older —
+  // stop there instead of relying on a fixed page cap to bound the fetch.
+  for (let page = 0; page < CONTACTS_MAX_PAGES; page++) {
     let path = `/contacts/?locationId=${locationId}&limit=100`
     if (startAfter && startAfterId) {
       path += `&startAfter=${startAfter}&startAfterId=${startAfterId}`
@@ -61,15 +67,21 @@ async function fetchAllContacts(token, locationId) {
 
     const batch = json?.contacts || []
     all.push(...batch)
+    pagesFetched++
     if (batch.length < 100) break
 
     const last = batch[batch.length - 1]
-    startAfter = last?.dateAdded ? new Date(last.dateAdded).getTime() : null
+    const lastDateMs = last?.dateAdded ? new Date(last.dateAdded).getTime() : null
+    if (lastDateMs !== null && lastDateMs < fromMs) break
+
+    startAfter = lastDateMs
     startAfterId = last?.id || null
     if (!startAfter || !startAfterId) break
+
+    if (page === CONTACTS_MAX_PAGES - 1) hitPageCap = true
   }
 
-  return all
+  return { contacts: all, pagesFetched, hitPageCap }
 }
 
 async function fetchAllOpportunities(token, locationId) {
@@ -80,7 +92,8 @@ async function fetchAllOpportunities(token, locationId) {
   // Per GHL's docs, page/startAfter/startAfterId are query-string params, not
   // POST body fields — passing them in the body (as this used to) meant they
   // were silently ignored and every "page" returned the same first 100 results.
-  for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum++) {
+  let hitPageCap = false
+  for (let pageNum = 1; pageNum <= OPPS_MAX_PAGES; pageNum++) {
     const path = `/opportunities/search?location_id=${locationId}&limit=100&page=${pageNum}`
     const { ok, json, text } = await ghlFetch(path, token)
     if (!ok) throw new Error(`Failed to fetch opportunities (page ${pageNum}): ${text}`)
@@ -90,9 +103,10 @@ async function fetchAllOpportunities(token, locationId) {
     all.push(...batch)
     pagesFetched++
     if (batch.length < 100) break
+    if (pageNum === OPPS_MAX_PAGES) hitPageCap = true
   }
 
-  return { opportunities: all, pagesFetched, firstMeta }
+  return { opportunities: all, pagesFetched, firstMeta, hitPageCap }
 }
 
 function defaultDateRange() {
@@ -125,15 +139,16 @@ export default async function handler(req, res) {
 
     // Custom fields need a separate OAuth scope that may not be granted yet —
     // don't let that block contacts/opportunities, which use scopes that already work.
-    const [fieldMapResult, contacts, oppsResult] = await Promise.all([
+    const [fieldMapResult, contactsResult, oppsResult] = await Promise.all([
       getCustomFieldMap(token, locationId).catch(err => ({ error: err.message })),
-      fetchAllContacts(token, locationId),
+      fetchAllContacts(token, locationId, fromMs),
       fetchAllOpportunities(token, locationId),
     ])
 
     const fieldMap  = fieldMapResult.map || { leadPrice: null, callCount: null, dispositionDate: null }
     const allFields = fieldMapResult.allFields || []
     const customFieldsError = fieldMapResult.error || null
+    const contacts = contactsResult.contacts
     const opportunities = oppsResult.opportunities
 
     const missingFields = Object.entries(fieldMap)
@@ -180,8 +195,11 @@ export default async function handler(req, res) {
       to,
       totalContactsScanned:     contacts.length,
       totalOpportunitiesScanned: opportunities.length,
-      opportunitiesPagesFetched: oppsResult.pagesFetched, // if this equals MAX_PAGES, we hit the safety cap and there may be more
-      opportunitiesFirstPageMeta: oppsResult.firstMeta,   // raw meta block from GHL — for verifying the pagination cursor field names are right
+      // true means the safety page cap was hit and there may be more data beyond what's shown —
+      // contacts stops naturally at the `from` date boundary so this should normally be false there;
+      // opportunities has no such boundary available and is more likely to hit this on large accounts
+      contactsPagination:     { pagesFetched: contactsResult.pagesFetched, hitPageCap: contactsResult.hitPageCap },
+      opportunitiesPagination: { pagesFetched: oppsResult.pagesFetched, hitPageCap: oppsResult.hitPageCap },
       leadsInRange: leads.length,
       fieldMap,
       missingFields, // non-empty means one or more target custom fields weren't found by name match — check allFields
