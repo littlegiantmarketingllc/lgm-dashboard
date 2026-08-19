@@ -2,9 +2,40 @@
 
 # Master Dashboard (ROI/Stats) — Architecture Plan
 
-**Owner:** Syed (architecture + DM tab) · **Calc rebuild:** Steve · **Status:** grounded in real QuickSight export, 2026-08-18 · **Test client:** Haley Elder (insurance vertical)
+**Owner:** Syed (architecture + data layer + canvas) · **Calc source of truth:** Steve, dictated via huddles · **Status:** build started 2026-08-20, following John's plan · **Test client:** Haley Elder (insurance vertical)
 
-Revision note: the first draft of this doc was written before we had eyes on the actual QuickSight analysis. Section 1 below is now based on a real export (`Haley Elder Master GHL`, account `lgm-stat`, "Lead Details" tab) — numbers, field names, and formulas are reverse-engineered from real totals, not assumed. Everything after that carries the implications through.
+## 0. Confirmed plan (2026-08-20, after Syed/John meeting)
+
+John declined the QuickSight-dataset-access / AWS IAM route — not a trust issue, AWS IAM is genuinely broken on LGM's end that week. New division of labor:
+
+- **Steve** (built the original QuickSight calculations) is the source of truth for formulas — dictates them in daily huddles or verifies our numbers against QuickSight's output. He does not need dataset/IAM access either; he already knows the logic.
+- **Syed + Claude** build the foundation: the joined GHL data layer for one location, and a blank canvas ready to receive Steve's calculations.
+- **Data source decision made:** live GHL API pulls (contacts + opportunities), joined in-memory on contact ID, using the existing marketplace-OAuth per-location token infrastructure (`ghl_tokens` Supabase table). This **replaces** §4's earlier open question about redirecting QuickSight's SPICE pipeline — that question is now moot, we're building fresh.
+- **Scope confirmed:** replicate the QuickSight **first tab only** (Lead Details) initially. Phase 2 adds Lead Analytics, Sales Board, and a Cohort tab. All other original QuickSight tabs are retired, not replicated.
+
+**Calculation logic confirmed by John** (partial — enough to build the data layer around, full formulas still come from Steve):
+- Everything attributes to the lead's **date created**, not when the sale closed — a sale today from a 4-month-old lead counts in that lead's original month, not today's.
+- PPL = (commission − lead cost) ÷ lead count; lead cost = SUM of the **"lead price"** custom field on contacts (matches the §1 reverse-engineered formula below).
+- Disposition rate = contacts with a **"disposition date"** custom field filled ÷ total leads (presence-based, not a status enum).
+- Call metrics = SUM of a **"call count"** custom field per contact; avg calls/lead = that ÷ lead count.
+- Premium = opportunity `monetaryValue` (built-in field, not custom).
+- Pivots by contact source and assigned user, with per-user above/below-average — unchanged from earlier.
+- **Not yet specified by John:** exact SMS reply rate formula, and whether CPP or a CPL-style metric is wanted (§1's discrepancy is still open — ask Steve directly).
+
+Everything in §1 below (the reverse-engineered audit) stays as reference/cross-check material — Steve's dictated formulas are authoritative when they conflict with anything reverse-engineered there.
+
+## 0a. What's built so far (2026-08-20)
+
+- `api/_ghlAuth.js` — shared per-location OAuth token helper, extracted from the duplicated logic in `ghl-location-data.js`/`token.js` (those two are untouched; new code uses the shared version).
+- `api/master-leads.js` — `GET /api/master-leads?locationId=X&from=&to=` — pulls all contacts + all opportunities for one location (paginated, 100/page, capped at 50 pages as a safety valve), joins opportunities onto contacts by `contactId`, filters contacts to the `from`/`to` window by `dateAdded` (the date-created attribution rule from §0), and resolves the "lead price," "call count," and "disposition date" custom fields by fuzzy name-match against `/locations/{id}/customFields` — no hardcoded field IDs, so it should work on any account without per-location config, **assuming those field names are close to consistent** (the response includes `missingFields` + the full `allFields` list so a mismatch is visible immediately instead of silently returning nulls).
+- `src/hooks/useMasterLeads.js` + `src/components/master/MasterDashboard.jsx` + `src/MasterStandaloneApp.jsx` — the canvas. Reads `?locationId=` from the URL (no login — access inherited from GHL embed context per §2), shows sanity-check counts (contacts scanned, opportunities scanned, leads in range) and a raw joined table. **Deliberately does not compute PPL/Dispo/SMS%/CVR/CPP yet** — this is what Steve verifies the raw rows against QuickSight before any formula gets trusted.
+- Wired into the existing `VITE_APP_MODE` pattern in `App.jsx` (same mechanism as `IS_HEALTH_MODE`) — `VITE_APP_MODE=master` will need its own Vercel project + env vars when ready to deploy, same as `lgm-customer-health` was split out.
+- Both builds (`npm run build` and `VITE_APP_MODE=master npm run build`) pass clean.
+
+**Not yet possible — needs from Syed:**
+1. **Haley's actual `locationId`** — nothing above has been run against real data yet, only built and compiled. Can't verify the join, the field-name matching, or the pagination logic without it.
+2. **Confirm GHL OAuth scopes** on the marketplace app include `contacts.readonly`, `opportunities.readonly`, and `locations/customFields.readonly` (or equivalent) — if not granted, `master-leads.js` will fail per-endpoint and that needs diagnosing once there's a real locationId to test against.
+3. Env vars `GHL_CLIENT_ID` / `GHL_CLIENT_SECRET` must already be set in Vercel (they're required by the pre-existing token-refresh flow this reuses) — should already be there if `ghl-location-data.js` works today, not a new requirement.
 
 ## 1. What the real QuickSight dashboard actually contains
 
