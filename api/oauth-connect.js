@@ -9,6 +9,7 @@ const SCOPES = [
   'conversations/message.readonly',
   'locations.readonly',
   'locations/tags.readonly',
+  'locations/customFields.readonly',
   'opportunities.readonly',
   'users.readonly',
 ].join(' ')
