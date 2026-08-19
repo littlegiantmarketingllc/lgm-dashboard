@@ -127,11 +127,17 @@ export default async function handler(req, res) {
       })
     }
 
-    const [{ map: fieldMap, allFields }, contacts, opportunities] = await Promise.all([
-      getCustomFieldMap(token, locationId),
+    // Custom fields need a separate OAuth scope that may not be granted yet —
+    // don't let that block contacts/opportunities, which use scopes that already work.
+    const [fieldMapResult, contacts, opportunities] = await Promise.all([
+      getCustomFieldMap(token, locationId).catch(err => ({ error: err.message })),
       fetchAllContacts(token, locationId),
       fetchAllOpportunities(token, locationId),
     ])
+
+    const fieldMap  = fieldMapResult.map || { leadPrice: null, callCount: null, dispositionDate: null }
+    const allFields = fieldMapResult.allFields || []
+    const customFieldsError = fieldMapResult.error || null
 
     const missingFields = Object.entries(fieldMap)
       .filter(([, v]) => v === null)
@@ -181,6 +187,7 @@ export default async function handler(req, res) {
       fieldMap,
       missingFields, // non-empty means one or more target custom fields weren't found by name match — check allFields
       allFields,     // full custom-field list for this location, for manual verification against fieldMap
+      customFieldsError, // non-null means the customFields API call itself failed (e.g. missing OAuth scope) — leadPrice/callCount/dispositionDate will all be null on every lead until this is fixed
       leads,
       fetchedAt: new Date().toISOString(),
     })

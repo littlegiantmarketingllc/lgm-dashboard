@@ -60,7 +60,7 @@ export default function MasterDashboard({ locationId }) {
   if (loading && !data) return <LoadingScreen />
   if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} />
 
-  const { leads = [], leadsInRange, totalContactsScanned, totalOpportunitiesScanned, missingFields = [], allFields = [], from, to } = data || {}
+  const { leads = [], leadsInRange, totalContactsScanned, totalOpportunitiesScanned, missingFields = [], allFields = [], customFieldsError, from, to } = data || {}
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -73,6 +73,18 @@ export default function MasterDashboard({ locationId }) {
             {' '}· {from} to {to} · leads attributed by date-created
           </p>
         </div>
+
+        {customFieldsError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-semibold">⚠ Couldn't read custom fields for this account: {customFieldsError}</p>
+            <p className="mt-1 text-[12px]">
+              Contacts and opportunities loaded fine (different OAuth scopes) — lead price, call count, and
+              disposition date will show as "—" until this is fixed. Usually means the OAuth app needs the
+              "Locations → Custom Fields" scope enabled in its GHL Marketplace configuration, then a fresh
+              reconnect through <code>/api/oauth-connect</code>.
+            </p>
+          </div>
+        )}
 
         {missingFields.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
