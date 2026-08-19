@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import HealthDashboard from './components/health/HealthDashboard'
 import LoginPage       from './components/health/LoginPage'
 
@@ -44,6 +44,8 @@ function LogoMark() {
 }
 
 export default function HealthStandaloneApp() {
+  useEffect(() => { document.title = 'LGM — Customer Health Dashboard' }, [])
+
   const params      = new URLSearchParams(window.location.search)
   const loginForced = params.get('login') === '1'
   const hasCookie   = !!getSessionCookie()
