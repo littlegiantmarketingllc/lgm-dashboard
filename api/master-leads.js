@@ -74,22 +74,36 @@ async function fetchAllContacts(token, locationId) {
 
 async function fetchAllOpportunities(token, locationId) {
   const all = []
+  let startAfter = null
+  let startAfterId = null
+  let pagesFetched = 0
+  let firstMeta = null
 
-  // GHL opportunity objects don't carry a dateAdded field, so the startAfter/
-  // startAfterId cursor pagination used for contacts doesn't work here — it
-  // silently stops after page 1. Skip-based pagination (same pattern as
-  // ghl-accounts.js's /locations/search) works reliably instead.
+  // Opportunity objects don't carry a dateAdded field (unlike contacts), so a
+  // cursor derived from the last item doesn't work — use the meta block GHL
+  // returns on the response itself instead. skip is explicitly rejected by
+  // this endpoint's schema (HTTP 422), so that's not an option either.
   for (let page = 0; page < MAX_PAGES; page++) {
-    const body = { locationId, limit: 100, skip: page * 100 }
+    const body = { locationId, limit: 100 }
+    if (startAfter && startAfterId) {
+      body.startAfter = startAfter
+      body.startAfterId = startAfterId
+    }
     const { ok, json, text } = await ghlFetch(`/opportunities/search`, token, 'POST', body)
     if (!ok) throw new Error(`Failed to fetch opportunities (page ${page}): ${text}`)
+    if (page === 0) firstMeta = json?.meta || null
 
     const batch = json?.opportunities || []
     all.push(...batch)
+    pagesFetched++
     if (batch.length < 100) break
+
+    startAfter   = json?.meta?.startAfter   || null
+    startAfterId = json?.meta?.startAfterId || null
+    if (!startAfter || !startAfterId) break
   }
 
-  return all
+  return { opportunities: all, pagesFetched, firstMeta }
 }
 
 function defaultDateRange() {
@@ -122,7 +136,7 @@ export default async function handler(req, res) {
 
     // Custom fields need a separate OAuth scope that may not be granted yet —
     // don't let that block contacts/opportunities, which use scopes that already work.
-    const [fieldMapResult, contacts, opportunities] = await Promise.all([
+    const [fieldMapResult, contacts, oppsResult] = await Promise.all([
       getCustomFieldMap(token, locationId).catch(err => ({ error: err.message })),
       fetchAllContacts(token, locationId),
       fetchAllOpportunities(token, locationId),
@@ -131,6 +145,7 @@ export default async function handler(req, res) {
     const fieldMap  = fieldMapResult.map || { leadPrice: null, callCount: null, dispositionDate: null }
     const allFields = fieldMapResult.allFields || []
     const customFieldsError = fieldMapResult.error || null
+    const opportunities = oppsResult.opportunities
 
     const missingFields = Object.entries(fieldMap)
       .filter(([, v]) => v === null)
@@ -176,6 +191,8 @@ export default async function handler(req, res) {
       to,
       totalContactsScanned:     contacts.length,
       totalOpportunitiesScanned: opportunities.length,
+      opportunitiesPagesFetched: oppsResult.pagesFetched, // if this equals MAX_PAGES, we hit the safety cap and there may be more
+      opportunitiesFirstPageMeta: oppsResult.firstMeta,   // raw meta block from GHL — for verifying the pagination cursor field names are right
       leadsInRange: leads.length,
       fieldMap,
       missingFields, // non-empty means one or more target custom fields weren't found by name match — check allFields
