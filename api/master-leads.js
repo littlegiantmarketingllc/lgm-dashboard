@@ -74,26 +74,19 @@ async function fetchAllContacts(token, locationId) {
 
 async function fetchAllOpportunities(token, locationId) {
   const all = []
-  let startAfter = null
-  let startAfterId = null
 
+  // GHL opportunity objects don't carry a dateAdded field, so the startAfter/
+  // startAfterId cursor pagination used for contacts doesn't work here — it
+  // silently stops after page 1. Skip-based pagination (same pattern as
+  // ghl-accounts.js's /locations/search) works reliably instead.
   for (let page = 0; page < MAX_PAGES; page++) {
-    const body = { locationId, limit: 100 }
-    if (startAfter && startAfterId) {
-      body.startAfter = startAfter
-      body.startAfterId = startAfterId
-    }
+    const body = { locationId, limit: 100, skip: page * 100 }
     const { ok, json, text } = await ghlFetch(`/opportunities/search`, token, 'POST', body)
     if (!ok) throw new Error(`Failed to fetch opportunities (page ${page}): ${text}`)
 
     const batch = json?.opportunities || []
     all.push(...batch)
     if (batch.length < 100) break
-
-    const last = batch[batch.length - 1]
-    startAfter = last?.dateAdded ? new Date(last.dateAdded).getTime() : null
-    startAfterId = last?.id || null
-    if (!startAfter || !startAfterId) break
   }
 
   return all
