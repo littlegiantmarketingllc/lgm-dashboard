@@ -120,13 +120,38 @@ async function ghlFetch(path, token, method = 'GET', body = null) {
   return { status: res.status, ok: res.ok, json, text: res.ok ? null : text.slice(0, 300) }
 }
 
+// Fetch GHL portal last-login for a location using the agency PIT key.
+// This is a real-time agency-level call that doesn't need per-location OAuth.
+async function fetchLocationLastLogin(locationId) {
+  const agencyKey = process.env.GHL_AGENCY_KEY
+  if (!agencyKey) return null
+  try {
+    const res = await fetch(`${GHL_BASE}/locations/${locationId}`, {
+      headers: { Authorization: `Bearer ${agencyKey}`, Version: GHL_VER },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    // GHL returns { location: { ... } } or the location object directly
+    const loc = data?.location ?? data
+    return loc?.lastLogin ?? loc?.last_login ?? null
+  } catch {
+    return null
+  }
+}
+
 export default async function handler(req, res) {
   const { locationId } = req.query
   if (!locationId) return res.status(400).json({ error: 'Missing locationId' })
 
   res.setHeader('Cache-Control', 'no-store')
 
-  const token = await getOAuthToken(locationId)
+  // Fetch portal last-login in parallel with OAuth token lookup — it uses the
+  // agency key so it works for every account regardless of OAuth status.
+  const [token, lastLogin] = await Promise.all([
+    getOAuthToken(locationId),
+    fetchLocationLastLogin(locationId),
+  ])
+
   if (!token) {
     return res.json({
       locationId,
@@ -134,6 +159,7 @@ export default async function handler(req, res) {
       users:         null,
       contacts:      null,
       opportunities: null,
+      lastLogin,      // still available even without per-location OAuth
     })
   }
 
@@ -157,17 +183,17 @@ export default async function handler(req, res) {
   const convoCount   = convos?.json?.total  ?? convos?.json?.meta?.total   ?? null
   const oppsCount    = opps?.json?.total    ?? opps?.json?.meta?.total     ?? opps?.json?.opportunities?.total ?? null
 
-  // Most recently updated contact — best proxy for "client is using their GHL account"
-  // This is a real-time signal: when client agents update contacts/CRM, dateUpdated changes.
+  // Most recently updated contact — real-time signal that the client's team is actively using GHL
   const lastContactUpdate = contacts?.json?.contacts?.[0]?.dateUpdated || null
 
   res.json({
     locationId,
-    oauthConnected: true,
-    users:              userCount,
-    contacts:           contactCount,
-    opportunities:      oppsCount,
-    conversations:      convoCount,
-    lastContactUpdate,  // ISO — most recently updated contact in this sub-account
+    oauthConnected:    true,
+    users:             userCount,
+    contacts:          contactCount,
+    opportunities:     oppsCount,
+    conversations:     convoCount,
+    lastContactUpdate, // ISO — most recently updated contact in this sub-account
+    lastLogin,         // ISO — last GHL portal login (real-time, agency key)
   })
 }

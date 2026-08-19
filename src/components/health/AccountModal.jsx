@@ -148,16 +148,20 @@ export default function AccountModal({ account, onClose }) {
     ? `LC Platform Activity (last wallet charge, ${account.lastLcActivityMonth})`
     : 'GHL Sub-Account Activity (no LC data — record last updated, may not reflect real client usage)'
 
-  // Real-time activity: most recently updated contact in this sub-account (loads with liveMetrics)
-  // This is the true "client using their GHL" signal — contact/CRM changes by the client's own team
+  // Real-time activity: most recently updated contact (CRM signal — client's team is working in GHL)
   const realtimeDays = liveMetrics?.lastContactUpdate
     ? Math.max(0, Math.floor((Date.now() - new Date(liveMetrics.lastContactUpdate).getTime()) / (1000 * 60 * 60 * 24)))
     : null
 
-  // Prefer real-time GHL signal over LC proxy once it loads
-  const days       = realtimeDays ?? lcDays
-  const actSource  = realtimeDays !== null ? 'GHL sub-account' : lcSource
-  const actColor   = days !== null ? (days <= 7 ? G : days <= 30 ? AMB : RED) : undefined
+  // Real-time portal login: last time someone logged into the GHL portal for this sub-account
+  const lastLoginDays = liveMetrics?.lastLogin
+    ? Math.max(0, Math.floor((Date.now() - new Date(liveMetrics.lastLogin).getTime()) / (1000 * 60 * 60 * 24)))
+    : null
+
+  // Priority: CRM activity (most specific) → portal login → LC wallet proxy
+  const days      = realtimeDays ?? lastLoginDays ?? lcDays
+  const actSource = realtimeDays !== null ? 'CRM activity' : lastLoginDays !== null ? 'portal login' : lcSource
+  const actColor  = days !== null ? (days <= 7 ? G : days <= 30 ? AMB : RED) : undefined
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
@@ -185,7 +189,7 @@ export default function AccountModal({ account, onClose }) {
                     Last active: <span className="font-semibold" style={{ color: actColor }}>
                       {days === 0 ? 'today' : `${days}d ago`}
                     </span>
-                    {realtimeDays !== null && (
+                    {(realtimeDays !== null || lastLoginDays !== null) && (
                       <span className="ml-1 text-[9px] font-semibold px-1 py-0.5 rounded" style={{ background: '#8CC63F15', color: '#3a6b10' }}>
                         live
                       </span>
@@ -361,20 +365,40 @@ export default function AccountModal({ account, onClose }) {
                 ))}
               </div>
             ) : null}
-            {liveMetrics?.lastContactUpdate && (
-              <div className="mt-2 px-3.5 py-2.5 rounded-xl border border-brand-border bg-brand-bg/60 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Last CRM Activity</p>
-                  <p className="text-[11px] font-semibold mt-0.5" style={{ color: realtimeDays !== null ? actColor : undefined }}>
-                    {realtimeDays === 0 ? 'Today' : realtimeDays === 1 ? 'Yesterday' : `${realtimeDays} days ago`}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-brand-muted">Contact updated</p>
-                  <p className="text-[10px] font-medium text-brand-text mt-0.5">
-                    {new Date(liveMetrics.lastContactUpdate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
+            {(liveMetrics?.lastContactUpdate || liveMetrics?.lastLogin) && (
+              <div className="mt-2 space-y-1.5">
+                {liveMetrics?.lastLogin && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-brand-border bg-brand-bg/60 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Last GHL Login</p>
+                      <p className="text-[11px] font-semibold mt-0.5" style={{ color: lastLoginDays !== null ? (lastLoginDays <= 7 ? G : lastLoginDays <= 30 ? AMB : RED) : undefined }}>
+                        {lastLoginDays === 0 ? 'Today' : lastLoginDays === 1 ? 'Yesterday' : `${lastLoginDays} days ago`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-brand-muted">Portal access</p>
+                      <p className="text-[10px] font-medium text-brand-text mt-0.5">
+                        {new Date(liveMetrics.lastLogin).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {liveMetrics?.lastContactUpdate && (
+                  <div className="px-3.5 py-2.5 rounded-xl border border-brand-border bg-brand-bg/60 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Last CRM Activity</p>
+                      <p className="text-[11px] font-semibold mt-0.5" style={{ color: realtimeDays !== null ? actColor : undefined }}>
+                        {realtimeDays === 0 ? 'Today' : realtimeDays === 1 ? 'Yesterday' : `${realtimeDays} days ago`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-brand-muted">Contact updated</p>
+                      <p className="text-[10px] font-medium text-brand-text mt-0.5">
+                        {new Date(liveMetrics.lastContactUpdate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
