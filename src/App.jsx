@@ -1,11 +1,23 @@
-import HealthStandaloneApp from './HealthStandaloneApp'
-import MasterStandaloneApp from './MasterStandaloneApp'
-import { useState, useMemo, useCallback } from 'react'
+import { lazy, Suspense, useState, useMemo, useCallback } from 'react'
 
 // VITE_APP_MODE=health is set on the lgm-customer-health Vercel project.
 // VITE_APP_MODE=master is set on the Master Dashboard Vercel project (GHL-embedded).
-// When either build runs, this file short-circuits and exports that standalone app.
+// When either build runs, this file short-circuits and renders that standalone app.
 // lgm-dashboard (QC) has no VITE_APP_MODE set, so it falls through to the full app.
+//
+// These two MUST stay lazy imports, not static ones. A static `import
+// HealthStandaloneApp from './HealthStandaloneApp'` at the top of this file
+// pulls in its whole dependency tree — including src/lib/supabase.js, which
+// calls createClient() at module-load time using VITE_SUPABASE_URL/ANON_KEY.
+// ES modules run that top-level code on import regardless of which mode
+// actually renders, so Master mode was crashing on Health's Supabase client
+// before React ever mounted, even though Master mode never uses it. Lazy
+// imports code-split each app into its own chunk that only loads when
+// actually rendered, so each mode is isolated from the others' env vars
+// and dependencies.
+const HealthStandaloneApp = lazy(() => import('./HealthStandaloneApp'))
+const MasterStandaloneApp = lazy(() => import('./MasterStandaloneApp'))
+
 const IS_HEALTH_MODE = import.meta.env.VITE_APP_MODE === 'health'
 const IS_MASTER_MODE = import.meta.env.VITE_APP_MODE === 'master'
 
@@ -76,8 +88,8 @@ function ErrorScreen({ message, onRetry }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  if (IS_HEALTH_MODE) return <HealthStandaloneApp />
-  if (IS_MASTER_MODE) return <MasterStandaloneApp />
+  if (IS_HEALTH_MODE) return <Suspense fallback={null}><HealthStandaloneApp /></Suspense>
+  if (IS_MASTER_MODE) return <Suspense fallback={null}><MasterStandaloneApp /></Suspense>
   // ── QC state ────────────────────────────────────────────────────────────────
   const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
