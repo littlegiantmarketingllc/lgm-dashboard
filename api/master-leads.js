@@ -119,10 +119,11 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
   try {
-    const token = await getLocationAccessToken(locationId)
+    const { token, reason } = await getLocationAccessToken(locationId)
     if (!token) {
       return res.status(404).json({
-        error: `No OAuth token found for location "${locationId}". Ensure our GHL app is installed at that sub-account.`,
+        error: `No OAuth token available for location "${locationId}".`,
+        reason,
       })
     }
 
