@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -157,10 +157,13 @@ function AgentTable({ group, onAccountClick }) {
                   {/* Agent name */}
                   <td className="pl-5 pr-2 py-2">
                     <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-medium text-brand-text truncate max-w-[140px]">{a.accountName}</span>
+                      <span className="text-[11px] font-medium text-brand-text truncate max-w-[160px]">{a.accountName}</span>
                       {churned && <span className="text-[8px] font-bold px-1 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 flex-shrink-0">CHR</span>}
                       {!bound && <span className="text-[8px] font-bold px-1 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0">UNMATCHED</span>}
                     </div>
+                    {a._dm?.agentName && (
+                      <div className="text-[9px] text-brand-muted mt-0.5 truncate max-w-[160px]">{a._dm.agentName}</div>
+                    )}
                   </td>
 
                   {/* Joined */}
@@ -224,8 +227,18 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
   const [selectedDm, setSelectedDm] = useState(null)
   const [sortBy, setSortBy]         = useState('mrr')
   const [search, setSearch]         = useState('')
+  const agentTableRef               = useRef(null)
 
   const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+  // Auto-scroll to agent table when a DM card is expanded
+  useEffect(() => {
+    if (!selectedDm) return
+    const id = setTimeout(() => {
+      agentTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
+    return () => clearTimeout(id)
+  }, [selectedDm])
 
   // Build per-DM groups from the accounts list (accounts already enriched with _dm)
   const dmGroups = useMemo(() => {
@@ -376,9 +389,11 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
       )}
 
       {/* Expanded agent table for selected DM */}
-      {selectedGroup && (
-        <AgentTable group={selectedGroup} onAccountClick={onAccountClick} />
-      )}
+      <div ref={agentTableRef}>
+        {selectedGroup && (
+          <AgentTable group={selectedGroup} onAccountClick={onAccountClick} />
+        )}
+      </div>
 
       {/* No DM data note */}
       {unmatchedCount > 0 && (
