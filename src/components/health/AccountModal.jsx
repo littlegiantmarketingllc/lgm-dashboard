@@ -3,6 +3,7 @@ import { differenceInDays, parseISO, isValid, format } from 'date-fns'
 import { recommendAction, enhancedScoreAccount, classify } from '../../lib/healthEngine'
 import GHLInfoPanel from './GHLInfoPanel'
 import InfoTip from './InfoTip'
+import { supabase } from '../../lib/supabase'
 
 const NOISE = /\b(agency|llc|inc|corp|insurance|marketing|services|group|associates|co\.?|ltd|the)\b/gi
 function buildGHLQuery(name) {
@@ -55,6 +56,9 @@ export default function AccountModal({ account, onClose }) {
   const [lcCharges,        setLcCharges]        = useState(null)
   const [lcLoading,        setLcLoading]        = useState(true)
 
+  const [ghlStats,         setGhlStats]         = useState(null)
+  const [ghlStatsLoading,  setGhlStatsLoading]  = useState(true)
+
   const fetchGHLInfo = useCallback(async () => {
     if (ghlLoading) return
     setGhlLoading(true)
@@ -102,6 +106,19 @@ export default function AccountModal({ account, onClose }) {
       .then(r => r.json())
       .then(data => { setLcCharges(data); setLcLoading(false) })
       .catch(() => { setLcLoading(false) })
+  }, [account.ghlId])
+
+  // Fetch GHL sub-account stats (last login + call/email/sms volumes from CSV export)
+  useEffect(() => {
+    if (!account.ghlId) { setGhlStatsLoading(false); return }
+    setGhlStatsLoading(true)
+    supabase
+      .from('ghl_account_stats')
+      .select('last_login, active_users, contacts, total_calls, inbound_calls, outbound_calls, total_emails, total_sms, form_submissions, appointments, google_reviews, positive_reviews, synced_at')
+      .eq('location_id', account.ghlId)
+      .maybeSingle()
+      .then(({ data }) => { setGhlStats(data); setGhlStatsLoading(false) })
+      .catch(() => { setGhlStatsLoading(false) })
   }, [account.ghlId])
 
   useEffect(() => {
@@ -154,10 +171,23 @@ export default function AccountModal({ account, onClose }) {
     ? Math.max(0, Math.floor((Date.now() - new Date(liveMetrics.lastContactUpdate).getTime()) / (1000 * 60 * 60 * 24)))
     : null
 
-  // Prefer real-time GHL signal over LC proxy once it loads
-  const days       = realtimeDays ?? lcDays
-  const actSource  = realtimeDays !== null ? 'GHL sub-account' : lcSource
-  const actColor   = days !== null ? (days <= 7 ? G : days <= 30 ? AMB : RED) : undefined
+  // GHL sub-account last login (from agency CSV export stored in ghl_account_stats)
+  let lastLoginDays = null, lastLoginFormatted = null
+  if (ghlStats?.last_login) {
+    try {
+      const d = parseISO(ghlStats.last_login)
+      if (isValid(d)) {
+        lastLoginDays      = differenceInDays(new Date(), d)
+        lastLoginFormatted = format(d, 'MMM d, yyyy')
+      }
+    } catch {}
+  }
+  const loginColor = lastLoginDays !== null ? (lastLoginDays <= 7 ? G : lastLoginDays <= 30 ? AMB : RED) : undefined
+
+  // Prefer real-time GHL signal over LC proxy, then portal last_login as a final fallback
+  const days      = realtimeDays ?? lcDays ?? lastLoginDays
+  const actSource = realtimeDays !== null ? 'GHL sub-account' : lcSource ?? (lastLoginDays !== null ? 'GHL portal login' : null)
+  const actColor  = days !== null ? (days <= 7 ? G : days <= 30 ? AMB : RED) : undefined
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
@@ -453,6 +483,83 @@ export default function AccountModal({ account, onClose }) {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* GHL Sub-Account Stats (from agency CSV export) */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
+              GHL Sub-Account Activity
+              <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
+                style={{ background: '#3b82f612', color: '#1d4ed8', border: '1px solid #3b82f630' }}>
+                Agency export
+              </span>
+            </p>
+            {ghlStatsLoading ? (
+              <div className="rounded-xl border border-brand-border p-4 flex items-center gap-2 text-[11px] text-brand-muted">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-border border-t-brand-green animate-spin flex-shrink-0" />
+                Loading sub-account stats…
+              </div>
+            ) : !ghlStats ? (
+              <div className="rounded-xl border border-brand-border bg-brand-bg p-3 text-[11px] text-brand-muted">
+                No sub-account stats found — location not yet in the export database.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-brand-border overflow-hidden">
+                {/* Last Login */}
+                <div className="px-4 py-3 bg-brand-bg/60 border-b border-brand-border flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted">Last Login to GHL Portal</p>
+                    <p className="text-[13px] font-bold mt-0.5" style={{ color: loginColor ?? 'inherit' }}>
+                      {lastLoginFormatted
+                        ? `${lastLoginFormatted} · ${lastLoginDays === 0 ? 'today' : `${lastLoginDays}d ago`}`
+                        : 'Never logged in'}
+                    </p>
+                  </div>
+                  {lastLoginDays !== null && (
+                    <span className="text-[9px] font-bold px-2 py-1 rounded-full border flex-shrink-0"
+                      style={{
+                        color: loginColor,
+                        background: `${loginColor}12`,
+                        borderColor: `${loginColor}30`,
+                      }}>
+                      {lastLoginDays <= 7 ? 'Recently active' : lastLoginDays <= 30 ? 'Moderately active' : 'Low activity'}
+                    </span>
+                  )}
+                </div>
+                {/* Activity metrics grid */}
+                <div className="grid grid-cols-3 divide-x divide-brand-border border-b border-brand-border">
+                  {[
+                    { label: 'Total Calls',  value: ghlStats.total_calls },
+                    { label: 'Emails Sent',  value: ghlStats.total_emails },
+                    { label: 'SMS Sent',     value: ghlStats.total_sms },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="px-3 py-2.5 text-center bg-white">
+                      <p className="num text-sm font-bold text-brand-text">{(value ?? 0).toLocaleString()}</p>
+                      <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-brand-border">
+                  {[
+                    { label: 'Active Users',      value: ghlStats.active_users },
+                    { label: 'Form Submissions',  value: ghlStats.form_submissions },
+                    { label: 'Appointments',      value: ghlStats.appointments },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="px-3 py-2.5 text-center bg-brand-bg/30">
+                      <p className="num text-sm font-bold text-brand-text">{(value ?? 0).toLocaleString()}</p>
+                      <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {ghlStats.synced_at && (
+                  <div className="px-4 py-1.5 border-t border-brand-border/50 bg-brand-bg/20 text-right">
+                    <span className="text-[9px] text-brand-muted/60">
+                      Data as of {format(parseISO(ghlStats.synced_at), 'MMM d, yyyy')}
+                    </span>
                   </div>
                 )}
               </div>
