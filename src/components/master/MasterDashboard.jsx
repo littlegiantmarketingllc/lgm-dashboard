@@ -50,14 +50,16 @@ export default function MasterDashboard({ locationId }) {
   const { data, loading, error, refetch, isDemo } = useMasterLeads(locationId, dateRange)
   const [showRaw, setShowRaw] = useState(false)
 
+  // These must run on every render, before any early return — React requires
+  // the same hooks in the same order every time. `leads` defaults to [] when
+  // data hasn't loaded yet, so the memos are cheap no-ops until then.
+  const { leads = [], customFieldsError, from, to } = data || {}
+  const overview = useMemo(() => computeOverview(leads), [leads])
+  const bySource = useMemo(() => pivotBySource(leads), [leads])
+  const byOwner  = useMemo(() => pivotByOwner(leads), [leads])
+
   if (loading && !data) return <LoadingScreen />
   if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} />
-
-  const { leads = [], customFieldsError, from, to } = data || {}
-
-  const overview   = useMemo(() => computeOverview(leads), [leads])
-  const bySource    = useMemo(() => pivotBySource(leads), [leads])
-  const byOwner      = useMemo(() => pivotByOwner(leads), [leads])
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
