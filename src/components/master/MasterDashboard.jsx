@@ -47,7 +47,7 @@ function ErrorScreen({ message, onRetry }) {
 // just not the first thing on the page.
 export default function MasterDashboard({ locationId }) {
   const [dateRange] = useState({ from: '', to: '' }) // empty = API default (last 3 months)
-  const { data, loading, error, refetch } = useMasterLeads(locationId, dateRange)
+  const { data, loading, error, refetch, isDemo } = useMasterLeads(locationId, dateRange)
   const [showRaw, setShowRaw] = useState(false)
 
   if (loading && !data) return <LoadingScreen />
@@ -65,12 +65,19 @@ export default function MasterDashboard({ locationId }) {
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-brand-heading font-bold text-xl">Master Dashboard</h1>
+            <h1 className="text-brand-heading font-bold text-xl flex items-center gap-2">
+              Master Dashboard
+              {isDemo && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-700 uppercase tracking-wider">
+                  Demo Data
+                </span>
+              )}
+            </h1>
             <p className="text-brand-muted text-sm mt-1">
-              {from} to {to} · leads attributed by date-created
+              {isDemo ? 'Sample data for UI preview — not a real account' : `${from} to ${to} · leads attributed by date-created`}
             </p>
           </div>
-          {customFieldsError && (
+          {customFieldsError && !isDemo && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[11px] font-medium max-w-sm">
               <span>⚠</span>
               <span>Custom fields blocked — lead price, call count, and disposition date are pending a GHL scope fix. Cards below reflect this.</span>

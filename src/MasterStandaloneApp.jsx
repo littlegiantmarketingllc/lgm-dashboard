@@ -10,8 +10,9 @@ export default function MasterStandaloneApp() {
 
   const params     = new URLSearchParams(window.location.search)
   const locationId = params.get('locationId')
+  const isDemo     = params.get('demo') === '1'
 
-  if (!locationId) {
+  if (!locationId && !isDemo) {
     return (
       <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl border border-brand-border p-8 max-w-md w-full text-center"
@@ -21,7 +22,7 @@ export default function MasterStandaloneApp() {
           <p className="text-brand-muted text-sm leading-relaxed">
             This dashboard is meant to be opened as <code>?locationId=&lt;ghl_location_id&gt;</code> —
             normally injected automatically by the GHL Custom Menu Link. For local testing, append that
-            query param manually.
+            query param manually. To preview the UI with sample data instead, add <code>?demo=1</code>.
           </p>
         </div>
       </div>
