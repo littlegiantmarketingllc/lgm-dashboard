@@ -2,7 +2,15 @@
 
 # Master Dashboard (ROI/Stats) — Architecture Plan
 
-**Owner:** Syed (architecture + data layer + canvas) · **Calc source of truth:** Steve, dictated via huddles · **Status:** build started 2026-08-20, following John's plan · **Test client:** Haley Elder (insurance vertical)
+**Owner:** Syed (architecture + data layer + canvas) · **Calc source of truth:** Steve, dictated via huddles · **Status:** live at https://lgm-master-dashboard.vercel.app (custom domain `master.littlegiantmarketing.com` pending one DNS record), custom-fields scope resolved 2026-08-21 · **Test client:** Haley Elder (insurance vertical)
+
+## 0d. Custom-fields scope resolved (2026-08-21)
+
+John published an updated version of the GHL marketplace app with `locations/customFields.readonly` (and other scopes) enabled, and reconnected via `/api/oauth-connect`. Real blocker after that: **the company-level token refreshed with the new scope, but Haley's per-location token was cached from hours earlier and didn't inherit it** — `getLocationAccessToken` in `api/_ghlAuth.js` only re-derives a location token when it's near its own expiry, not when the underlying company-level grant changes. Fixed by manually clearing the stale `ghl:token:{locationId}` row in Supabase so it re-derived fresh. **This will recur for other locations** the first time each one is loaded after a future scope change — worth a proper fix (e.g. version-stamp tokens, or clear all cached location tokens on every company-token refresh) if scopes get expanded again, rather than manually clearing rows per-location each time.
+
+Confirmed working end-to-end: `customFieldsError: null`, all 3 target fields resolved by name ("Lead Price", "Call Count", "Disposition Date and Time"), 237 total custom fields discovered on this account. Real KPI numbers now render for CPP, Disposition Rate, and Calls Per Lead — only PPL remains pending (needs a confirmed commission field, not yet identified).
+
+**New data point on the leads-definition question (§1):** Disposition Rate now computes at 31% here vs. QuickSight's ~98% for the same account — the same directional pattern as the leads-count (2.4x) and win-rate (1.3x) gaps found earlier. Three independent metrics now agree: our broader ~3,900-4,600 contact pull includes a lot of never-touched contacts that QuickSight's narrower lead definition excludes. Strengthens the case that this needs a real answer from Steve/John, not a guess.
 
 ## 0. Confirmed plan (2026-08-20, after Syed/John meeting)
 
