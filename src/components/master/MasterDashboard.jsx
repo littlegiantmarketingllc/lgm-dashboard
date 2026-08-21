@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useMasterLeads } from '../../hooks/useMasterLeads'
 import { computeOverview, pivotBySource, pivotByOwner } from '../../lib/masterMetrics'
+import MasterHeader from './MasterHeader'
 import OverviewCards from './OverviewCards'
 import PivotTable from './PivotTable'
 
@@ -10,30 +11,38 @@ function fmtMoney(n) {
   return Number.isFinite(num) ? '$' + num.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'
 }
 
-function LoadingScreen() {
+// Loading/error states keep the header visible too — the page should never
+// look headerless mid-transition, that reads as broken rather than loading.
+function LoadingScreen({ isDemo }) {
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center gap-4">
-      <div className="relative w-12 h-12">
-        <div className="absolute inset-0 rounded-full border-4 border-brand-border" />
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin" />
+    <div className="min-h-screen bg-brand-bg text-brand-text">
+      <MasterHeader isDemo={isDemo} />
+      <div className="flex flex-col items-center justify-center gap-4 py-32">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-brand-border" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-green animate-spin" />
+        </div>
+        <p className="text-brand-muted text-sm">Pulling leads + opportunities from GHL…</p>
       </div>
-      <p className="text-brand-muted text-sm">Pulling leads + opportunities from GHL…</p>
     </div>
   )
 }
 
-function ErrorScreen({ message, onRetry }) {
+function ErrorScreen({ message, onRetry, isDemo }) {
   return (
-    <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-brand-border p-8 max-w-lg w-full text-center"
-        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-        <div className="text-4xl mb-4">⚠️</div>
-        <h2 className="text-brand-heading font-bold text-lg mb-2">Could not load data</h2>
-        <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
-        <button onClick={onRetry} className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold"
-          style={{ background: '#8CC63F', boxShadow: '0 2px 8px rgba(140,198,63,0.35)' }}>
-          Try Again
-        </button>
+    <div className="min-h-screen bg-brand-bg text-brand-text">
+      <MasterHeader isDemo={isDemo} />
+      <div className="flex items-center justify-center px-4 py-32">
+        <div className="bg-white rounded-2xl border border-brand-border p-8 max-w-lg w-full text-center"
+          style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-brand-heading font-bold text-lg mb-2">Could not load data</h2>
+          <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
+          <button onClick={onRetry} className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold"
+            style={{ background: '#8CC63F', boxShadow: '0 2px 8px rgba(140,198,63,0.35)' }}>
+            Try Again
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -58,23 +67,18 @@ export default function MasterDashboard({ locationId }) {
   const bySource = useMemo(() => pivotBySource(leads), [leads])
   const byOwner  = useMemo(() => pivotByOwner(leads), [leads])
 
-  if (loading && !data) return <LoadingScreen />
-  if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} />
+  if (loading && !data) return <LoadingScreen isDemo={isDemo} />
+  if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} isDemo={isDemo} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
+      <MasterHeader isDemo={isDemo} />
+
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-brand-heading font-bold text-xl flex items-center gap-2">
-              Master Dashboard
-              {isDemo && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-700 uppercase tracking-wider">
-                  Demo Data
-                </span>
-              )}
-            </h1>
+            <h1 className="text-brand-heading font-bold text-xl">Overview</h1>
             <p className="text-brand-muted text-sm mt-1">
               {isDemo ? 'Sample data for UI preview — not a real account' : `${from} to ${to} · leads attributed by date-created`}
             </p>
@@ -148,6 +152,10 @@ export default function MasterDashboard({ locationId }) {
           </div>
         )}
       </div>
+
+      <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
+        Little Giant Marketing &mdash; Master Dashboard
+      </footer>
     </div>
   )
 }
