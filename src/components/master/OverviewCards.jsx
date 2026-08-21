@@ -65,7 +65,7 @@ function PendingCard({ label, icon, delay, infoText, pendingNote }) {
 export default function OverviewCards({ overview, customFieldsBlocked }) {
   const {
     leadCount, saleCount, wonPremium, withOpportunity,
-    cpp, callsPerLead, dispoRate, ppl,
+    cpp, callCount, callsPerLead, dispoRate, conversionRate, ppl,
   } = overview
 
   return (
@@ -110,37 +110,59 @@ export default function OverviewCards({ overview, customFieldsBlocked }) {
         infoText="Leads with at least one opportunity of any stage/status attached — a rough proxy for engagement until a proper Quote Rate is defined."
       />
 
+      <Card
+        label="Conversion Rate"
+        value={conversionRate ?? 0}
+        suffix="%"
+        decimals={1}
+        sub="Sale Count ÷ Leads"
+        icon="📈"
+        accentColor={G}
+        delay={160}
+        infoText="Sales ÷ Leads — the simple 'Close Rate' definition. QuickSight's own headline Conv. Rate tile used Sales ÷ Quotes instead (a different, usually higher, number) — that variant needs a confirmed 'Quoted' stage before it can be added here too."
+      />
+
       {customFieldsBlocked ? (
-        <PendingCard label="Cost Per Policy (CPP)" icon="🧮" delay={160}
+        <PendingCard label="Cost Per Policy (CPP)" icon="🧮" delay={200}
           pendingNote="Needs lead price — blocked on the custom-fields OAuth scope"
           infoText="Will show: total lead cost ÷ Sale Count, once the custom-fields scope is enabled." />
       ) : (
         <Card label="Cost Per Policy" value={cpp ?? 0} prefix="$" decimals={cpp !== null ? 0 : 0}
-          sub="Total lead cost ÷ Sale Count" icon="🧮" delay={160}
+          sub="Total lead cost ÷ Sale Count" icon="🧮" delay={200}
           infoText="Reverse-engineered from QuickSight's CPP field, not yet confirmed by Steve — treat as provisional." />
       )}
 
       {customFieldsBlocked ? (
-        <PendingCard label="Disposition Rate" icon="📋" delay={200}
+        <PendingCard label="Disposition Rate" icon="📋" delay={240}
           pendingNote="Needs disposition date — blocked on the custom-fields OAuth scope"
           infoText="Will show: leads with a disposition date set ÷ total leads." />
       ) : (
         <Card label="Disposition Rate" value={dispoRate ?? 0} suffix="%" decimals={1}
-          sub="Leads with a disposition date set" icon="📋" accentColor={AMB} delay={200}
+          sub="Leads with a disposition date set" icon="📋" accentColor={AMB} delay={240}
           infoText="Percentage of in-range leads with the disposition date custom field filled in." />
       )}
 
       {customFieldsBlocked ? (
-        <PendingCard label="Calls Per Lead" icon="📞" delay={240}
+        <PendingCard label="Call Count" icon="📞" delay={280}
+          pendingNote="Blocked on the custom-fields OAuth scope"
+          infoText="Will show: sum of the call count field across in-range leads." />
+      ) : (
+        <Card label="Call Count" value={callCount ?? 0} decimals={0}
+          sub="Sum of call count across all leads" icon="📞" delay={280}
+          infoText="Total value of the call count custom field, summed across every in-range lead." />
+      )}
+
+      {customFieldsBlocked ? (
+        <PendingCard label="Calls Per Lead" icon="📱" delay={320}
           pendingNote="Needs call count — blocked on the custom-fields OAuth scope"
           infoText="Will show: sum of the call count field ÷ total leads." />
       ) : (
         <Card label="Calls Per Lead" value={callsPerLead ?? 0} decimals={2}
-          sub="Sum of call count ÷ total leads" icon="📞" delay={240}
+          sub="Call Count ÷ total leads" icon="📱" delay={320}
           infoText="Average value of the call count custom field across in-range leads." />
       )}
 
-      <PendingCard label="PPL (Profit Per Lead)" icon="📈" delay={280}
+      <PendingCard label="PPL (Profit Per Lead)" icon="💹" delay={360}
         pendingNote="Needs a confirmed commission source — ask Steve, don't guess"
         infoText="Will show: (commission − lead cost) ÷ leads. QuickSight has a Commission value; we haven't identified which GHL field it maps to yet." />
 

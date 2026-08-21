@@ -1,15 +1,13 @@
 import { useState, useMemo } from 'react'
 import { useMasterLeads } from '../../hooks/useMasterLeads'
-import { computeOverview, pivotBySource, pivotByOwner } from '../../lib/masterMetrics'
+import { computeOverview, pivotBySource, pivotByOwner, salesStageBreakdown } from '../../lib/masterMetrics'
 import MasterHeader from './MasterHeader'
+import DateFilterBar from './DateFilterBar'
+import OwnerSourceFilter from './OwnerSourceFilter'
 import OverviewCards from './OverviewCards'
 import PivotTable from './PivotTable'
-
-function fmtMoney(n) {
-  if (n === null || n === undefined || n === '') return '—'
-  const num = Number(n)
-  return Number.isFinite(num) ? '$' + num.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'
-}
+import SalesStageChart from './SalesStageChart'
+import LeadDetailsTable from './LeadDetailsTable'
 
 // Loading/error states keep the header visible too — the page should never
 // look headerless mid-transition, that reads as broken rather than loading.
@@ -48,24 +46,46 @@ function ErrorScreen({ message, onRetry, isDemo }) {
   )
 }
 
-// The real Overview: KPI cards + two pivot tables, built on live GHL data.
-// Metrics that need the custom-fields OAuth scope (leadPrice/callCount/
-// dispositionDate) or a still-unconfirmed formula (PPL) show as pending cards
-// rather than a wrong or fake number — see lib/masterMetrics.js for the exact
-// status of every metric. Raw data is still available below for verification,
-// just not the first thing on the page.
+// The real Overview: KPI cards, Sales Stage chart, two pivot tables, and a
+// full Lead Details table — built on live GHL data, filterable by date range
+// (re-fetches — a new window means new data from GHL), and by owner/source
+// (client-side — narrows the already-loaded leads, no re-fetch needed).
+// Metrics that need the custom-fields OAuth scope or a still-unconfirmed
+// formula (PPL) show as pending cards rather than a wrong or fake number —
+// see lib/masterMetrics.js for the exact status of every metric.
 export default function MasterDashboard({ locationId }) {
-  const [dateRange] = useState({ from: '', to: '' }) // empty = API default (last 3 months)
+  const [dateRange, setDateRange] = useState({ from: '', to: '' }) // empty = API default (last 3 months)
   const { data, loading, error, refetch, isDemo } = useMasterLeads(locationId, dateRange)
-  const [showRaw, setShowRaw] = useState(false)
+
+  const [ownerFilter, setOwnerFilter] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
 
   // These must run on every render, before any early return — React requires
   // the same hooks in the same order every time. `leads` defaults to [] when
   // data hasn't loaded yet, so the memos are cheap no-ops until then.
   const { leads = [], customFieldsError, from, to } = data || {}
-  const overview = useMemo(() => computeOverview(leads), [leads])
-  const bySource = useMemo(() => pivotBySource(leads), [leads])
-  const byOwner  = useMemo(() => pivotByOwner(leads), [leads])
+
+  const owners = useMemo(
+    () => [...new Set(leads.map(l => l.assignedToName || l.assignedTo).filter(Boolean))].sort(),
+    [leads]
+  )
+  const sources = useMemo(
+    () => [...new Set(leads.map(l => l.source).filter(Boolean))].sort(),
+    [leads]
+  )
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter(l => {
+      if (ownerFilter && (l.assignedToName || l.assignedTo) !== ownerFilter) return false
+      if (sourceFilter && l.source !== sourceFilter) return false
+      return true
+    })
+  }, [leads, ownerFilter, sourceFilter])
+
+  const overview     = useMemo(() => computeOverview(filteredLeads), [filteredLeads])
+  const bySource      = useMemo(() => pivotBySource(filteredLeads), [filteredLeads])
+  const byOwner        = useMemo(() => pivotByOwner(filteredLeads), [filteredLeads])
+  const stageBreakdown = useMemo(() => salesStageBreakdown(filteredLeads), [filteredLeads])
 
   if (loading && !data) return <LoadingScreen isDemo={isDemo} />
   if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} isDemo={isDemo} />
@@ -91,66 +111,39 @@ export default function MasterDashboard({ locationId }) {
           )}
         </div>
 
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl border border-brand-border p-3"
+          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <DateFilterBar value={dateRange} onChange={setDateRange} />
+          <OwnerSourceFilter
+            owners={owners}
+            sources={sources}
+            ownerValue={ownerFilter}
+            sourceValue={sourceFilter}
+            onOwnerChange={setOwnerFilter}
+            onSourceChange={setSourceFilter}
+          />
+        </div>
+
         <OverviewCards overview={overview} customFieldsBlocked={!!customFieldsError} />
+
+        <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <PivotTable
             title="By Lead Source"
             subtitle={`${bySource.length} sources`}
             rows={bySource}
-            delay={320}
+            delay={440}
           />
           <PivotTable
             title="By Assigned Owner"
             subtitle={`${byOwner.length} owners`}
             rows={byOwner}
-            delay={360}
+            delay={480}
           />
         </div>
 
-        <button
-          onClick={() => setShowRaw(v => !v)}
-          className="text-[12px] font-medium text-brand-muted hover:text-brand-heading transition-colors"
-        >
-          {showRaw ? '▾' : '▸'} Show raw pulled data ({leads.length.toLocaleString()} rows, for verification)
-        </button>
-
-        {showRaw && (
-          <div className="rounded-2xl border border-brand-border bg-white overflow-hidden"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-              <table className="w-full text-[12px]">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-brand-border text-left text-brand-muted uppercase tracking-wider text-[10px]">
-                    <th className="px-4 py-2">Name</th>
-                    <th className="px-4 py-2">Date Added</th>
-                    <th className="px-4 py-2">Source</th>
-                    <th className="px-4 py-2">Assigned To</th>
-                    <th className="px-4 py-2 text-right">Opps</th>
-                    <th className="px-4 py-2 text-right">Opp Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leads.slice(0, 200).map(l => (
-                    <tr key={l.contactId} className="border-b border-brand-border/60 last:border-0">
-                      <td className="px-4 py-2 font-medium">{l.name || '—'}</td>
-                      <td className="px-4 py-2">{l.dateAdded ? new Date(l.dateAdded).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-2">{l.source || '—'}</td>
-                      <td className="px-4 py-2">{l.assignedToName || l.assignedTo || '—'}</td>
-                      <td className="px-4 py-2 text-right">{l.opportunities.length}</td>
-                      <td className="px-4 py-2 text-right">
-                        {fmtMoney(l.opportunities.reduce((s, o) => s + (Number(o.monetaryValue) || 0), 0))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {leads.length > 200 && (
-                <p className="px-4 py-3 text-[11px] text-brand-muted">Showing first 200 of {leads.length.toLocaleString()}.</p>
-              )}
-            </div>
-          </div>
-        )}
+        <LeadDetailsTable leads={filteredLeads} delay={520} />
       </div>
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">

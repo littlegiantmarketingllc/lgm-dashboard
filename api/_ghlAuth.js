@@ -122,10 +122,14 @@ export async function getLocationAccessToken(locationId) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-export async function ghlFetch(path, token, method = 'GET', body = null, retriesLeft = 3) {
+// version override exists because a handful of newer GHL endpoints (e.g.
+// /opportunities/pipelines) require a different Version header than the
+// 2021-07-28 used everywhere else — defaulting keeps every existing call site
+// unaffected.
+export async function ghlFetch(path, token, method = 'GET', body = null, retriesLeft = 3, version = GHL_VER) {
   const opts = {
     method,
-    headers: { Authorization: `Bearer ${token}`, Version: GHL_VER, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, Version: version, 'Content-Type': 'application/json' },
   }
   if (body) opts.body = JSON.stringify(body)
   const res = await fetch(`${GHL_BASE}${path}`, opts)
@@ -136,7 +140,7 @@ export async function ghlFetch(path, token, method = 'GET', body = null, retries
     const retryAfterHeader = res.headers.get('retry-after')
     const waitMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : (4 - retriesLeft) * 1000
     await sleep(waitMs)
-    return ghlFetch(path, token, method, body, retriesLeft - 1)
+    return ghlFetch(path, token, method, body, retriesLeft - 1, version)
   }
 
   const text = await res.text()

@@ -26,9 +26,11 @@ const OPPS_MAX_PAGES = 100
 // Target fields we need values for. Matched against GHL custom field names/fieldKeys
 // by case-insensitive substring — GHL naming may not be an exact match per account.
 const FIELD_TARGETS = {
-  leadPrice:      ['lead price', 'lead cost'],
-  callCount:      ['call count', 'calls count'],
+  leadPrice:       ['lead price', 'lead cost'],
+  callCount:       ['call count', 'calls count'],
   dispositionDate: ['disposition date'],
+  leadProfile:     ['lead profile'],
+  badLeadReason:   ['bad lead reason'],
 }
 
 async function getCustomFieldMap(token, locationId) {
@@ -158,6 +160,29 @@ async function fetchUsers(token, locationId) {
   }
 }
 
+// Opportunities only carry an opaque pipelineStageId — resolving it to a
+// human-readable stage name (for the Sales Stage chart) needs this separate
+// endpoint, which per GHL's docs requires Version: v3, unlike everything else
+// in this file (2021-07-28). Response shape wasn't fully documented, so this
+// parses defensively — if GHL's actual field names differ from what's guessed
+// here, stages just fall back to raw IDs instead of crashing anything.
+async function fetchStageNames(token, locationId) {
+  try {
+    const { ok, json } = await ghlFetch(`/opportunities/pipelines?locationId=${locationId}`, token, 'GET', null, 3, 'v3')
+    if (!ok) return {}
+    const pipelines = json?.pipelines || []
+    const map = {}
+    for (const p of pipelines) {
+      for (const s of (p.stages || [])) {
+        if (s.id) map[s.id] = s.name || s.label || s.id
+      }
+    }
+    return map
+  } catch {
+    return {} // best-effort — pipelineStageName just falls back to the raw id if this fails
+  }
+}
+
 function defaultDateRange() {
   const to = new Date()
   const from = new Date()
@@ -188,11 +213,12 @@ export default async function handler(req, res) {
 
     // Custom fields need a separate OAuth scope that may not be granted yet —
     // don't let that block contacts/opportunities, which use scopes that already work.
-    const [fieldMapResult, contactsResult, oppsResult, usersById] = await Promise.all([
+    const [fieldMapResult, contactsResult, oppsResult, usersById, stageNames] = await Promise.all([
       getCustomFieldMap(token, locationId).catch(err => ({ error: err.message })),
       fetchAllContacts(token, locationId, fromMs),
       fetchAllOpportunities(token, locationId),
       fetchUsers(token, locationId),
+      fetchStageNames(token, locationId),
     ])
 
     const fieldMap  = fieldMapResult.map || { leadPrice: null, callCount: null, dispositionDate: null }
@@ -218,6 +244,7 @@ export default async function handler(req, res) {
         monetaryValue:     o.monetaryValue ?? null,
         pipelineId:        o.pipelineId,
         pipelineStageId:   o.pipelineStageId,
+        pipelineStageName: stageNames[o.pipelineStageId] || null,
         status:            o.status,
         dateAdded:         o.dateAdded,
         lastStageChangeAt: o.lastStageChangeAt,
@@ -230,22 +257,37 @@ export default async function handler(req, res) {
         const t = c.dateAdded ? new Date(c.dateAdded).getTime() : null
         return t !== null && t >= fromMs && t <= toMs
       })
-      .map(c => ({
-        contactId:       c.id,
-        name:            c.contactName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-        dateAdded:       c.dateAdded,
-        source:          c.source || null,
-        assignedTo:      c.assignedTo || null,
-        assignedToName:  usersById[c.assignedTo] || null,
-        // Convenience fields — the 3 we have confirmed formulas for, pulled out for quick access.
-        leadPrice:       readCustomFieldValue(c, fieldMap.leadPrice),
-        callCount:       readCustomFieldValue(c, fieldMap.callCount),
-        dispositionDate: readCustomFieldValue(c, fieldMap.dispositionDate),
-        // Every custom field GHL has on this contact, name-resolved — not just the 3 above.
-        // Steve needs to see the full set to confirm which additional fields other formulas depend on.
-        customFields:    resolveAllCustomFields(c, fieldsById),
-        opportunities:   oppsByContact[c.id] || [],
-      }))
+      .map(c => {
+        const opps = oppsByContact[c.id] || []
+        const wonOpp = opps.find(o => o.status === 'won')
+        // "current" sales stage for a lead with multiple opportunities — the
+        // most recently stage-changed one is the most representative single value.
+        const latestOpp = opps.length
+          ? [...opps].sort((a, b) => new Date(b.lastStageChangeAt || 0) - new Date(a.lastStageChangeAt || 0))[0]
+          : null
+
+        return {
+          contactId:          c.id,
+          name:               c.contactName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+          dateAdded:          c.dateAdded,
+          lastStatusChangeAt: c.lastStatusChangeAt || null,
+          soldDate:           wonOpp?.lastStageChangeAt || null,
+          salesStage:         latestOpp?.pipelineStageName || null,
+          source:             c.source || null,
+          assignedTo:         c.assignedTo || null,
+          assignedToName:     usersById[c.assignedTo] || null,
+          // Convenience fields we have confirmed formulas/columns for, pulled out for quick access.
+          leadPrice:          readCustomFieldValue(c, fieldMap.leadPrice),
+          callCount:          readCustomFieldValue(c, fieldMap.callCount),
+          dispositionDate:    readCustomFieldValue(c, fieldMap.dispositionDate),
+          leadProfile:        readCustomFieldValue(c, fieldMap.leadProfile),
+          badLeadReason:      readCustomFieldValue(c, fieldMap.badLeadReason),
+          // Every custom field GHL has on this contact, name-resolved — not just the ones above.
+          // Steve needs to see the full set to confirm which additional fields other formulas depend on.
+          customFields:       resolveAllCustomFields(c, fieldsById),
+          opportunities:      opps,
+        }
+      })
 
     res.json({
       locationId,

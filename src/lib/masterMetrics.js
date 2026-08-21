@@ -37,12 +37,34 @@ export function computeOverview(leads) {
     saleCount,
     wonPremium,
     withOpportunity,
-    leadCost:     totalLeadCost,
-    cpp:          (totalLeadCost !== null && saleCount > 0) ? totalLeadCost / saleCount : null,
-    callsPerLead: (totalCalls !== null && leadCount > 0) ? totalCalls / leadCount : null,
-    dispoRate:    (dispositioned !== null && leadCount > 0) ? (dispositioned / leadCount) * 100 : null,
-    ppl:          null, // needs "commission" — not yet identified which GHL field this is, do not guess
+    leadCost:        totalLeadCost,
+    cpp:             (totalLeadCost !== null && saleCount > 0) ? totalLeadCost / saleCount : null,
+    callCount:       totalCalls, // raw total — QuickSight shows this as its own tile, separate from the per-lead average
+    callsPerLead:    (totalCalls !== null && leadCount > 0) ? totalCalls / leadCount : null,
+    dispoRate:       (dispositioned !== null && leadCount > 0) ? (dispositioned / leadCount) * 100 : null,
+    // Sales ÷ Leads — the simple "Close Rate" definition. QuickSight's headline
+    // "Conv. Rate" tile actually used Sales ÷ Quotes (a different denominator,
+    // per the earlier reverse-engineered audit) — that variant needs a "quoted"
+    // stage identified from real Sales Stage data before it can be added here.
+    conversionRate:  leadCount > 0 ? (saleCount / leadCount) * 100 : null,
+    ppl:             null, // needs "commission" — not yet identified which GHL field this is, do not guess
   }
+}
+
+// Groups by each lead's current sales stage (see api/master-leads.js — the
+// most recently stage-changed opportunity's stage). Leads with no opportunity
+// at all fall into "(no opportunity)" rather than being silently dropped, so
+// the chart's total always reconciles with the Leads KPI card.
+export function salesStageBreakdown(leads) {
+  const counts = new Map()
+  for (const lead of leads) {
+    const stage = lead.salesStage || '(no opportunity)'
+    counts.set(stage, (counts.get(stage) || 0) + 1)
+  }
+  const total = leads.length
+  return [...counts.entries()]
+    .map(([stage, count]) => ({ stage, count, pct: total > 0 ? (count / total) * 100 : 0 }))
+    .sort((a, b) => b.count - a.count)
 }
 
 function pivotBy(leads, keyFn, labelFn) {
