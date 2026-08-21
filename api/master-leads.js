@@ -32,12 +32,27 @@ const FIELD_TARGETS = {
 }
 
 async function getCustomFieldMap(token, locationId) {
+  // Unfiltered call — contact fields per GHL's default. Opportunity custom fields
+  // are a separate registry in GHL; ?model=opportunity is undocumented in the
+  // pages we could reach but matches GHL's usual pattern elsewhere, so we try it
+  // as a supplement and merge — if it 400s or comes back empty, contact fields
+  // (the main formulas we know about) still work fine on their own.
   const { ok, json, text } = await ghlFetch(`/locations/${locationId}/customFields`, token)
   if (!ok) throw new Error(`Failed to fetch custom fields: ${text}`)
+  const contactFields = json?.customFields || []
 
-  const fields = json?.customFields || []
+  let opportunityFields = []
+  try {
+    const oppRes = await ghlFetch(`/locations/${locationId}/customFields?model=opportunity`, token)
+    if (oppRes.ok) opportunityFields = oppRes.json?.customFields || []
+  } catch { /* best-effort supplement, contact fields already succeeded above */ }
+
+  // De-dupe by id in case the unfiltered call already included opportunity fields
+  const byId = new Map()
+  for (const f of [...contactFields, ...opportunityFields]) byId.set(f.id, f)
+  const fields = [...byId.values()]
+
   const map = {} // targetKey -> { id, name } | null
-
   for (const [targetKey, aliases] of Object.entries(FIELD_TARGETS)) {
     const match = fields.find(f => {
       const name = (f.name || f.fieldKey || '').toLowerCase()
@@ -53,6 +68,19 @@ function readCustomFieldValue(contact, fieldMatch) {
   if (!fieldMatch) return null
   const cf = (contact.customFields || []).find(f => f.id === fieldMatch.id)
   return cf?.value ?? cf?.fieldValue ?? null
+}
+
+// John/Steve want every custom field carried through the join, not just the
+// handful we've identified formulas for — resolves every field GHL returned
+// on this entity (contact or opportunity) to its human-readable name, keyed
+// against the location's full custom-field registry.
+function resolveAllCustomFields(entity, fieldsById) {
+  const out = {}
+  for (const cf of (entity.customFields || [])) {
+    const key = fieldsById[cf.id]?.name || cf.id
+    out[key] = cf.value ?? cf.fieldValue ?? null
+  }
+  return out
 }
 
 async function fetchAllContacts(token, locationId, fromMs) {
@@ -119,6 +147,17 @@ async function fetchAllOpportunities(token, locationId) {
   return { opportunities: all, pagesFetched, firstMeta, hitPageCap }
 }
 
+async function fetchUsers(token, locationId) {
+  try {
+    const { ok, json } = await ghlFetch(`/users/?locationId=${locationId}`, token)
+    if (!ok) return {}
+    const users = json?.users || []
+    return Object.fromEntries(users.map(u => [u.id, u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email]))
+  } catch {
+    return {} // best-effort — assignedTo just falls back to the raw GHL id if this fails
+  }
+}
+
 function defaultDateRange() {
   const to = new Date()
   const from = new Date()
@@ -149,10 +188,11 @@ export default async function handler(req, res) {
 
     // Custom fields need a separate OAuth scope that may not be granted yet —
     // don't let that block contacts/opportunities, which use scopes that already work.
-    const [fieldMapResult, contactsResult, oppsResult] = await Promise.all([
+    const [fieldMapResult, contactsResult, oppsResult, usersById] = await Promise.all([
       getCustomFieldMap(token, locationId).catch(err => ({ error: err.message })),
       fetchAllContacts(token, locationId, fromMs),
       fetchAllOpportunities(token, locationId),
+      fetchUsers(token, locationId),
     ])
 
     const fieldMap  = fieldMapResult.map || { leadPrice: null, callCount: null, dispositionDate: null }
@@ -165,20 +205,23 @@ export default async function handler(req, res) {
       .filter(([, v]) => v === null)
       .map(([k]) => k)
 
+    const fieldsById = Object.fromEntries(allFields.map(f => [f.id, f]))
+
     // Group opportunities by contactId for the join
     const oppsByContact = {}
     for (const o of opportunities) {
       const cid = o.contactId || o.contact?.id
       if (!cid) continue
       ;(oppsByContact[cid] ||= []).push({
-        id:              o.id,
-        name:            o.name,
-        monetaryValue:   o.monetaryValue ?? null,
-        pipelineId:      o.pipelineId,
-        pipelineStageId: o.pipelineStageId,
-        status:          o.status,
-        dateAdded:       o.dateAdded,
+        id:                o.id,
+        name:              o.name,
+        monetaryValue:     o.monetaryValue ?? null,
+        pipelineId:        o.pipelineId,
+        pipelineStageId:   o.pipelineStageId,
+        status:            o.status,
+        dateAdded:         o.dateAdded,
         lastStageChangeAt: o.lastStageChangeAt,
+        customFields:      resolveAllCustomFields(o, fieldsById), // every field GHL has on this opportunity, not just the 3 we compute with
       })
     }
 
@@ -193,9 +236,14 @@ export default async function handler(req, res) {
         dateAdded:       c.dateAdded,
         source:          c.source || null,
         assignedTo:      c.assignedTo || null,
+        assignedToName:  usersById[c.assignedTo] || null,
+        // Convenience fields — the 3 we have confirmed formulas for, pulled out for quick access.
         leadPrice:       readCustomFieldValue(c, fieldMap.leadPrice),
         callCount:       readCustomFieldValue(c, fieldMap.callCount),
         dispositionDate: readCustomFieldValue(c, fieldMap.dispositionDate),
+        // Every custom field GHL has on this contact, name-resolved — not just the 3 above.
+        // Steve needs to see the full set to confirm which additional fields other formulas depend on.
+        customFields:    resolveAllCustomFields(c, fieldsById),
         opportunities:   oppsByContact[c.id] || [],
       }))
 
