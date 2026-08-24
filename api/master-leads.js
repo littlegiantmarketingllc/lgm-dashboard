@@ -13,7 +13,13 @@
 import { getLocationAccessToken, ghlFetch } from './_ghlAuth.js'
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
-const PAGE_DELAY_MS = 120 // small gap between pagination requests to avoid tripping GHL's rate limit at all
+// Small gap between pagination requests to avoid tripping GHL's rate limit.
+// The 429 that motivated this originally happened while automated testing was
+// ALSO hammering the same endpoint concurrently — normal single-user traffic
+// doesn't need as much padding. 120ms × ~150 total requests across contacts +
+// opportunities was adding ~18s of pure wait to every page load; the retry
+// logic in ghlFetch already handles a real 429 if one does happen.
+const PAGE_DELAY_MS = 40
 
 const CONTACTS_MAX_PAGES = 200 // hard backstop; the date-range early-stop below is the real limiter
 // GHL's page=N pagination on /opportunities/search only works up to page 100 (10,000 records) —
@@ -36,7 +42,7 @@ const FIELD_TARGETS = {
   // formula that should divide by "New Customers" was silently substituting a
   // won-opportunity count instead — wrong denominator for CPP, Calls to Close,
   // Close Rate, and Quotes to Close Rate.
-  oppSoldDate:      ['opp sold date', 'opportunity sold date'],
+  oppSoldDate:      ['opp sold date', 'opportunity sold date', 'sold date', 'date sold', 'policy sold date'],
   quotedTimestamp:  ['quoted timestamp', 'quoted date', 'quote date', 'quoted'],
   xdatedReason:     ['x-dated reason', 'xdated reason', 'x dated reason', 'reason x-dated'],
   leadProfile:      ['lead profile'],

@@ -85,7 +85,7 @@ export default function MasterDashboard({ locationId }) {
   // These must run on every render, before any early return — React requires
   // the same hooks in the same order every time. `leads` defaults to [] when
   // data hasn't loaded yet, so the memos are cheap no-ops until then.
-  const { leads = [], customFieldsError, from, to } = data || {}
+  const { leads = [], customFieldsError, missingFields = [], allFields = [], from, to } = data || {}
 
   const owners = useMemo(
     () => [...new Set(leads.map(l => l.assignedToName || l.assignedTo).filter(Boolean))].sort(),
@@ -142,6 +142,26 @@ export default function MasterDashboard({ locationId }) {
           )}
         </div>
 
+        {/* Shows exactly which target fields didn't match a real GHL custom field
+            name on this account, and the account's actual field list, so a naming
+            mismatch is visible here instead of requiring a raw API pull to diagnose. */}
+        {!isDemo && !customFieldsError && missingFields.length > 0 && (
+          <details className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+            <summary className="text-[12px] font-semibold cursor-pointer">
+              ⚠ {missingFields.length} field{missingFields.length > 1 ? 's' : ''} not matched to a real GHL custom field — click to see details
+            </summary>
+            <div className="mt-2 text-[11px] space-y-2">
+              <p><strong>Looking for, not found:</strong> {missingFields.join(', ')}</p>
+              <details>
+                <summary className="cursor-pointer font-medium">Show all {allFields.length} custom fields actually on this account</summary>
+                <ul className="mt-1.5 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 max-h-48 overflow-y-auto">
+                  {allFields.map(f => <li key={f.id} className="truncate">{f.name}</li>)}
+                </ul>
+              </details>
+            </div>
+          </details>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl border border-brand-border p-3"
           style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <DateFilterBar value={dateRange} onChange={setDateRange} />
@@ -159,26 +179,26 @@ export default function MasterDashboard({ locationId }) {
 
         <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <PivotTable
-            title="By Lead Source"
-            subtitle={`${bySource.length} sources`}
-            rows={bySource}
-            delay={440}
-          />
-          <PivotTable
-            title="By Assigned Owner"
-            subtitle={`${byOwner.length} owners`}
-            rows={byOwner}
-            delay={480}
-          />
-          <PivotTable
-            title="By Lead Profile"
-            subtitle={`${byLeadProfile.length} profiles`}
-            rows={byLeadProfile}
-            delay={520}
-          />
-        </div>
+        {/* Full width, stacked — each table has 7 data columns and needs the
+            room; three of these side by side forced horizontal scrolling. */}
+        <PivotTable
+          title="By Lead Source"
+          subtitle={`${bySource.length} sources`}
+          rows={bySource}
+          delay={440}
+        />
+        <PivotTable
+          title="By Assigned Owner"
+          subtitle={`${byOwner.length} owners`}
+          rows={byOwner}
+          delay={480}
+        />
+        <PivotTable
+          title="By Lead Profile"
+          subtitle={`${byLeadProfile.length} profiles`}
+          rows={byLeadProfile}
+          delay={520}
+        />
 
         <LeadDetailsTable leads={filteredLeads} delay={560} />
       </div>
