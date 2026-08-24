@@ -4,16 +4,28 @@
 // After that, ghl-location-data.js can derive location tokens for all sub-accounts.
 
 // locations/customFields.readonly added 2026-08-21 — the marketplace app was
-// updated (new published version) to support it. A prior attempt to add this
-// scope failed with "Invalid scope(s)" because the app didn't have it enabled
-// yet; if this breaks the connect flow again, revert immediately rather than
-// iterate blindly — this app also serves the Health dashboard.
+// updated (new published version) to support it.
+//
+// locations/tags.readonly removed 2026-08-24 — confirmed via grep that
+// nothing in this codebase actually calls a /tags endpoint, and the app's
+// "live" version (there are now multiple versions in play — v1 original,
+// v2 with customFields added) started rejecting it as invalid. Safe to drop
+// since nothing depends on it.
+//
+// conversations.readonly / conversations/message.readonly are still
+// requested even though the same "Invalid scope(s)" error currently flags
+// them too — unlike tags, these ARE used (Health dashboard's conversation
+// count + last-message preview in AccountModal.jsx). Removing them would
+// silently break a working feature, so this needs a GHL-side fix instead:
+// whichever app version is "live" for new authorizations needs both of
+// these enabled under Settings → Scopes. Until that's done, /api/oauth-connect
+// will keep failing at this exact step — don't touch this scope list again
+// to "fix" it without that GHL-side change happening first.
 const SCOPES = [
   'contacts.readonly',
   'conversations.readonly',
   'conversations/message.readonly',
   'locations.readonly',
-  'locations/tags.readonly',
   'locations/customFields.readonly',
   'opportunities.readonly',
   'users.readonly',
