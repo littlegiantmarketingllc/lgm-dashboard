@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/master-leads.js": {
-      "maxDuration": 90
+      "maxDuration": 300
     },
     "api/cron-refresh-master-cache.js": {
       "maxDuration": 300
