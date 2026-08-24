@@ -2,7 +2,15 @@
 
 # Master Dashboard (ROI/Stats) — Architecture Plan
 
-**Owner:** Syed (architecture + data layer + canvas) · **Calc source of truth:** Steve, dictated via huddles · **Status:** live at https://lgm-master-dashboard.vercel.app (custom domain `master.littlegiantmarketing.com` pending one DNS record), custom-fields scope resolved 2026-08-21 · **Test client:** Haley Elder (insurance vertical)
+**Owner:** Syed (architecture + data layer + canvas) · **Calc source of truth:** Steve, dictated via huddles · **Status:** live at https://lgm-master-dashboard.vercel.app (custom domain `master.littlegiantmarketing.com` pending one DNS record), custom-fields scope resolved 2026-08-21, token keep-alive cron added 2026-08-24 · **Test client:** Haley Elder (insurance vertical)
+
+## 0e. Token kept expiring unnoticed — fixed with a keep-alive cron (2026-08-24)
+
+Three days after the 2026-08-21 fixes, the dashboard broke again with the same "Invalid client credentials" error. Root cause, confirmed by comparing timestamps: the GHL company access token has an exact **24-hour lifespan**, and the refresh_token grant only appears to work within a limited window after expiry — every failure so far was a refresh attempted **more than a day** after expiry (nobody had loaded the dashboard in the meantime to trigger a timely reactive refresh), never one attempted while still fresh. Compared `oauth-callback.js`'s token-exchange call against `_ghlAuth.js`'s refresh call line-by-line first to rule out a credentials/code mismatch between the two — they're identical, so this is a timing issue, not a bug in either file.
+
+**Fix:** `api/cron-refresh-token.js` + a Vercel Cron entry in `vercel.json` (`0 */6 * * *`) proactively refreshes the company token every 6 hours, well inside the 24h window, regardless of whether anyone's used the dashboard. `CRON_SECRET` set on `lgm-master-dashboard`; Vercel auto-injects it as the cron invocation's `Authorization` header (same pattern as the existing `N8N_API_SECRET` check in `api/token.js`).
+
+**Important:** this cron only prevents *future* staleness — it can't revive a token that's already past the refresh grace window. If the dashboard ever shows the OAuth error again despite the cron running, that means the cron itself broke (check Vercel's cron logs first) rather than assume it's the same 24h-drift issue.
 
 ## 0d. Custom-fields scope resolved (2026-08-21)
 
