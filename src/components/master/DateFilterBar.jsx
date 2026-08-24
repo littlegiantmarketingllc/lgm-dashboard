@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function toISO(d) { return d.toISOString().slice(0, 10) }
 
@@ -60,20 +60,21 @@ const PRESETS = [
   { key: '90d',        label: '90 Days' },
 ]
 
+// Date-range picker for the whole dashboard — presets re-fetch from GHL (a new
+// window means new data), Owner/Source filters elsewhere are client-side.
+//
+// The initial fetch fires from a plain useEffect on mount — a prior version
+// used a "setState during render + setTimeout" trick to dodge a React warning,
+// which is fragile (can double-fire, or race with StrictMode's dev-mode double
+// render) and was the likely cause of the filters intermittently not applying.
 export default function DateFilterBar({ value, onChange }) {
-  const [activePreset, setActivePreset] = useState(() => {
-    // Initialize to '90d' and fire immediately so the parent gets a real date range on mount
-    return '90d'
-  })
+  const [activePreset, setActivePreset] = useState('90d')
   const [showCustom, setShowCustom] = useState(false)
 
-  // Fire the default range on first render so the API always gets explicit dates
-  const [initialized, setInitialized] = useState(false)
-  if (!initialized) {
-    setInitialized(true)
-    // Use setTimeout to avoid setState-during-render warning
-    setTimeout(() => onChange(presetRange('90d')), 0)
-  }
+  useEffect(() => {
+    onChange(presetRange('90d'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // fire once on mount only — selectPreset handles every change after that
 
   function selectPreset(key) {
     setActivePreset(key)
@@ -130,13 +131,6 @@ export default function DateFilterBar({ value, onChange }) {
             onChange={e => onChange({ from: value.from, to: e.target.value })}
             className="text-[11px] px-2 py-1.5 rounded-lg border border-brand-border bg-white text-brand-text"
           />
-          <button
-            onClick={() => { if (value.from && value.to) onChange(value) }}
-            className="px-3 py-1.5 rounded-full text-[11px] font-semibold text-white border-transparent"
-            style={{ background: '#8CC63F' }}
-          >
-            Apply
-          </button>
         </div>
       )}
     </div>

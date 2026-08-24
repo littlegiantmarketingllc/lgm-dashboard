@@ -10,13 +10,17 @@ function SortIcon({ col, sortCol, sortDir }) {
   return <span className="ml-0.5 text-[9px]" style={{ color: '#8CC63F' }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
 }
 
+function fmtSignedMoney(n) { if (n === null || n === undefined) return '—'; const s = n < 0 ? '-$' : '$'; return s + Math.round(Math.abs(n)).toLocaleString() }
+
 const COLS = [
-  { key: 'label',        label: 'Name',      align: 'left',  fmt: v => v },
-  { key: 'leadCount',     label: 'Leads',     align: 'right', fmt: v => v.toLocaleString() },
-  { key: 'saleCount',     label: 'Sale Count', align: 'right', fmt: v => v.toLocaleString() },
-  { key: 'wonPremium',    label: 'Premium',   align: 'right', fmt: fmtMoney },
-  { key: 'dispoRate',     label: 'Dispo Rate', align: 'right', fmt: fmtPct, tip: 'Blocked until the custom-fields OAuth scope is enabled.' },
-  { key: 'callsPerLead',  label: 'Calls/Lead', align: 'right', fmt: v => fmtNum(v, 2), tip: 'Blocked until the custom-fields OAuth scope is enabled.' },
+  { key: 'label',          label: 'Name',          align: 'left',  fmt: v => v },
+  { key: 'leadCount',      label: 'Leads',         align: 'right', fmt: v => v.toLocaleString() },
+  { key: 'newCustomers',   label: 'New Customers', align: 'right', fmt: v => v.toLocaleString() },
+  { key: 'writtenPremium', label: 'Premium',       align: 'right', fmt: fmtMoney },
+  { key: 'ppl',            label: 'PPL',           align: 'right', fmt: fmtSignedMoney },
+  { key: 'closeRate',      label: 'Close Rate',    align: 'right', fmt: fmtPct },
+  { key: 'dispoRate',      label: 'Dispo Rate',    align: 'right', fmt: fmtPct },
+  { key: 'callsPerLead',   label: 'Calls/Lead',    align: 'right', fmt: v => fmtNum(v, 2) },
 ]
 
 // Generic pivot table — takes rows already shaped by pivotBySource()/pivotByOwner()

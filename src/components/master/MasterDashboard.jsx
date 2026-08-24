@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useMasterLeads } from '../../hooks/useMasterLeads'
-import { computeOverview, pivotBySource, pivotByOwner, salesStageBreakdown } from '../../lib/masterMetrics'
+import { computeOverview, pivotBySource, pivotByOwner, pivotByLeadProfile, salesStageBreakdown } from '../../lib/masterMetrics'
 import MasterHeader from './MasterHeader'
 import MasterTabBar, { TABS } from './MasterTabBar'
 import DateFilterBar from './DateFilterBar'
@@ -104,9 +104,10 @@ export default function MasterDashboard({ locationId }) {
     })
   }, [leads, ownerFilter, sourceFilter])
 
-  const overview     = useMemo(() => computeOverview(filteredLeads), [filteredLeads])
-  const bySource      = useMemo(() => pivotBySource(filteredLeads), [filteredLeads])
-  const byOwner        = useMemo(() => pivotByOwner(filteredLeads), [filteredLeads])
+  const overview      = useMemo(() => computeOverview(filteredLeads), [filteredLeads])
+  const bySource       = useMemo(() => pivotBySource(filteredLeads), [filteredLeads])
+  const byOwner         = useMemo(() => pivotByOwner(filteredLeads), [filteredLeads])
+  const byLeadProfile    = useMemo(() => pivotByLeadProfile(filteredLeads), [filteredLeads])
   const stageBreakdown = useMemo(() => salesStageBreakdown(filteredLeads), [filteredLeads])
 
   // Non-Lead-Details tabs don't depend on this page's data fetch at all —
@@ -158,7 +159,7 @@ export default function MasterDashboard({ locationId }) {
 
         <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <PivotTable
             title="By Lead Source"
             subtitle={`${bySource.length} sources`}
@@ -171,9 +172,15 @@ export default function MasterDashboard({ locationId }) {
             rows={byOwner}
             delay={480}
           />
+          <PivotTable
+            title="By Lead Profile"
+            subtitle={`${byLeadProfile.length} profiles`}
+            rows={byLeadProfile}
+            delay={520}
+          />
         </div>
 
-        <LeadDetailsTable leads={filteredLeads} delay={520} />
+        <LeadDetailsTable leads={filteredLeads} delay={560} />
       </div>
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">

@@ -3,9 +3,11 @@
 // Commission is a static 10.5% of Written Premium — confirmed by Steve.
 
 const COMMISSION_RATE = 0.105
+const POLICY_SOLD_STAGE = 'Policy Sold'
+const BAD_LEAD_DNC_STAGE = 'Bad Lead / DNC'
 
-function isWon(o) {
-  return o.status === 'won' || o.pipelineStageName === 'Policy Sold'
+function isPolicySold(o) {
+  return o.pipelineStageName === POLICY_SOLD_STAGE
 }
 
 function hasValue(v) {
@@ -15,49 +17,25 @@ function hasValue(v) {
 export function computeOverview(leads) {
   const leadCount = leads.length
   const allOpps   = leads.flatMap(l => l.opportunities || [])
-  const wonOpps   = allOpps.filter(isWon)
+  const policySoldOpps = allOpps.filter(isPolicySold)
 
   // ── BASE CALCULATIONS ──────────────────────────────────────────────────────
-  // 1. Leads
+  // 1. Leads — count({crm_id})
   // (leadCount above)
 
-  // 2. Written Premium — sumIf(monetaryValue, stage = 'Policy Sold')
-  const wonPremium = wonOpps.reduce((s, o) => s + (Number(o.monetaryValue) || 0), 0)
+  // 2. Written Premium — sumIf(monetaryValue, pipelineStageId = 'Policy Sold')
+  const writtenPremium = policySoldOpps.reduce((s, o) => s + (Number(o.monetaryValue) || 0), 0)
 
-  // 6. New Customers — count({Opp Sold Date}) ≈ won opportunities
-  const saleCount = wonOpps.length
-
-  // 12. Premium average per customer
-  const premiumAvgPerCustomer = saleCount > 0 ? wonPremium / saleCount : null
-
-  // Leads with ≥1 opportunity (proxy for engagement)
-  const withOpportunity = leads.filter(l => (l.opportunities || []).length > 0).length
-
-  // Custom-field availability — only compute if at least one lead has the field
+  // Custom-field availability — only compute a metric if at least one lead actually has the field,
+  // so a genuinely-missing field shows as a pending "—" instead of a misleading 0.
   const hasLeadCost   = leads.some(l => hasValue(l.leadPrice))
   const hasCallCount  = leads.some(l => hasValue(l.callCount))
   const hasDispoDate  = leads.some(l => hasValue(l.dispositionDate))
   const hasBadLead    = leads.some(l => hasValue(l.badLeadDate))
   const hasSmsReply   = leads.some(l => hasValue(l.smsReplyDate))
+  const hasOppSold    = leads.some(l => hasValue(l.oppSoldDate))
   const hasQuoted     = leads.some(l => hasValue(l.quotedTimestamp))
   const hasXdated     = leads.some(l => hasValue(l.xdatedReason))
-
-  // 7. Lead Cost — sum({Lead Price})
-  const totalLeadCost = hasLeadCost
-    ? leads.reduce((s, l) => s + (Number(l.leadPrice) || 0), 0)
-    : null
-
-  // 8. Calls — sum({Call Count})
-  const totalCalls = hasCallCount
-    ? leads.reduce((s, l) => s + (Number(l.callCount) || 0), 0)
-    : null
-
-  // 9. Calls for Customers — sumIf({Call Count}, stage = 'Policy Sold')
-  const callsForCustomers = hasCallCount
-    ? leads
-        .filter(l => (l.opportunities || []).some(isWon))
-        .reduce((s, l) => s + (Number(l.callCount) || 0), 0)
-    : null
 
   // 3. Bad Leads — count({Bad Lead Date})
   const badLeads = hasBadLead
@@ -69,9 +47,36 @@ export function computeOverview(leads) {
     ? leads.filter(l => hasValue(l.dispositionDate)).length
     : null
 
-  // 5. SMS Replies — countIf({SMS reply date}, stage <> 'Bad Lead / DNC')
+  // 5. SMS Replies — countIf({SMS reply date}, pipelineStageId <> 'Bad Lead / DNC')
   const smsReplies = hasSmsReply
-    ? leads.filter(l => hasValue(l.smsReplyDate) && l.salesStage !== 'Bad Lead / DNC').length
+    ? leads.filter(l => hasValue(l.smsReplyDate) && l.salesStage !== BAD_LEAD_DNC_STAGE).length
+    : null
+
+  // 6. New Customers — count({Opp Sold Date}). This is the denominator for
+  // CPP, Calls to Close, Close Rate, and Quotes to Close Rate below — it is a
+  // dedicated field, NOT a stage or opportunity-status check. A prior version
+  // of this file substituted "count of won opportunities" here because the
+  // field wasn't being fetched at all; that's a different, usually larger,
+  // number and made every formula depending on it wrong.
+  const newCustomers = hasOppSold
+    ? leads.filter(l => hasValue(l.oppSoldDate)).length
+    : null
+
+  // 7. Lead Cost — sum({Lead Price})
+  const leadCost = hasLeadCost
+    ? leads.reduce((s, l) => s + (Number(l.leadPrice) || 0), 0)
+    : null
+
+  // 8. Calls — sum({Call Count})
+  const totalCalls = hasCallCount
+    ? leads.reduce((s, l) => s + (Number(l.callCount) || 0), 0)
+    : null
+
+  // 9. Calls for Customers — sumIf({Call Count}, pipelineStageId = 'Policy Sold')
+  const callsForCustomers = hasCallCount
+    ? leads
+        .filter(l => l.salesStage === POLICY_SOLD_STAGE)
+        .reduce((s, l) => s + (Number(l.callCount) || 0), 0)
     : null
 
   // 10. Quotes — count({Quoted Timestamp})
@@ -84,15 +89,26 @@ export function computeOverview(leads) {
     ? leads.filter(l => (l.xdatedReason || '').toLowerCase().includes('rate is too high')).length
     : null
 
+  // 12. Premium average per customer — avgIf(monetaryValue, pipelineStageId = 'Policy Sold')
+  // Averaged over Policy-Sold opportunities themselves, same population as
+  // Written Premium above (a lead can have more than one such opportunity,
+  // so this is not simply writtenPremium / newCustomers).
+  const premiumAvgPerCustomer = policySoldOpps.length > 0
+    ? writtenPremium / policySoldOpps.length
+    : null
+
+  // Leads with ≥1 opportunity of any kind — a rough engagement proxy, not part of Steve's spec.
+  const withOpportunity = leads.filter(l => (l.opportunities || []).length > 0).length
+
   // ── SPECIAL PARAMETERS ────────────────────────────────────────────────────
-  // Commission rate = 0.105 (static, confirmed by Steve)
+  // Commission rate = 0.105, static, confirmed by Steve — see COMMISSION_RATE above.
 
   // ── COMPOUND CALCULATIONS ─────────────────────────────────────────────────
   // 0. Commission — {Written Premium} * 0.105
-  const commission = wonPremium * COMMISSION_RATE
+  const commission = writtenPremium * COMMISSION_RATE
 
   // 1. Profit — Commission - {Lead Cost}
-  const profit = totalLeadCost !== null ? commission - totalLeadCost : null
+  const profit = leadCost !== null ? commission - leadCost : null
 
   // 2. PPL — Profit / Leads
   const ppl = (profit !== null && leadCount > 0) ? profit / leadCount : null
@@ -106,17 +122,19 @@ export function computeOverview(leads) {
     ? (smsReplies / leadCount) * 100 : null
 
   // 5. Close rate — {New Customers} / Leads
-  const conversionRate = leadCount > 0 ? (saleCount / leadCount) * 100 : null
+  const closeRate = (newCustomers !== null && leadCount > 0)
+    ? (newCustomers / leadCount) * 100 : null
 
   // 6. CPP — {Lead Cost} / {New Customers}
-  const cpp = (totalLeadCost !== null && saleCount > 0) ? totalLeadCost / saleCount : null
+  const cpp = (leadCost !== null && newCustomers !== null && newCustomers > 0)
+    ? leadCost / newCustomers : null
 
   // 7. Calls per lead — sum({Call Count}) / Leads
   const callsPerLead = (totalCalls !== null && leadCount > 0) ? totalCalls / leadCount : null
 
   // 8. Calls to Close — {Calls for Customers} / {New Customers}
-  const callsToClose = (callsForCustomers !== null && saleCount > 0)
-    ? callsForCustomers / saleCount : null
+  const callsToClose = (callsForCustomers !== null && newCustomers !== null && newCustomers > 0)
+    ? callsForCustomers / newCustomers : null
 
   // 9. Quote Rate — Quotes / Leads
   const quoteRate = (quotes !== null && leadCount > 0) ? (quotes / leadCount) * 100 : null
@@ -130,18 +148,17 @@ export function computeOverview(leads) {
     ? (rateTooHigh / leadCount) * 100 : null
 
   // 12. Quotes to close rate — {New Customers} / Quotes
-  const quotesToCloseRate = (quotes !== null && quotes > 0)
-    ? (saleCount / quotes) * 100 : null
+  const quotesToCloseRate = (newCustomers !== null && quotes !== null && quotes > 0)
+    ? (newCustomers / quotes) * 100 : null
 
   return {
     // Base
-    leadCount, saleCount, wonPremium, premiumAvgPerCustomer, withOpportunity,
-    leadCost: totalLeadCost,
-    totalCalls, callsForCustomers,
+    leadCount, writtenPremium, newCustomers, premiumAvgPerCustomer, withOpportunity,
+    leadCost, totalCalls, callsForCustomers,
     dispositionCount, badLeads, smsReplies, quotes, rateTooHigh,
     // Compound
     commission, profit, ppl,
-    conversionRate, cpp,
+    closeRate, cpp,
     callsPerLead, callsToClose,
     dispoRate, smsReplyRate, quoteRate,
     badLeadRate, rateTooHighRate, quotesToCloseRate,
@@ -178,4 +195,8 @@ export function pivotBySource(leads) {
 
 export function pivotByOwner(leads) {
   return pivotBy(leads, l => l.assignedTo, l => l.assignedToName || l.assignedTo || '(unassigned)')
+}
+
+export function pivotByLeadProfile(leads) {
+  return pivotBy(leads, l => l.leadProfile, l => l.leadProfile || '(no profile)')
 }

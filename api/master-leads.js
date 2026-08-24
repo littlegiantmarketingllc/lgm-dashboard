@@ -31,6 +31,12 @@ const FIELD_TARGETS = {
   dispositionDate:  ['disposition date and time', 'disposition date'],
   badLeadDate:      ['bad lead date'],
   smsReplyDate:     ['sms reply date', 'sms reply'],
+  // "New Customers" per Steve's spec = count({Opp Sold Date}) — a dedicated field,
+  // not a stage/status check. Was missing entirely before, which meant every
+  // formula that should divide by "New Customers" was silently substituting a
+  // won-opportunity count instead — wrong denominator for CPP, Calls to Close,
+  // Close Rate, and Quotes to Close Rate.
+  oppSoldDate:      ['opp sold date', 'opportunity sold date'],
   quotedTimestamp:  ['quoted timestamp', 'quoted date', 'quote date', 'quoted'],
   xdatedReason:     ['x-dated reason', 'xdated reason', 'x dated reason', 'reason x-dated'],
   leadProfile:      ['lead profile'],
@@ -263,7 +269,6 @@ export default async function handler(req, res) {
       })
       .map(c => {
         const opps = oppsByContact[c.id] || []
-        const wonOpp = opps.find(o => o.status === 'won')
         // "current" sales stage for a lead with multiple opportunities — the
         // most recently stage-changed one is the most representative single value.
         const latestOpp = opps.length
@@ -275,7 +280,6 @@ export default async function handler(req, res) {
           name:               c.contactName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
           dateAdded:          c.dateAdded,
           lastStatusChangeAt: c.lastStatusChangeAt || null,
-          soldDate:           wonOpp?.lastStageChangeAt || null,
           salesStage:         latestOpp?.pipelineStageName || null,
           source:             c.source || null,
           assignedTo:         c.assignedTo || null,
@@ -286,6 +290,7 @@ export default async function handler(req, res) {
           dispositionDate:    readCustomFieldValue(c, fieldMap.dispositionDate),
           badLeadDate:        readCustomFieldValue(c, fieldMap.badLeadDate),
           smsReplyDate:       readCustomFieldValue(c, fieldMap.smsReplyDate),
+          oppSoldDate:        readCustomFieldValue(c, fieldMap.oppSoldDate),
           quotedTimestamp:    readCustomFieldValue(c, fieldMap.quotedTimestamp),
           xdatedReason:       readCustomFieldValue(c, fieldMap.xdatedReason),
           leadProfile:        readCustomFieldValue(c, fieldMap.leadProfile),

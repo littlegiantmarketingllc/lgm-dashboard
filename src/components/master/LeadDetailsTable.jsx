@@ -34,7 +34,7 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Lead Created', 'Last Status Change', 'Name', 'Sold Date', 'Lead Source', 'Lead Profile', 'Sales Stage', 'Bad Lead Reason'].map(h => (
+              {['Lead Created', 'Last Status Change', 'Name', 'Assigned To', 'Sold Date', 'Lead Source', 'Lead Profile', 'Sales Stage', 'Bad Lead Reason'].map(h => (
                 <th key={h} className="px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap text-left text-brand-muted">
                   {h}
                 </th>
@@ -43,14 +43,15 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
           </thead>
           <tbody>
             {pageRows.length === 0 && (
-              <tr><td colSpan={8} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
+              <tr><td colSpan={9} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
             )}
             {pageRows.map(l => (
               <tr key={l.contactId} className="border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
                 <td className="pl-5 pr-3 py-2 text-[11px] text-brand-text whitespace-nowrap">{fmtDate(l.dateAdded)}</td>
                 <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.lastStatusChangeAt)}</td>
                 <td className="px-3 py-2 text-[11px] font-medium text-brand-text truncate max-w-[160px]">{l.name || '—'}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.soldDate)}</td>
+                <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.assignedToName || l.assignedTo || '—'}</td>
+                <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.oppSoldDate)}</td>
                 <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.source || '—'}</td>
                 <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.leadProfile || '—'}</td>
                 <td className="px-3 py-2 text-[11px]">

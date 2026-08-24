@@ -58,9 +58,9 @@ function SectionLabel({ children }) {
 
 export default function OverviewCards({ overview }) {
   const {
-    leadCount, saleCount, wonPremium, premiumAvgPerCustomer,
+    leadCount, newCustomers, writtenPremium, premiumAvgPerCustomer,
     leadCost, commission, profit, ppl,
-    conversionRate, cpp,
+    closeRate, cpp,
     totalCalls, callsPerLead, callsForCustomers, callsToClose,
     dispositionCount, dispoRate,
     smsReplies, smsReplyRate,
@@ -69,8 +69,6 @@ export default function OverviewCards({ overview }) {
     rateTooHigh, rateTooHighRate,
     quotesToCloseRate,
   } = overview
-
-  const d = (n, delay) => delay
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -82,11 +80,11 @@ export default function OverviewCards({ overview }) {
         sub="Total contacts in date range"
         infoText="count(crm_id) — total contacts created in the selected window." />
 
-      <Card label="New Customers" value={saleCount} icon="🏆" delay={40} accentColor={G}
-        sub={leadCount ? `${fmt(conversionRate, 1)}% close rate` : undefined}
+      <Card label="New Customers" value={newCustomers} icon="🏆" delay={40} accentColor={G}
+        sub={leadCount ? `${fmt(closeRate, 1)}% close rate` : undefined}
         infoText="count({Opp Sold Date}) — contacts with a won / Policy Sold opportunity." />
 
-      <Card label="Written Premium" value={wonPremium} prefix="$" icon="💰" delay={80} accentColor={G}
+      <Card label="Written Premium" value={writtenPremium} prefix="$" icon="💰" delay={80} accentColor={G}
         sub="Sum of won opportunity value"
         infoText="sumIf(monetaryValue, pipelineStageId = 'Policy Sold')" />
 
@@ -118,7 +116,7 @@ export default function OverviewCards({ overview }) {
       {/* ── SALES EFFICIENCY ─────────────────────────────────────── */}
       <SectionLabel>Sales Efficiency</SectionLabel>
 
-      <Card label="Close Rate" value={conversionRate} suffix="%" decimals={1} icon="🎯" delay={320} accentColor={G}
+      <Card label="Close Rate" value={closeRate} suffix="%" decimals={1} icon="🎯" delay={320} accentColor={G}
         sub="New Customers ÷ Leads"
         infoText="{New Customers} / Leads" />
 
