@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useMasterLeads } from '../../hooks/useMasterLeads'
 import { computeOverview, pivotBySource, pivotByOwner, salesStageBreakdown } from '../../lib/masterMetrics'
 import MasterHeader from './MasterHeader'
+import MasterTabBar, { TABS } from './MasterTabBar'
 import DateFilterBar from './DateFilterBar'
 import OwnerSourceFilter from './OwnerSourceFilter'
 import OverviewCards from './OverviewCards'
@@ -9,12 +10,14 @@ import PivotTable from './PivotTable'
 import SalesStageChart from './SalesStageChart'
 import LeadDetailsTable from './LeadDetailsTable'
 
-// Loading/error states keep the header visible too — the page should never
-// look headerless mid-transition, that reads as broken rather than loading.
-function LoadingScreen({ isDemo }) {
+// Loading/error/empty states all keep the header + tab bar visible — the
+// page should never look headerless mid-transition, and switching tabs
+// should always work even while Lead Details is still fetching.
+function LoadingScreen({ isDemo, activeTab, onTabChange }) {
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <MasterHeader isDemo={isDemo} />
+      <MasterTabBar active={activeTab} onChange={onTabChange} />
       <div className="flex flex-col items-center justify-center gap-4 py-32">
         <div className="relative w-12 h-12">
           <div className="absolute inset-0 rounded-full border-4 border-brand-border" />
@@ -26,10 +29,11 @@ function LoadingScreen({ isDemo }) {
   )
 }
 
-function ErrorScreen({ message, onRetry, isDemo }) {
+function ErrorScreen({ message, onRetry, isDemo, activeTab, onTabChange }) {
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <MasterHeader isDemo={isDemo} />
+      <MasterTabBar active={activeTab} onChange={onTabChange} />
       <div className="flex items-center justify-center px-4 py-32">
         <div className="bg-white rounded-2xl border border-brand-border p-8 max-w-lg w-full text-center"
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
@@ -46,6 +50,23 @@ function ErrorScreen({ message, onRetry, isDemo }) {
   )
 }
 
+// Every tab besides Lead Details, until it gets built out.
+function EmptyTabScreen({ isDemo, activeTab, onTabChange }) {
+  const label = TABS.find(t => t.key === activeTab)?.label
+  return (
+    <div className="min-h-screen bg-brand-bg text-brand-text">
+      <MasterHeader isDemo={isDemo} />
+      <MasterTabBar active={activeTab} onChange={onTabChange} />
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center">
+        <p className="text-brand-muted text-sm">{label} — nothing here yet.</p>
+      </div>
+      <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">
+        Little Giant Marketing &mdash; Master Dashboard
+      </footer>
+    </div>
+  )
+}
+
 // The real Overview: KPI cards, Sales Stage chart, two pivot tables, and a
 // full Lead Details table — built on live GHL data, filterable by date range
 // (re-fetches — a new window means new data from GHL), and by owner/source
@@ -54,6 +75,7 @@ function ErrorScreen({ message, onRetry, isDemo }) {
 // formula (PPL) show as pending cards rather than a wrong or fake number —
 // see lib/masterMetrics.js for the exact status of every metric.
 export default function MasterDashboard({ locationId }) {
+  const [activeTab, setActiveTab] = useState('lead-details')
   const [dateRange, setDateRange] = useState({ from: '', to: '' }) // empty = API default (last 3 months)
   const { data, loading, error, refetch, isDemo } = useMasterLeads(locationId, dateRange)
 
@@ -87,12 +109,20 @@ export default function MasterDashboard({ locationId }) {
   const byOwner        = useMemo(() => pivotByOwner(filteredLeads), [filteredLeads])
   const stageBreakdown = useMemo(() => salesStageBreakdown(filteredLeads), [filteredLeads])
 
-  if (loading && !data) return <LoadingScreen isDemo={isDemo} />
-  if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} isDemo={isDemo} />
+  // Non-Lead-Details tabs don't depend on this page's data fetch at all —
+  // check this before the loading/error states so switching tabs always
+  // works instantly, even while Lead Details is still pulling from GHL.
+  if (activeTab !== 'lead-details') {
+    return <EmptyTabScreen isDemo={isDemo} activeTab={activeTab} onTabChange={setActiveTab} />
+  }
+
+  if (loading && !data) return <LoadingScreen isDemo={isDemo} activeTab={activeTab} onTabChange={setActiveTab} />
+  if (error && !data)   return <ErrorScreen message={error} onRetry={refetch} isDemo={isDemo} activeTab={activeTab} onTabChange={setActiveTab} />
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <MasterHeader isDemo={isDemo} />
+      <MasterTabBar active={activeTab} onChange={setActiveTab} />
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
