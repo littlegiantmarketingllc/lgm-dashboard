@@ -1,60 +1,153 @@
-// Pure computation functions for the Master Dashboard — mirrors the pattern in
-// healthEngine.js: no side effects, no API calls, just math over the `leads`
-// array already fetched by /api/master-leads.
-//
-// Formula status as of 2026-08-21 (update this comment as items get confirmed):
-//   Computable now — leadCount, saleCount, wonPremium, withOpportunity, and the
-//     source/owner pivots built on top of those.
-//   Blocked on the GHL custom-fields OAuth scope (see MasterDashboard's status
-//     banner) — leadPrice, callCount, dispositionDate. Everything downstream of
-//     those (CPP, Calls Per Lead, Dispo Rate) returns null until that scope is on.
-//   Blocked, no data source wired up at all yet — SMS Reply Rate, and PPL
-//     specifically (needs a "commission" value; QuickSight has one, we haven't
-//     identified which GHL field it maps to — do not guess, ask Steve).
-//   Reverse-engineered from QuickSight exports, not yet confirmed by Steve —
-//     CPP = leadCost / saleCount. Treat as provisional.
+// Pure computation functions for the Master Dashboard.
+// All formulas match the QS Calculated Fields spec shared by Steve (2026-08-25).
+// Commission is a static 10.5% of Written Premium — confirmed by Steve.
 
-function isWon(o) { return o.status === 'won' }
+const COMMISSION_RATE = 0.105
+
+function isWon(o) {
+  return o.status === 'won' || o.pipelineStageName === 'Policy Sold'
+}
+
+function hasValue(v) {
+  return v !== null && v !== undefined && v !== ''
+}
 
 export function computeOverview(leads) {
   const leadCount = leads.length
-  const allOpps = leads.flatMap(l => l.opportunities || [])
-  const wonOpps = allOpps.filter(isWon)
+  const allOpps   = leads.flatMap(l => l.opportunities || [])
+  const wonOpps   = allOpps.filter(isWon)
+
+  // ── BASE CALCULATIONS ──────────────────────────────────────────────────────
+  // 1. Leads
+  // (leadCount above)
+
+  // 2. Written Premium — sumIf(monetaryValue, stage = 'Policy Sold')
+  const wonPremium = wonOpps.reduce((s, o) => s + (Number(o.monetaryValue) || 0), 0)
+
+  // 6. New Customers — count({Opp Sold Date}) ≈ won opportunities
   const saleCount = wonOpps.length
-  const wonPremium = wonOpps.reduce((sum, o) => sum + (Number(o.monetaryValue) || 0), 0)
+
+  // 12. Premium average per customer
+  const premiumAvgPerCustomer = saleCount > 0 ? wonPremium / saleCount : null
+
+  // Leads with ≥1 opportunity (proxy for engagement)
   const withOpportunity = leads.filter(l => (l.opportunities || []).length > 0).length
 
-  const hasLeadCost    = leads.some(l => l.leadPrice !== null && l.leadPrice !== undefined && l.leadPrice !== '')
-  const hasCallCount   = leads.some(l => l.callCount !== null && l.callCount !== undefined && l.callCount !== '')
-  const hasDisposition = leads.some(l => !!l.dispositionDate)
+  // Custom-field availability — only compute if at least one lead has the field
+  const hasLeadCost   = leads.some(l => hasValue(l.leadPrice))
+  const hasCallCount  = leads.some(l => hasValue(l.callCount))
+  const hasDispoDate  = leads.some(l => hasValue(l.dispositionDate))
+  const hasBadLead    = leads.some(l => hasValue(l.badLeadDate))
+  const hasSmsReply   = leads.some(l => hasValue(l.smsReplyDate))
+  const hasQuoted     = leads.some(l => hasValue(l.quotedTimestamp))
+  const hasXdated     = leads.some(l => hasValue(l.xdatedReason))
 
-  const totalLeadCost = hasLeadCost  ? leads.reduce((sum, l) => sum + (Number(l.leadPrice) || 0), 0) : null
-  const totalCalls    = hasCallCount ? leads.reduce((sum, l) => sum + (Number(l.callCount) || 0), 0) : null
-  const dispositioned = hasDisposition ? leads.filter(l => !!l.dispositionDate).length : null
+  // 7. Lead Cost — sum({Lead Price})
+  const totalLeadCost = hasLeadCost
+    ? leads.reduce((s, l) => s + (Number(l.leadPrice) || 0), 0)
+    : null
+
+  // 8. Calls — sum({Call Count})
+  const totalCalls = hasCallCount
+    ? leads.reduce((s, l) => s + (Number(l.callCount) || 0), 0)
+    : null
+
+  // 9. Calls for Customers — sumIf({Call Count}, stage = 'Policy Sold')
+  const callsForCustomers = hasCallCount
+    ? leads
+        .filter(l => (l.opportunities || []).some(isWon))
+        .reduce((s, l) => s + (Number(l.callCount) || 0), 0)
+    : null
+
+  // 3. Bad Leads — count({Bad Lead Date})
+  const badLeads = hasBadLead
+    ? leads.filter(l => hasValue(l.badLeadDate)).length
+    : null
+
+  // 4. Dispositions — count({Disposition Date and Time})
+  const dispositionCount = hasDispoDate
+    ? leads.filter(l => hasValue(l.dispositionDate)).length
+    : null
+
+  // 5. SMS Replies — countIf({SMS reply date}, stage <> 'Bad Lead / DNC')
+  const smsReplies = hasSmsReply
+    ? leads.filter(l => hasValue(l.smsReplyDate) && l.salesStage !== 'Bad Lead / DNC').length
+    : null
+
+  // 10. Quotes — count({Quoted Timestamp})
+  const quotes = hasQuoted
+    ? leads.filter(l => hasValue(l.quotedTimestamp)).length
+    : null
+
+  // 11. Rate too high — countIf(Id, {X-dated Reason} = 'Rate is too high')
+  const rateTooHigh = hasXdated
+    ? leads.filter(l => (l.xdatedReason || '').toLowerCase().includes('rate is too high')).length
+    : null
+
+  // ── SPECIAL PARAMETERS ────────────────────────────────────────────────────
+  // Commission rate = 0.105 (static, confirmed by Steve)
+
+  // ── COMPOUND CALCULATIONS ─────────────────────────────────────────────────
+  // 0. Commission — {Written Premium} * 0.105
+  const commission = wonPremium * COMMISSION_RATE
+
+  // 1. Profit — Commission - {Lead Cost}
+  const profit = totalLeadCost !== null ? commission - totalLeadCost : null
+
+  // 2. PPL — Profit / Leads
+  const ppl = (profit !== null && leadCount > 0) ? profit / leadCount : null
+
+  // 3. Disposition rate — Dispositions / Leads
+  const dispoRate = (dispositionCount !== null && leadCount > 0)
+    ? (dispositionCount / leadCount) * 100 : null
+
+  // 4. SMS reply rate — {SMS Replies} / Leads
+  const smsReplyRate = (smsReplies !== null && leadCount > 0)
+    ? (smsReplies / leadCount) * 100 : null
+
+  // 5. Close rate — {New Customers} / Leads
+  const conversionRate = leadCount > 0 ? (saleCount / leadCount) * 100 : null
+
+  // 6. CPP — {Lead Cost} / {New Customers}
+  const cpp = (totalLeadCost !== null && saleCount > 0) ? totalLeadCost / saleCount : null
+
+  // 7. Calls per lead — sum({Call Count}) / Leads
+  const callsPerLead = (totalCalls !== null && leadCount > 0) ? totalCalls / leadCount : null
+
+  // 8. Calls to Close — {Calls for Customers} / {New Customers}
+  const callsToClose = (callsForCustomers !== null && saleCount > 0)
+    ? callsForCustomers / saleCount : null
+
+  // 9. Quote Rate — Quotes / Leads
+  const quoteRate = (quotes !== null && leadCount > 0) ? (quotes / leadCount) * 100 : null
+
+  // 10. Bad Lead rate — {Bad Leads} / Leads
+  const badLeadRate = (badLeads !== null && leadCount > 0)
+    ? (badLeads / leadCount) * 100 : null
+
+  // 11. Rate too high rate — {Rate too high} / Leads
+  const rateTooHighRate = (rateTooHigh !== null && leadCount > 0)
+    ? (rateTooHigh / leadCount) * 100 : null
+
+  // 12. Quotes to close rate — {New Customers} / Quotes
+  const quotesToCloseRate = (quotes !== null && quotes > 0)
+    ? (saleCount / quotes) * 100 : null
 
   return {
-    leadCount,
-    saleCount,
-    wonPremium,
-    withOpportunity,
-    leadCost:        totalLeadCost,
-    cpp:             (totalLeadCost !== null && saleCount > 0) ? totalLeadCost / saleCount : null,
-    callCount:       totalCalls, // raw total — QuickSight shows this as its own tile, separate from the per-lead average
-    callsPerLead:    (totalCalls !== null && leadCount > 0) ? totalCalls / leadCount : null,
-    dispoRate:       (dispositioned !== null && leadCount > 0) ? (dispositioned / leadCount) * 100 : null,
-    // Sales ÷ Leads — the simple "Close Rate" definition. QuickSight's headline
-    // "Conv. Rate" tile actually used Sales ÷ Quotes (a different denominator,
-    // per the earlier reverse-engineered audit) — that variant needs a "quoted"
-    // stage identified from real Sales Stage data before it can be added here.
-    conversionRate:  leadCount > 0 ? (saleCount / leadCount) * 100 : null,
-    ppl:             null, // needs "commission" — not yet identified which GHL field this is, do not guess
+    // Base
+    leadCount, saleCount, wonPremium, premiumAvgPerCustomer, withOpportunity,
+    leadCost: totalLeadCost,
+    totalCalls, callsForCustomers,
+    dispositionCount, badLeads, smsReplies, quotes, rateTooHigh,
+    // Compound
+    commission, profit, ppl,
+    conversionRate, cpp,
+    callsPerLead, callsToClose,
+    dispoRate, smsReplyRate, quoteRate,
+    badLeadRate, rateTooHighRate, quotesToCloseRate,
   }
 }
 
-// Groups by each lead's current sales stage (see api/master-leads.js — the
-// most recently stage-changed opportunity's stage). Leads with no opportunity
-// at all fall into "(no opportunity)" rather than being silently dropped, so
-// the chart's total always reconciles with the Leads KPI card.
 export function salesStageBreakdown(leads) {
   const counts = new Map()
   for (const lead of leads) {

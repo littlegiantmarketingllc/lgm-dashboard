@@ -9,13 +9,17 @@ const GHL_BASE   = 'https://services.leadconnectorhq.com'
 const GHL_VER    = '2021-07-28'
 const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
 
+// Hardcoded GHL marketplace app Client ID — same app as lgm-goals-dashboard.
+// Secret is in GHL_CLIENT_SECRET env var (65069ed9-2c96-4a99-9c52-f2a540b70fcb).
+const GOALS_APP_CLIENT_ID = '6a6dea0af575e7245fd2313c-msp4gmsf'
+
 async function refreshToken(tokenData) {
   try {
     const res = await fetch(`${GHL_BASE}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id:     process.env.GHL_CLIENT_ID,
+        client_id:     GOALS_APP_CLIENT_ID,
         client_secret: process.env.GHL_CLIENT_SECRET,
         grant_type:    'refresh_token',
         refresh_token: tokenData.refreshToken,

@@ -26,11 +26,15 @@ const OPPS_MAX_PAGES = 100
 // Target fields we need values for. Matched against GHL custom field names/fieldKeys
 // by case-insensitive substring — GHL naming may not be an exact match per account.
 const FIELD_TARGETS = {
-  leadPrice:       ['lead price', 'lead cost'],
-  callCount:       ['call count', 'calls count'],
-  dispositionDate: ['disposition date'],
-  leadProfile:     ['lead profile'],
-  badLeadReason:   ['bad lead reason'],
+  leadPrice:        ['lead price', 'lead cost'],
+  callCount:        ['call count', 'calls count'],
+  dispositionDate:  ['disposition date and time', 'disposition date'],
+  badLeadDate:      ['bad lead date'],
+  smsReplyDate:     ['sms reply date', 'sms reply'],
+  quotedTimestamp:  ['quoted timestamp', 'quoted date', 'quote date', 'quoted'],
+  xdatedReason:     ['x-dated reason', 'xdated reason', 'x dated reason', 'reason x-dated'],
+  leadProfile:      ['lead profile'],
+  badLeadReason:    ['bad lead reason'],
 }
 
 async function getCustomFieldMap(token, locationId) {
@@ -276,10 +280,14 @@ export default async function handler(req, res) {
           source:             c.source || null,
           assignedTo:         c.assignedTo || null,
           assignedToName:     usersById[c.assignedTo] || null,
-          // Convenience fields we have confirmed formulas/columns for, pulled out for quick access.
+          // Convenience fields pulled out for quick access by masterMetrics.js
           leadPrice:          readCustomFieldValue(c, fieldMap.leadPrice),
           callCount:          readCustomFieldValue(c, fieldMap.callCount),
           dispositionDate:    readCustomFieldValue(c, fieldMap.dispositionDate),
+          badLeadDate:        readCustomFieldValue(c, fieldMap.badLeadDate),
+          smsReplyDate:       readCustomFieldValue(c, fieldMap.smsReplyDate),
+          quotedTimestamp:    readCustomFieldValue(c, fieldMap.quotedTimestamp),
+          xdatedReason:       readCustomFieldValue(c, fieldMap.xdatedReason),
           leadProfile:        readCustomFieldValue(c, fieldMap.leadProfile),
           badLeadReason:      readCustomFieldValue(c, fieldMap.badLeadReason),
           // Every custom field GHL has on this contact, name-resolved — not just the ones above.

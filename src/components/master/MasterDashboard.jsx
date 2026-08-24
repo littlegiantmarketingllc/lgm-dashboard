@@ -154,7 +154,7 @@ export default function MasterDashboard({ locationId }) {
           />
         </div>
 
-        <OverviewCards overview={overview} customFieldsBlocked={!!customFieldsError} />
+        <OverviewCards overview={overview} />
 
         <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
 
