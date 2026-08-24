@@ -36,6 +36,7 @@ export function computeOverview(leads) {
   const hasOppSold    = leads.some(l => hasValue(l.oppSoldDate))
   const hasQuoted     = leads.some(l => hasValue(l.quotedTimestamp))
   const hasXdated     = leads.some(l => hasValue(l.xdatedReason))
+  const hasOptOut     = leads.some(l => hasValue(l.optOutDate))
 
   // 3. Bad Leads — count({Bad Lead Date})
   const badLeads = hasBadLead
@@ -87,6 +88,12 @@ export function computeOverview(leads) {
   // 11. Rate too high — countIf(Id, {X-dated Reason} = 'Rate is too high')
   const rateTooHigh = hasXdated
     ? leads.filter(l => (l.xdatedReason || '').toLowerCase().includes('rate is too high')).length
+    : null
+
+  // Opt Outs — count({Opt Out Date}). Not in Steve's original spec sheet, but
+  // shown alongside it in QuickSight's Lead Source / Owner / Profile matrices.
+  const optOuts = hasOptOut
+    ? leads.filter(l => hasValue(l.optOutDate)).length
     : null
 
   // 12. Premium average per customer — avgIf(monetaryValue, pipelineStageId = 'Policy Sold')
@@ -151,17 +158,21 @@ export function computeOverview(leads) {
   const quotesToCloseRate = (newCustomers !== null && quotes !== null && quotes > 0)
     ? (newCustomers / quotes) * 100 : null
 
+  // 13. Opt out rate — {Opt Outs} / Leads
+  const optOutRate = (optOuts !== null && leadCount > 0)
+    ? (optOuts / leadCount) * 100 : null
+
   return {
     // Base
     leadCount, writtenPremium, newCustomers, premiumAvgPerCustomer, withOpportunity,
     leadCost, totalCalls, callsForCustomers,
-    dispositionCount, badLeads, smsReplies, quotes, rateTooHigh,
+    dispositionCount, badLeads, smsReplies, quotes, rateTooHigh, optOuts,
     // Compound
     commission, profit, ppl,
     closeRate, cpp,
     callsPerLead, callsToClose,
     dispoRate, smsReplyRate, quoteRate,
-    badLeadRate, rateTooHighRate, quotesToCloseRate,
+    badLeadRate, rateTooHighRate, quotesToCloseRate, optOutRate,
   }
 }
 

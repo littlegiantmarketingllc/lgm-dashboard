@@ -2,12 +2,19 @@
   "functions": {
     "api/master-leads.js": {
       "maxDuration": 90
+    },
+    "api/cron-refresh-master-cache.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
     {
       "path": "/api/cron-refresh-token",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron-refresh-master-cache",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

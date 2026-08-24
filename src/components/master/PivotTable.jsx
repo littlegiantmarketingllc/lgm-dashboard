@@ -12,15 +12,32 @@ function SortIcon({ col, sortCol, sortDir }) {
 
 function fmtSignedMoney(n) { if (n === null || n === undefined) return '—'; const s = n < 0 ? '-$' : '$'; return s + Math.round(Math.abs(n)).toLocaleString() }
 
+// Full column set matches QuickSight's Lead Source / Assigned Owner / Lead
+// Profile matrices exactly (per Steve's spec + the screenshots John/Steve
+// shared) — every metric computeOverview() already produces per group. This
+// table scrolls horizontally within its own card (overflow-x-auto below);
+// the page itself never scrolls sideways since each table is full-width and
+// stacked (see MasterDashboard.jsx).
 const COLS = [
-  { key: 'label',          label: 'Name',          align: 'left',  fmt: v => v },
-  { key: 'leadCount',      label: 'Leads',         align: 'right', fmt: v => v.toLocaleString() },
-  { key: 'newCustomers',   label: 'New Customers', align: 'right', fmt: v => v.toLocaleString() },
-  { key: 'writtenPremium', label: 'Premium',       align: 'right', fmt: fmtMoney },
-  { key: 'ppl',            label: 'PPL',           align: 'right', fmt: fmtSignedMoney },
-  { key: 'closeRate',      label: 'Close Rate',    align: 'right', fmt: fmtPct },
-  { key: 'dispoRate',      label: 'Dispo Rate',    align: 'right', fmt: fmtPct },
-  { key: 'callsPerLead',   label: 'Calls/Lead',    align: 'right', fmt: v => fmtNum(v, 2) },
+  { key: 'label',            label: 'Name',           align: 'left',  fmt: v => v },
+  { key: 'leadCount',        label: 'Leads',          align: 'right', fmt: v => v.toLocaleString() },
+  { key: 'leadCost',         label: 'Lead Cost',      align: 'right', fmt: fmtMoney },
+  { key: 'dispoRate',        label: 'Dispo Rate',     align: 'right', fmt: fmtPct },
+  { key: 'smsReplyRate',     label: 'SMS Reply',      align: 'right', fmt: fmtPct },
+  { key: 'optOutRate',       label: 'Opt Out',        align: 'right', fmt: fmtPct },
+  { key: 'quoteRate',        label: 'Quote Rate',     align: 'right', fmt: fmtPct },
+  { key: 'callsPerLead',     label: 'Calls/Lead',     align: 'right', fmt: v => fmtNum(v, 2) },
+  { key: 'badLeadRate',      label: 'Bad Lead',       align: 'right', fmt: fmtPct },
+  { key: 'rateTooHighRate',  label: 'Rate Too High',  align: 'right', fmt: fmtPct },
+  { key: 'newCustomers',     label: 'Customers',      align: 'right', fmt: v => v.toLocaleString() },
+  { key: 'quotesToCloseRate',label: 'Quotes→Close',   align: 'right', fmt: fmtPct },
+  { key: 'closeRate',        label: 'Close Rate',     align: 'right', fmt: fmtPct },
+  { key: 'callsToClose',     label: 'Calls to Close', align: 'right', fmt: v => fmtNum(v, 2) },
+  { key: 'cpp',              label: 'CPP',            align: 'right', fmt: fmtMoney },
+  { key: 'writtenPremium',   label: 'Premium',        align: 'right', fmt: fmtMoney },
+  { key: 'commission',       label: 'Commission',     align: 'right', fmt: fmtMoney },
+  { key: 'profit',           label: 'Profit',         align: 'right', fmt: fmtSignedMoney },
+  { key: 'ppl',              label: 'PPL',            align: 'right', fmt: fmtSignedMoney },
 ]
 
 // Generic pivot table — takes rows already shaped by pivotBySource()/pivotByOwner()
@@ -65,7 +82,7 @@ export default function PivotTable({ title, subtitle, rows, delay = 0 }) {
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className={`px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap select-none cursor-pointer hover:text-brand-heading text-brand-muted text-${col.align}`}
+                  className={`px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap select-none cursor-pointer hover:text-brand-heading text-brand-muted text-${col.align} ${col.key === 'label' ? 'sticky left-0 z-20 bg-brand-bg border-r border-brand-border' : ''}`}
                 >
                   <span className="inline-flex items-center gap-0.5">
                     {col.label}
@@ -85,10 +102,10 @@ export default function PivotTable({ title, subtitle, rows, delay = 0 }) {
               <tr><td colSpan={COLS.length} className="py-10 text-center text-brand-muted text-sm">No data for this window.</td></tr>
             )}
             {sorted.map(row => (
-              <tr key={row.label} className="border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
+              <tr key={row.label} className="group border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
                 {COLS.map(col => (
                   <td key={col.key}
-                    className={`px-3 py-2 first:pl-5 last:pr-4 text-[11px] text-${col.align} ${col.key === 'label' ? 'font-medium text-brand-text truncate max-w-[220px]' : 'num text-brand-text'}`}
+                    className={`px-3 py-2 first:pl-5 last:pr-4 text-[11px] text-${col.align} ${col.key === 'label' ? 'font-medium text-brand-text truncate max-w-[220px] sticky left-0 z-10 bg-white group-hover:bg-[#f3f6f2] border-r border-brand-border' : 'num text-brand-text'}`}
                   >
                     {row[col.key] === null || row[col.key] === undefined
                       ? <span className="text-brand-border">—</span>

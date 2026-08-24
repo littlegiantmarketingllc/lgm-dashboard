@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
+import InfoTip from '../health/InfoTip'
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString() : '—' }
+function hasValue(v) { return v !== null && v !== undefined && v !== '' }
 
 const PAGE_SIZE = 25
 
@@ -34,34 +36,57 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Lead Created', 'Last Status Change', 'Name', 'Assigned To', 'Sold Date', 'Lead Source', 'Lead Profile', 'Sales Stage', 'Bad Lead Reason'].map(h => (
+              {['Lead Created', 'Last Status Change', 'Name', 'Assigned To', 'Sales Stage', 'New Customer', 'Bad Lead', 'Reason', 'Lead Source', 'Lead Profile'].map(h => (
                 <th key={h} className="px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap text-left text-brand-muted">
-                  {h}
+                  <span className="inline-flex items-center gap-1">
+                    {h}
+                    {h === 'Last Status Change' && (
+                      <InfoTip text="GHL's contacts API doesn't return this field on any account — it isn't a data issue on our end. If Steve can confirm which endpoint or field actually carries this, we can wire it up." position="bottom-end" />
+                    )}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {pageRows.length === 0 && (
-              <tr><td colSpan={9} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
+              <tr><td colSpan={10} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
             )}
-            {pageRows.map(l => (
-              <tr key={l.contactId} className="border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
-                <td className="pl-5 pr-3 py-2 text-[11px] text-brand-text whitespace-nowrap">{fmtDate(l.dateAdded)}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.lastStatusChangeAt)}</td>
-                <td className="px-3 py-2 text-[11px] font-medium text-brand-text truncate max-w-[160px]">{l.name || '—'}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.assignedToName || l.assignedTo || '—'}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.oppSoldDate)}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.source || '—'}</td>
-                <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.leadProfile || '—'}</td>
-                <td className="px-3 py-2 text-[11px]">
-                  {l.salesStage
-                    ? <span className="inline-block px-1.5 py-0.5 rounded border border-brand-border bg-brand-bg text-brand-text text-[10px] whitespace-nowrap">{l.salesStage}</span>
-                    : <span className="text-brand-border">—</span>}
-                </td>
-                <td className="px-3 pr-4 py-2 text-[11px] text-brand-muted truncate max-w-[160px]">{l.badLeadReason || '—'}</td>
-              </tr>
-            ))}
+            {pageRows.map(l => {
+              const isCustomer = hasValue(l.oppSoldDate)
+              const isBadLead = hasValue(l.badLeadDate)
+              const reason = l.badLeadReason || l.xdatedReason || null
+              return (
+                <tr key={l.contactId} className="border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
+                  <td className="pl-5 pr-3 py-2 text-[11px] text-brand-text whitespace-nowrap">{fmtDate(l.dateAdded)}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.lastStatusChangeAt)}</td>
+                  <td className="px-3 py-2 text-[11px] font-medium text-brand-text truncate max-w-[160px]">{l.name || '—'}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.assignedToName || l.assignedTo || '—'}</td>
+                  <td className="px-3 py-2 text-[11px]">
+                    {l.salesStage
+                      ? <span className="inline-block px-1.5 py-0.5 rounded border border-brand-border bg-brand-bg text-brand-text text-[10px] whitespace-nowrap">{l.salesStage}</span>
+                      : <span className="text-brand-border">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-[11px] whitespace-nowrap">
+                    {isCustomer
+                      ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: 'rgba(140,198,63,0.15)', color: '#5C8A2A' }}>
+                          ✓ {fmtDate(l.oppSoldDate)}
+                        </span>
+                      )
+                      : <span className="text-brand-border">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-[11px] whitespace-nowrap">
+                    {isBadLead
+                      ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-semibold">🚫 Bad Lead</span>
+                      : <span className="text-brand-border">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted truncate max-w-[160px]">{reason || '—'}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.source || '—'}</td>
+                  <td className="px-3 pr-4 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.leadProfile || '—'}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -8,7 +8,18 @@ import OwnerSourceFilter from './OwnerSourceFilter'
 import OverviewCards from './OverviewCards'
 import PivotTable from './PivotTable'
 import SalesStageChart from './SalesStageChart'
+import RateTooHighTrend from './RateTooHighTrend'
 import LeadDetailsTable from './LeadDetailsTable'
+
+function fmtAgo(ms) {
+  if (ms === null || ms === undefined || ms < 0) return null
+  const mins = Math.round(ms / 60000)
+  if (mins < 1) return 'just now'
+  if (mins === 1) return '1 min ago'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.round(mins / 60)
+  return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`
+}
 
 // Loading/error/empty states all keep the header + tab bar visible — the
 // page should never look headerless mid-transition, and switching tabs
@@ -85,7 +96,7 @@ export default function MasterDashboard({ locationId }) {
   // These must run on every render, before any early return — React requires
   // the same hooks in the same order every time. `leads` defaults to [] when
   // data hasn't loaded yet, so the memos are cheap no-ops until then.
-  const { leads = [], customFieldsError, missingFields = [], allFields = [], from, to } = data || {}
+  const { leads = [], customFieldsError, missingFields = [], allFields = [], from, to, cacheAgeMs } = data || {}
 
   const owners = useMemo(
     () => [...new Set(leads.map(l => l.assignedToName || l.assignedTo).filter(Boolean))].sort(),
@@ -175,9 +186,29 @@ export default function MasterDashboard({ locationId }) {
           />
         </div>
 
+        {!isDemo && (
+          <div className="flex items-center justify-end gap-2 -mt-3">
+            {cacheAgeMs !== undefined && (
+              <span className="text-[10px] text-brand-muted">
+                Data as of {fmtAgo(cacheAgeMs)} · switching date presets is instant, this is when GHL was last pulled
+              </span>
+            )}
+            <button
+              onClick={() => refetch({ force: true })}
+              disabled={loading}
+              className="px-2.5 py-1 rounded-lg border border-brand-border bg-white text-[10px] font-semibold text-brand-muted hover:bg-brand-bg disabled:opacity-50 whitespace-nowrap"
+            >
+              {loading ? 'Refreshing…' : '↻ Refresh now'}
+            </button>
+          </div>
+        )}
+
         <OverviewCards overview={overview} />
 
-        <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
+          <RateTooHighTrend leads={filteredLeads} delay={420} />
+        </div>
 
         {/* Full width, stacked — each table has 7 data columns and needs the
             room; three of these side by side forced horizontal scrolling. */}

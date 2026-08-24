@@ -68,6 +68,7 @@ export default function OverviewCards({ overview }) {
     quotes, quoteRate,
     rateTooHigh, rateTooHighRate,
     quotesToCloseRate,
+    optOuts, optOutRate,
   } = overview
 
   return (
@@ -191,6 +192,11 @@ export default function OverviewCards({ overview }) {
         accentColor={rateTooHigh ? ORG : undefined}
         sub={rateTooHighRate !== null ? `${fmt(rateTooHighRate, 1)}% of leads` : 'countIf(X-dated Reason = "Rate too high")'}
         infoText="countIf(Id, {X-dated Reason} = 'Rate is too high')" />
+
+      <Card label="Opt Outs" value={optOuts} icon="🔕" delay={960}
+        accentColor={optOuts ? RED : undefined}
+        sub={optOutRate !== null ? `${fmt(optOutRate, 1)}% of leads` : 'count({Opt Out Date})'}
+        infoText="count({Opt Out Date}) — leads who opted out of communication." />
 
     </div>
   )

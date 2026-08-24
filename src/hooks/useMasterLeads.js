@@ -15,7 +15,7 @@ export function useMasterLeads(locationId, { from, to } = {}) {
 
   const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1'
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ force = false } = {}) => {
     if (isDemo) {
       setLoading(true)
       setError(null)
@@ -36,6 +36,7 @@ export function useMasterLeads(locationId, { from, to } = {}) {
       const params = new URLSearchParams({ locationId })
       if (from) params.set('from', from)
       if (to)   params.set('to', to)
+      if (force) params.set('refresh', '1')
       const res  = await fetch(`/api/master-leads?${params.toString()}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
