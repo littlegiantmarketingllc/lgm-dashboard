@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import InfoTip from './InfoTip'
+import { useRole } from '../../contexts/RoleContext'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -70,8 +71,10 @@ const COLS = [
 ]
 
 const PAGE_SIZE = 25
+const BILLING_COLS = new Set(['stripeStatus', 'totalRev', 'planPrice', 'addOns', 'lcWalletCharges', 'users', '_estGP'])
 
 export default function MasterAccountsTable({ accounts, dateFiltered = false, dateLabel = null, onAccountClick }) {
+  const { isAdmin }           = useRole()
   const [sortCol, setSortCol] = useState('lastActivity')
   const [sortDir, setSortDir] = useState('asc')
   const [page,    setPage]    = useState(1)
@@ -79,8 +82,9 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
   const accountsKey = accounts.length
   useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stripeCount = useMemo(() => accounts.filter(a => a._stripeBound).length, [accounts])
-  const lcCount     = useMemo(() => accounts.filter(a => (a.lcWalletCharges ?? 0) > 0).length, [accounts])
+  const stripeCount  = useMemo(() => accounts.filter(a => a._stripeBound).length, [accounts])
+  const lcCount      = useMemo(() => accounts.filter(a => (a.lcWalletCharges ?? 0) > 0).length, [accounts])
+  const visibleCols  = isAdmin ? COLS : COLS.filter(c => !BILLING_COLS.has(c.key))
 
   function estGP(account) {
     if (!account._stripeBound || !account.totalRev || account.totalRev <= 0) return null
@@ -148,8 +152,8 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
             </h2>
             <p className="text-brand-muted text-[10px] mt-0.5">
               {accounts.length} sub-accounts
-              {stripeCount > 0 && <> · <span className="font-medium" style={{ color: G }}>{stripeCount} Stripe</span> · {accounts.length - stripeCount} unmatched</>}
-              {lcCount > 0 && <> · <span className="font-medium" style={{ color: '#7c3aed' }}>{lcCount} with LC spend</span></>}
+              {isAdmin && stripeCount > 0 && <> · <span className="font-medium" style={{ color: G }}>{stripeCount} Stripe</span> · {accounts.length - stripeCount} unmatched</>}
+              {isAdmin && lcCount > 0 && <> · <span className="font-medium" style={{ color: '#7c3aed' }}>{lcCount} with LC spend</span></>}
               {' '}· click a column to sort · click a row to open details
             </p>
           </div>
@@ -164,7 +168,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {COLS.map(col => (
+              {visibleCols.map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
@@ -188,7 +192,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
           <tbody>
             {pageData.length === 0 && (
               <tr>
-                <td colSpan={COLS.length} className="py-10 text-center text-brand-muted text-sm">
+                <td colSpan={visibleCols.length} className="py-10 text-center text-brand-muted text-sm">
                   No accounts match the current filters.
                 </td>
               </tr>
@@ -214,7 +218,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                       {churned && (
                         <span className="text-[8px] font-bold px-1 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 flex-shrink-0">CHR</span>
                       )}
-                      {!bound && (
+                      {isAdmin && !bound && (
                         <span
                           title="No Stripe match found for this account — billing columns can't populate until Cliff reconciles it. Not a $0 or broken account, just an unmatched data gap."
                           className="text-[8px] font-bold px-1 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0"
@@ -238,68 +242,70 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                       : '—'}
                   </td>
 
-                  {/* Stripe Status */}
-                  <td className="px-2 py-2 text-center">
-                    {bound ? (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                        a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
-                        a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                        a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
-                        'bg-red-50 border-red-200 text-red-600'
-                      }`}>{a.stripeStatus ?? '—'}</span>
-                    ) : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Total Rev */}
-                  <td className="px-2 py-2 text-right">
-                    {bound
-                      ? <span className="num text-[11px] font-semibold text-brand-text">{fmtRev(a.totalRev)}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Plan Price (+ annual badge) */}
-                  <td className="px-2 py-2 text-right">
-                    {bound ? (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="num text-[11px] text-brand-text">{fmtRev(a.planPrice)}</span>
-                        {a.planInterval === 'year' && (
-                          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700">yr</span>
-                        )}
-                      </span>
-                    ) : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Add-ons — show $0 for Stripe-matched accounts with no add-ons */}
-                  <td className="px-2 py-2 text-right">
-                    {bound ? (
-                      a.addOns > 0
-                        ? <span className="num text-[11px] text-brand-text">{fmtRev(a.addOns)}</span>
-                        : <span className="num text-[10px] text-brand-muted">$0</span>
-                    ) : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* LC Wallet — cumulative spend */}
-                  <td className="px-2 py-2 text-right">
-                    {wallet
-                      ? <span className="num text-[11px] font-medium" style={{ color: '#7c3aed' }}>{wallet}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Billed Users */}
-                  <td className="px-2 py-2 text-center">
-                    {bound
-                      ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Est. GP% */}
-                  <td className="px-2 py-2 text-right">
-                    {gp !== null
-                      ? <span className="num text-[10px] font-medium" style={{ color: gp >= 70 ? G : gp >= 40 ? AMB : RED }}>
-                          {gp}%
+                  {/* Billing columns — admin only */}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-center">
+                      {bound ? (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
+                          a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                          a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                          'bg-red-50 border-red-200 text-red-600'
+                        }`}>{a.stripeStatus ?? '—'}</span>
+                      ) : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {bound
+                        ? <span className="num text-[11px] font-semibold text-brand-text">{fmtRev(a.totalRev)}</span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {bound ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="num text-[11px] text-brand-text">{fmtRev(a.planPrice)}</span>
+                          {a.planInterval === 'year' && (
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700">yr</span>
+                          )}
                         </span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
+                      ) : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {bound ? (
+                        a.addOns > 0
+                          ? <span className="num text-[11px] text-brand-text">{fmtRev(a.addOns)}</span>
+                          : <span className="num text-[10px] text-brand-muted">$0</span>
+                      ) : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {wallet
+                        ? <span className="num text-[11px] font-medium" style={{ color: '#7c3aed' }}>{wallet}</span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-center">
+                      {bound
+                        ? <span className="num text-[11px] text-brand-text">{a.users > 0 ? a.users : '—'}</span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {gp !== null
+                        ? <span className="num text-[10px] font-medium" style={{ color: gp >= 70 ? G : gp >= 40 ? AMB : RED }}>
+                            {gp}%
+                          </span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
 
                   {/* Last Activity */}
                   <td className="px-2 py-2 text-center">

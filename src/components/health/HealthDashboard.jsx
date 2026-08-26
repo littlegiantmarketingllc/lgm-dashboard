@@ -3,6 +3,7 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths, differenceInDays,
 import { useMergedHealthData }    from '../../hooks/useMergedHealthData'
 import { useAccountStatus }       from '../../hooks/useAccountStatus'
 import { useDmAgentMap }          from '../../hooks/useDmAgentMap'
+import { useRole }                from '../../contexts/RoleContext'
 import { scoreAccount, classify, isAtRisk, recommendAction, isUpsellReady, suggestAddon } from '../../lib/healthEngine'
 import HealthFilterBar            from './HealthFilterBar'
 import HealthSummaryCards         from './HealthSummaryCards'
@@ -97,6 +98,7 @@ function ErrorBanner({ message, onRetry }) {
 
 
 export default function HealthDashboard({ filters, setFilters }) {
+  const { isAdmin }             = useRole()
   const { accounts: raw, loading, stripeLoading, error, lastUpdated, refetch } = useMergedHealthData()
   const { statuses, setStatus } = useAccountStatus()
   const { dmMap, dmLoaded }     = useDmAgentMap()
@@ -354,12 +356,12 @@ export default function HealthDashboard({ filters, setFilters }) {
           <strong className="text-brand-text">{accounts.length} GHL sub-accounts</strong> · GoHighLevel Agency API
         </span>
         <span className="text-brand-border">·</span>
-        {stripeLoading ? (
+        {isAdmin && stripeLoading ? (
           <>
             <span className="w-1.5 h-1.5 rounded-full bg-purple-300 animate-pulse flex-shrink-0" />
             <span className="text-brand-muted/60 animate-pulse">Loading Stripe billing…</span>
           </>
-        ) : billedAccounts.length > 0 ? (
+        ) : isAdmin && billedAccounts.length > 0 ? (
           <>
             <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
             <span>
@@ -426,8 +428,8 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* ── Overview sub-tab ─────────────────────────────────────── */}
       {activeSubTab === 'overview' && <>
 
-      {/* Stripe sync progress banner */}
-      {stripeLoading && (
+      {/* Stripe sync progress banner — admin only */}
+      {isAdmin && stripeLoading && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-100 bg-purple-50 text-[12px]"
           style={{ boxShadow: '0 1px 6px rgba(139,92,246,0.07)' }}>
           <div className="w-4 h-4 rounded-full border-2 border-purple-200 border-t-purple-500 animate-spin flex-shrink-0" />
@@ -470,6 +472,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         onPendingTicketsClick={() => setTicketsModalFilter('urgent')}
         onNewClientsClick={() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onNeedsCheckinClick={() => needsAttentionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        isAdmin={isAdmin}
       />
 
       {/* 2. Quick Wins — stale, upsell, newest */}
@@ -480,18 +483,20 @@ export default function HealthDashboard({ filters, setFilters }) {
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 3. DM vs Agent breakdown */}
-      <DmAgentBreakdown
-        hasBilling={billedAccounts.length > 0}
-        stripeLoading={stripeLoading}
-        breakdown={dmAgentBreakdown}
-        avgHealthDm={avgHealthDm}
-        avgHealthAgent={avgHealthAgent}
-        onTypeClick={(type) => {
-          setFilters(f => ({ ...f, typeFilter: type }))
-          setTimeout(() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
-        }}
-      />
+      {/* 3. DM vs Agent breakdown — admin only (contains revenue split) */}
+      {isAdmin && (
+        <DmAgentBreakdown
+          hasBilling={billedAccounts.length > 0}
+          stripeLoading={stripeLoading}
+          breakdown={dmAgentBreakdown}
+          avgHealthDm={avgHealthDm}
+          avgHealthAgent={avgHealthAgent}
+          onTypeClick={(type) => {
+            setFilters(f => ({ ...f, typeFilter: type }))
+            setTimeout(() => masterTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+          }}
+        />
+      )}
 
       {/* 4. Resolution tracker */}
       <ResolutionTrackerHealth accounts={staleAccounts} statuses={statuses} />
@@ -506,17 +511,19 @@ export default function HealthDashboard({ filters, setFilters }) {
         />
       </div>
 
-      {/* 6. Upsell table */}
-      <UpsellTable
-        accounts={upsellAccounts}
-        hasBilling={billedAccounts.length > 0}
-        stripeLoading={stripeLoading}
-        isContacted={() => false}
-        toggleContacted={() => {}}
-        getContactedAt={() => null}
-        onAccountClick={setSelectedAccount}
-        potentialMRR={BILLING.upsellMRR}
-      />
+      {/* 6. Upsell table — admin only */}
+      {isAdmin && (
+        <UpsellTable
+          accounts={upsellAccounts}
+          hasBilling={billedAccounts.length > 0}
+          stripeLoading={stripeLoading}
+          isContacted={() => false}
+          toggleContacted={() => {}}
+          getContactedAt={() => null}
+          onAccountClick={setSelectedAccount}
+          potentialMRR={BILLING.upsellMRR}
+        />
+      )}
 
       {/* 7. Charts — health distribution, join timeline, activity + billing panels */}
       {activeDateLabel && (
@@ -530,11 +537,11 @@ export default function HealthDashboard({ filters, setFilters }) {
         <HealthCharts accounts={filteredAccounts} stripeLoading={stripeLoading} />
       </div>
 
-      {/* 8. Billing breakdown by charge type */}
-      <TransactionBreakdown accounts={billedAccounts} stripeLoading={stripeLoading} />
+      {/* 8. Billing breakdown by charge type — admin only */}
+      {isAdmin && <TransactionBreakdown accounts={billedAccounts} stripeLoading={stripeLoading} />}
 
-      {/* Churned this period — only visible when a date filter is active */}
-      {cancelledInPeriod.length > 0 && (
+      {/* Churned this period — admin only, only visible when a date filter is active */}
+      {isAdmin && cancelledInPeriod.length > 0 && (
         <div className="animate-fade-in-up rounded-2xl border border-red-200 bg-white overflow-hidden"
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
           <div className="px-5 sm:px-6 py-4 border-b border-red-100 flex items-center justify-between gap-3 bg-red-50/40">

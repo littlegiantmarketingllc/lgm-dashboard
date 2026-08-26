@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useRole } from '../../contexts/RoleContext'
 
 const G   = '#8CC63F'
 const AMB = '#EAB308'
@@ -38,7 +39,7 @@ function KpiTile({ label, value, sub, color, onClick }) {
   )
 }
 
-function DmCard({ group, rank, selected, onClick }) {
+function DmCard({ group, rank, selected, onClick, isAdmin }) {
   const hasRank = rank < 3
   const borderStyle = selected
     ? { borderColor: G, boxShadow: `0 0 0 2px ${G}35, 0 4px 16px rgba(0,0,0,0.08)` }
@@ -70,10 +71,12 @@ function DmCard({ group, rank, selected, onClick }) {
 
       {/* Stats */}
       <div className="px-3.5 py-2.5 space-y-1.5">
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="text-brand-muted">District MRR</span>
-          <span className="num font-bold text-[12px]" style={{ color: G }}>{fmt$(group.totalMRR)}</span>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-brand-muted">District MRR</span>
+            <span className="num font-bold text-[12px]" style={{ color: G }}>{fmt$(group.totalMRR)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-brand-muted">Agents</span>
           <span className="num font-semibold text-brand-text">{group.agentCount} <span className="text-brand-muted font-normal">({group.billedCount} billed)</span></span>
@@ -104,7 +107,7 @@ function DmCard({ group, rank, selected, onClick }) {
   )
 }
 
-function AgentTable({ group, onAccountClick }) {
+function AgentTable({ group, onAccountClick, isAdmin }) {
   return (
     <div className="rounded-2xl border border-brand-border bg-white overflow-hidden animate-fade-in-up"
       style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
@@ -115,11 +118,11 @@ function AgentTable({ group, onAccountClick }) {
             {group.name} — Agent Portfolio
           </h3>
           <p className="text-brand-muted text-[10px] mt-0.5">
-            {group.agentCount} agents · {fmt$(group.totalMRR)} district MRR · click a row to open details
+            {group.agentCount} agents{isAdmin ? ` · ${fmt$(group.totalMRR)} district MRR` : ''} · click a row to open details
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="num text-[13px] font-bold" style={{ color: G }}>{fmt$(group.totalMRR)}</span>
+          {isAdmin && <span className="num text-[13px] font-bold" style={{ color: G }}>{fmt$(group.totalMRR)}</span>}
           {group.avgHealth !== null && (
             <span className="num text-[11px] font-bold px-2 py-0.5 rounded-full border"
               style={{ color: bandColor(group.avgHealth >= 70 ? 'healthy' : group.avgHealth >= 40 ? 'watch' : 'at_risk'), borderColor: `${bandColor(group.avgHealth >= 70 ? 'healthy' : group.avgHealth >= 40 ? 'watch' : 'at_risk')}28`, background: `${bandColor(group.avgHealth >= 70 ? 'healthy' : group.avgHealth >= 40 ? 'watch' : 'at_risk')}12` }}>
@@ -133,7 +136,7 @@ function AgentTable({ group, onAccountClick }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Agent', 'Joined', 'Status', 'MRR', 'Plan', 'Activity', 'Health'].map(h => (
+              {['Agent', 'Joined', ...(isAdmin ? ['Status', 'MRR', 'Plan'] : []), 'Activity', 'Health'].map(h => (
                 <th key={h} className={`px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest text-brand-muted ${h === 'MRR' || h === 'Plan' ? 'text-right' : h === 'Status' || h === 'Activity' || h === 'Health' ? 'text-center' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -173,31 +176,33 @@ function AgentTable({ group, onAccountClick }) {
                       : '—'}
                   </td>
 
-                  {/* Stripe Status */}
-                  <td className="px-2 py-2 text-center">
-                    {bound ? (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                        a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
-                        a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                        a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
-                        'bg-red-50 border-red-200 text-red-600'
-                      }`}>{a.stripeStatus ?? '—'}</span>
-                    ) : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* MRR */}
-                  <td className="px-2 py-2 text-right">
-                    {bound && a.totalRev > 0
-                      ? <span className="num text-[11px] font-semibold text-brand-text">${Math.round(a.totalRev).toLocaleString()}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
-
-                  {/* Plan */}
-                  <td className="px-2 py-2 text-right">
-                    {bound && a.planPrice > 0
-                      ? <span className="num text-[10px] text-brand-text">${Math.round(a.planPrice).toLocaleString()}</span>
-                      : <span className="text-brand-border text-[10px]">—</span>}
-                  </td>
+                  {/* Billing columns — admin only */}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-center">
+                      {bound ? (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
+                          a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                          a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                          'bg-red-50 border-red-200 text-red-600'
+                        }`}>{a.stripeStatus ?? '—'}</span>
+                      ) : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {bound && a.totalRev > 0
+                        ? <span className="num text-[11px] font-semibold text-brand-text">${Math.round(a.totalRev).toLocaleString()}</span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td className="px-2 py-2 text-right">
+                      {bound && a.planPrice > 0
+                        ? <span className="num text-[10px] text-brand-text">${Math.round(a.planPrice).toLocaleString()}</span>
+                        : <span className="text-brand-border text-[10px]">—</span>}
+                    </td>
+                  )}
 
                   {/* Activity */}
                   <td className="px-2 py-2 text-center">
@@ -224,8 +229,9 @@ function AgentTable({ group, onAccountClick }) {
 }
 
 export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
+  const { isAdmin }                 = useRole()
   const [selectedDm, setSelectedDm] = useState(null)
-  const [sortBy, setSortBy]         = useState('mrr')
+  const [sortBy, setSortBy]         = useState(isAdmin ? 'mrr' : 'agents')
   const [search, setSearch]         = useState('')
   const agentTableRef               = useRef(null)
 
@@ -295,7 +301,7 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
   const selectedGroup = sorted.find(g => g.name === selectedDm) || null
 
   const SORT_OPTS = [
-    { key: 'mrr',    label: 'MRR' },
+    ...(isAdmin ? [{ key: 'mrr', label: 'MRR' }] : []),
     { key: 'agents', label: 'Agents' },
     { key: 'health', label: 'Health' },
   ]
@@ -304,10 +310,12 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
     <div className="space-y-5">
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiTile label="DMs Tracked"      value={dmGroups.length} color={G} />
-        <KpiTile label="Referred MRR"     value={fmt$(totalMRR)}  color={G} sub="from DM-referred agents" />
-        <KpiTile label="Referred Agents"  value={totalAgents}     color="#1A1A1A" sub="across all DMs" />
+      <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'}`}>
+        <KpiTile label="DMs Tracked"     value={dmGroups.length} color={G} />
+        {isAdmin && (
+          <KpiTile label="Referred MRR"  value={fmt$(totalMRR)}  color={G} sub="from DM-referred agents" />
+        )}
+        <KpiTile label="Referred Agents" value={totalAgents}     color="#1A1A1A" sub="across all DMs" />
         <KpiTile
           label="At-Risk Agents"
           value={totalAtRisk}
@@ -383,6 +391,7 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
               rank={i}
               selected={selectedDm === g.name}
               onClick={() => setSelectedDm(selectedDm === g.name ? null : g.name)}
+              isAdmin={isAdmin}
             />
           ))}
         </div>
@@ -391,7 +400,7 @@ export default function DmFootprintTab({ accounts, dmMap, onAccountClick }) {
       {/* Expanded agent table for selected DM */}
       <div ref={agentTableRef}>
         {selectedGroup && (
-          <AgentTable group={selectedGroup} onAccountClick={onAccountClick} />
+          <AgentTable group={selectedGroup} onAccountClick={onAccountClick} isAdmin={isAdmin} />
         )}
       </div>
 

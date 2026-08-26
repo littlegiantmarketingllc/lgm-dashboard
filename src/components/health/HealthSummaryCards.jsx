@@ -92,6 +92,8 @@ export default function HealthSummaryCards({
   urgentTickets = 0,
   onOpenTicketsClick,
   onPendingTicketsClick,
+  // Role-based: admins see billing cards, account managers do not
+  isAdmin = true,
 }) {
   const hasBilling = billedCount > 0
 
@@ -121,7 +123,7 @@ export default function HealthSummaryCards({
       <Card
         label={dateFiltered ? 'New Clients' : 'New Clients — Last 30 Days'}
         value={newCount}
-        sub={`Joined GHL in ${newPeriodLabel}${hasBilling && newMRR ? ` · ${fmt(newMRR)}/mo` : ''}`}
+        sub={`Joined GHL in ${newPeriodLabel}${isAdmin && hasBilling && newMRR ? ` · ${fmt(newMRR)}/mo` : ''}`}
         icon="✨"
         accentColor={G}
         delay={40}
@@ -167,8 +169,8 @@ export default function HealthSummaryCards({
         infoText="Average months clients have been active GHL sub-accounts. Longer tenure = lower churn risk."
       />
 
-      {/* ── Billing-dependent fields ────────────────────────────────────────── */}
-      {hasBilling ? (
+      {/* ── Billing-dependent fields — admin only ───────────────────────────── */}
+      {isAdmin && hasBilling ? (
         <>
           <Card
             label="At-Risk Accounts"
@@ -207,14 +209,14 @@ export default function HealthSummaryCards({
             infoText="Average billed GHL user seats per Stripe-matched account. Low seat count = upsell opportunity. Seats are billed through Stripe — total GHL members (including free seats) will show once Cliff's daily sync is live."
           />
         </>
-      ) : (
+      ) : isAdmin ? (
         <>
           <PendingCard label="At-Risk Accounts (by Revenue)"  icon="🚨" delay={120} pendingNote="Requires billing data to calculate revenue at risk" infoText="Will show: accounts inactive 30+ days with revenue at churn risk. Needs Stripe or billing sheet." />
           <PendingCard label="Healthy Accounts (by Score)"    icon="✅" delay={140} pendingNote="Health band available — revenue breakdown needs billing data" infoText="Count of accounts scoring 70+ is computable now; revenue split needs billing sheet." />
           <PendingCard label="Avg Monthly Subscription (MRR)" icon="💰" delay={160} pendingNote="Requires billing data — connect Stripe or billing sheet" infoText="Will show: average monthly charges per client (plan + seats + add-ons). Requires Stripe or the LGM billing sheet." />
           <PendingCard label="Avg Users / Account"            icon="👥" delay={180} pendingNote="Available per account via OAuth — bulk aggregate pending" infoText="Billed user seat average. Available per account in the detail modal now; bulk average requires Stripe matching." />
         </>
-      )}
+      ) : null}
 
       {/* ── Freshdesk support tickets — agency-wide ─────────────────────────── */}
       {freshdeskLoaded ? (
