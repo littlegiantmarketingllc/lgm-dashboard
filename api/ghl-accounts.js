@@ -37,9 +37,20 @@ export default async function handler(req, res) {
 
     const now = new Date()
 
-    // Strip internal sandbox / test accounts — they aren't real clients
+    // Strip internal / non-client accounts — pattern match + exact name list
     const SANDBOX_PATTERNS = /sandbox|test account|test 2|in progress|bilingual snapshot/i
-    const realLocs = all.filter(loc => !SANDBOX_PATTERNS.test(loc.name || ''))
+    const EXCLUDED_NAMES   = new Set([
+      'little giant dev',
+      'recruitment account - dm',
+      'clifford berman\'s account',
+      'kitajima insurance',
+      'lgm add-ons',
+      'data forest',
+    ])
+    const realLocs = all.filter(loc => {
+      const name = (loc.name || '').trim()
+      return !SANDBOX_PATTERNS.test(name) && !EXCLUDED_NAMES.has(name.toLowerCase())
+    })
 
     const accounts = realLocs.map(loc => {
       const updatedAt        = loc.dateUpdated ? new Date(loc.dateUpdated) : null
