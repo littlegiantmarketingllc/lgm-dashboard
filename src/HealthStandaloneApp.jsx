@@ -1,12 +1,9 @@
 import { useState, useEffect, Component } from 'react'
-import { ClerkProvider, SignedIn, SignedOut, SignIn, useUser, useClerk } from '@clerk/clerk-react'
+import { ClerkProvider, SignedIn, SignedOut, SignIn, useUser, useClerk, useAuth } from '@clerk/clerk-react'
 import { RoleContext } from './contexts/RoleContext'
 import HealthDashboard from './components/health/HealthDashboard'
 import LoginPage       from './components/health/LoginPage'
 
-// Clerk requires a DNS CNAME (clerk.littlegiantmarketing.com → frontend-api.clerk.services)
-// before the production key works. Set VITE_CLERK_ENABLED=true in Vercel after DNS is live.
-// Until then the app runs on legacy password+cookie auth with no interruption.
 const CLERK_KEY = import.meta.env.VITE_CLERK_ENABLED === 'true'
   ? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
   : null
@@ -51,7 +48,6 @@ function LogoMark() {
   )
 }
 
-// ─── Shared dashboard shell (header + footer + HealthDashboard) ───────────────
 function DashboardShell({ onSignOut }) {
   const [healthFilters, setHealthFilters] = useState({
     search: '', typeFilter: 'all', bandFilter: 'all', billingFilter: 'all',
@@ -79,18 +75,6 @@ function DashboardShell({ onSignOut }) {
   )
 }
 
-// ─── Reads role from Clerk publicMetadata — must be inside <ClerkProvider> ────
-function ClerkRoleProvider({ children }) {
-  const { user, isLoaded } = useUser()
-  const role = !isLoaded ? 'account_manager'
-             : (user?.publicMetadata?.role || 'account_manager')
-  return (
-    <RoleContext.Provider value={{ role, isAdmin: role === 'admin', isLoaded }}>
-      {children}
-    </RoleContext.Provider>
-  )
-}
-
 // ─── Clerk sign-in page styling ───────────────────────────────────────────────
 const clerkAppearance = {
   elements: {
@@ -103,11 +87,36 @@ const clerkAppearance = {
   },
 }
 
-// ─── Clerk-powered auth + role gating ────────────────────────────────────────
-function ClerkAuthApp() {
-  const { signOut } = useClerk()
+// ─── Lives inside ClerkProvider — handles loading timeout + auth UI ───────────
+function ClerkInner({ onFallback }) {
+  const { isLoaded } = useAuth()
+  const { signOut }  = useClerk()
+  const { user }     = useUser()
+
+  // If Clerk hasn't finished initializing within 7 seconds, fall back to legacy auth
+  useEffect(() => {
+    if (isLoaded) return
+    const t = setTimeout(onFallback, 7000)
+    return () => clearTimeout(t)
+  }, [isLoaded, onFallback])
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="w-7 h-7 rounded-full border-[3px] border-[#8CC63F] border-t-transparent"
+            style={{ animation: 'spin 0.8s linear infinite' }}
+          />
+          <p className="text-brand-muted text-xs tracking-wide">Loading…</p>
+        </div>
+      </div>
+    )
+  }
+
+  const role = user?.publicMetadata?.role || 'account_manager'
   return (
-    <ClerkRoleProvider>
+    <RoleContext.Provider value={{ role, isAdmin: role === 'admin', isLoaded: true }}>
       <SignedOut>
         <div className="min-h-screen flex flex-col items-center justify-center bg-brand-bg p-4">
           <div className="mb-8 flex justify-center">
@@ -121,11 +130,11 @@ function ClerkAuthApp() {
       <SignedIn>
         <DashboardShell onSignOut={() => signOut({ redirectUrl: '/' })} />
       </SignedIn>
-    </ClerkRoleProvider>
+    </RoleContext.Provider>
   )
 }
 
-// ─── Legacy password+cookie auth (used when Clerk is not configured) ──────────
+// ─── Legacy password+cookie auth ─────────────────────────────────────────────
 function LegacyAuthApp() {
   const params      = new URLSearchParams(window.location.search)
   const loginForced = params.get('login') === '1'
@@ -141,7 +150,6 @@ function LegacyAuthApp() {
 
   if (!authed) return <LoginPage onSuccess={handleLoginSuccess} />
 
-  // Legacy users always get admin — existing behavior unchanged
   return (
     <RoleContext.Provider value={{ role: 'admin', isAdmin: true, isLoaded: true }}>
       <DashboardShell onSignOut={() => { window.location.href = '/api/auth?logout=1' }} />
@@ -149,8 +157,7 @@ function LegacyAuthApp() {
   )
 }
 
-// ─── Error boundary: if Clerk fails to load (DNS not configured, network error,
-//     bad key), fall back to legacy auth instead of white-screening ─────────────
+// ─── Error boundary: catches synchronous render errors from Clerk ─────────────
 class ClerkErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { failed: false } }
   static getDerivedStateFromError() { return { failed: true } }
@@ -163,16 +170,15 @@ class ClerkErrorBoundary extends Component {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function HealthStandaloneApp() {
   useEffect(() => { document.title = 'LGM — Customer Health Dashboard' }, [])
+  const [useLegacy, setUseLegacy] = useState(false)
 
-  if (CLERK_KEY) {
-    return (
-      <ClerkErrorBoundary>
-        <ClerkProvider publishableKey={CLERK_KEY}>
-          <ClerkAuthApp />
-        </ClerkProvider>
-      </ClerkErrorBoundary>
-    )
-  }
+  if (!CLERK_KEY || useLegacy) return <LegacyAuthApp />
 
-  return <LegacyAuthApp />
+  return (
+    <ClerkErrorBoundary>
+      <ClerkProvider publishableKey={CLERK_KEY}>
+        <ClerkInner onFallback={() => setUseLegacy(true)} />
+      </ClerkProvider>
+    </ClerkErrorBoundary>
+  )
 }
