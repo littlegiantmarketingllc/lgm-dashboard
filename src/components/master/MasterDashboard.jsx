@@ -50,7 +50,18 @@ function ErrorScreen({ message, onRetry, isDemo, activeTab, onTabChange }) {
           style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-brand-heading font-bold text-lg mb-2">Could not load data</h2>
-          <p className="text-brand-muted text-sm leading-relaxed mb-6">{message}</p>
+          {/* The API joins error + actionable hint with a blank line; render
+              them as separate paragraphs so the fix doesn't get lost in a wall
+              of text. */}
+          <div className="mb-6 space-y-2">
+            {String(message).split('\n\n').map((para, i) => (
+              <p key={i} className={i === 0
+                ? 'text-brand-muted text-sm leading-relaxed'
+                : 'text-brand-muted text-[12px] leading-relaxed bg-brand-bg rounded-xl px-3 py-2 text-left'}>
+                {para}
+              </p>
+            ))}
+          </div>
           <button onClick={onRetry} className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold"
             style={{ background: '#8CC63F', boxShadow: '0 2px 8px rgba(140,198,63,0.35)' }}>
             Try Again
@@ -96,7 +107,7 @@ export default function MasterDashboard({ locationId }) {
   // These must run on every render, before any early return — React requires
   // the same hooks in the same order every time. `leads` defaults to [] when
   // data hasn't loaded yet, so the memos are cheap no-ops until then.
-  const { leads = [], customFieldsError, missingFields = [], allFields = [], from, to, cacheAgeMs } = data || {}
+  const { leads = [], customFieldsError, missingFields = [], allFields = [], from, to, cacheAgeMs, stale, staleReason } = data || {}
 
   const owners = useMemo(
     () => [...new Set(leads.map(l => l.assignedToName || l.assignedTo).filter(Boolean))].sort(),
@@ -186,10 +197,21 @@ export default function MasterDashboard({ locationId }) {
           />
         </div>
 
+        {!isDemo && stale && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[11px] font-medium">
+            <span>⚠</span>
+            <span>
+              Live GHL connection is down — showing the last successful sync (
+              {fmtAgo(cacheAgeMs)} old). Numbers may not reflect the newest leads.
+              {staleReason ? ` (${staleReason})` : ''}
+            </span>
+          </div>
+        )}
+
         {!isDemo && (
           <div className="flex items-center justify-end gap-2 -mt-3">
             {cacheAgeMs !== undefined && (
-              <span className="text-[10px] text-brand-muted">
+              <span className={`text-[10px] ${stale ? 'text-amber-700 font-semibold' : 'text-brand-muted'}`}>
                 Data as of {fmtAgo(cacheAgeMs)} · switching date presets is instant, this is when GHL was last pulled
               </span>
             )}

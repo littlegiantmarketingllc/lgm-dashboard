@@ -19,6 +19,13 @@ import { getLocationAccessToken } from './_ghlAuth.js'
 import { kv } from './_supabase.js'
 import { loadRaw, buildLeads, cacheKey, touchKnownLocations, CACHE_TTL_MS } from './_masterLeadsCore.js'
 
+// GHL location IDs are 20-char alphanumeric (e.g. EsfaSslc9A9wO3hXkJNj). A
+// 24-char lowercase-hex value is a Mongo ObjectId from somewhere else in the
+// stack — company ID, user ID, a record ID from an automation — and passing
+// one here fails in a way that reads like an auth error but isn't.
+const LOCATION_ID_LEN = 20
+const WELL_FORMED_LOCATION_ID = new RegExp(`^[A-Za-z0-9]{${LOCATION_ID_LEN}}$`)
+
 function defaultDateRange() {
   const to = new Date()
   const from = new Date()
@@ -41,10 +48,56 @@ export default async function handler(req, res) {
 
   try {
     const { token, reason } = await getLocationAccessToken(locationId)
+    let stale = false
+    let staleReason = null
+
     if (!token) {
-      return res.status(404).json({
-        error: `No OAuth token available for location "${locationId}".`,
-        reason,
+      // Live token is dead (expired refresh token, GHL outage, etc). Rather
+      // than hard-failing the whole dashboard, fall back to whatever was last
+      // cached for this location, however old — a stale number beats a blank
+      // error screen, and the "Data as of" banner already tells the viewer
+      // how old it is. Only a location that has NEVER successfully loaded
+      // (no cache at all yet) actually 404s.
+      const cached = await kv.get(cacheKey(locationId))
+      if (!cached) {
+        // Distinguish "this ID isn't a real location" from "our token died".
+        // These have completely different fixes (correct the embed URL vs.
+        // reconnect the GHL app), and reporting both as a generic OAuth
+        // failure has repeatedly sent debugging down the wrong path.
+        if (/location not found/i.test(reason || '')) {
+          return res.status(400).json({
+            error: `GHL does not recognize "${locationId}" as a location in this agency.`,
+            hint: WELL_FORMED_LOCATION_ID.test(locationId)
+              ? 'The ID is the right shape but GHL returned "Location not found" — the sub-account may have been deleted, or the app is not installed on it.'
+              : `That value doesn't look like a GHL location ID (those are ${LOCATION_ID_LEN} letters/digits, e.g. EsfaSslc9A9wO3hXkJNj). It looks like a different object's ID — check what the embed URL or workflow is passing as locationId.`,
+            reason,
+            tokenHealthy: true,
+          })
+        }
+        return res.status(404).json({
+          error: `No OAuth token available for location "${locationId}", and no cached data to fall back to.`,
+          reason,
+        })
+      }
+      stale = true
+      staleReason = reason
+      await touchKnownLocations(locationId)
+      const { leads, missingFields } = buildLeads(cached, fromMs, toMs)
+      return res.json({
+        locationId, from, to,
+        totalContactsScanned:     cached.contacts.length,
+        totalOpportunitiesScanned: cached.opportunities.length,
+        contactsPagination:     cached.contactsPagination,
+        opportunitiesPagination: cached.opportunitiesPagination,
+        leadsInRange: leads.length,
+        fieldMap: cached.fieldMap,
+        missingFields,
+        allFields: cached.allFields,
+        customFieldsError: cached.customFieldsError,
+        leads,
+        fetchedAt: cached.fetchedAt,
+        cacheAgeMs: Date.now() - new Date(cached.fetchedAt).getTime(),
+        stale, staleReason,
       })
     }
 
@@ -54,8 +107,16 @@ export default async function handler(req, res) {
     const isFresh = raw && (Date.now() - new Date(raw.fetchedAt).getTime() < CACHE_TTL_MS)
 
     if (!isFresh) {
-      raw = await loadRaw(token, locationId)
-      await kv.set(cacheKey(locationId), raw)
+      try {
+        raw = await loadRaw(token, locationId)
+        await kv.set(cacheKey(locationId), raw)
+      } catch (err) {
+        // Live pull failed even with a token in hand (rate limit, GHL 5xx,
+        // etc) — same fallback: serve what's cached rather than erroring if
+        // we have anything at all, even the just-failed isFresh===false copy.
+        if (raw) { stale = true; staleReason = err.message }
+        else throw err
+      }
     }
 
     const { leads, missingFields } = buildLeads(raw, fromMs, toMs)
@@ -76,6 +137,7 @@ export default async function handler(req, res) {
       leads,
       fetchedAt: raw.fetchedAt,
       cacheAgeMs: Date.now() - new Date(raw.fetchedAt).getTime(),
+      stale, staleReason,
     })
   } catch (err) {
     console.error('master-leads error:', err.message)

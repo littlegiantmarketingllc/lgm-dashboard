@@ -9,6 +9,21 @@ export const GHL_BASE   = 'https://services.leadconnectorhq.com'
 export const GHL_VER    = '2021-07-28'
 const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
 
+// Cheap breadcrumb so a dead token is visible without digging through Vercel
+// logs — the dashboard UI reads this to show a "reconnect needed" banner
+// instead of silently failing until someone notices. Written on every
+// company-token refresh attempt (cron and reactive), not on the more
+// frequent per-location calls.
+const STATUS_KEY = 'ghl:token_status'
+export async function setTokenStatus(ok, reason = null) {
+  try {
+    await kv.set(STATUS_KEY, { ok, reason, at: new Date().toISOString() })
+  } catch { /* status tracking must never break the actual token flow */ }
+}
+export async function getTokenStatus() {
+  return (await kv.get(STATUS_KEY)) || null
+}
+
 // Each step below returns { ok, value, reason } instead of swallowing errors into
 // null — a silent null here used to collapse every possible failure (bad creds,
 // dead refresh token, app not installed on the location, network error) into the
@@ -55,10 +70,12 @@ async function fetchLocationTokenFromCompany(locationId) {
     if (Date.now() > company.expiresAt - 30 * 60 * 1000) {
       const refreshed = await refreshToken(company)
       if (!refreshed.ok) {
+        await setTokenStatus(false, refreshed.reason)
         return { ok: false, reason: `Company token expired and refresh failed — ${refreshed.reason}` }
       }
       await kv.set(`ghl:company_token:${COMPANY_ID}`, refreshed.value)
       company = refreshed.value
+      await setTokenStatus(true)
     }
 
     const res = await fetch(`${GHL_BASE}/oauth/locationToken`, {

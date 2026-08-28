@@ -39,7 +39,10 @@ export function useMasterLeads(locationId, { from, to } = {}) {
       if (force) params.set('refresh', '1')
       const res  = await fetch(`/api/master-leads?${params.toString()}`)
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+      // hint carries the actionable "what to actually do about it" text the
+      // API attaches to known error classes (e.g. a bad locationId) — keep it
+      // attached to the thrown error so the error screen can show it.
+      if (!res.ok) throw new Error([json.error, json.hint].filter(Boolean).join('\n\n') || `HTTP ${res.status}`)
       setData(json)
     } catch (err) {
       setError(err.message)
