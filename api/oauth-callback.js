@@ -2,6 +2,7 @@
 // Redirect URI to register in GHL marketplace app:
 //   https://health.littlegiantmarketing.com/api/oauth-callback
 import { kv } from './_supabase.js'
+import { credentialIdentity } from './_ghlAuth.js'
 
 const GHL_BASE  = 'https://services.leadconnectorhq.com'
 const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
@@ -53,6 +54,10 @@ export default async function handler(req, res) {
     expiresAt:    Date.now() + (tokens.expires_in * 1000),
     companyId,
     tokenType:    'Company',
+    // Stamp which credentials minted this token, so any project that later
+    // tries to refresh it can prove it holds the matching pair. See
+    // credentialDrift() in _ghlAuth.js.
+    issuedBy:     credentialIdentity(),
   })
 
   console.log(`[oauth-callback] Company token stored for ${companyId}`)

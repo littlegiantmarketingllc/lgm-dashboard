@@ -8,7 +8,7 @@
 // entirely rather than depending on someone actually using the dashboard
 // often enough to trigger a timely reactive refresh.
 import { kv } from './_supabase.js'
-import { setTokenStatus } from './_ghlAuth.js'
+import { setTokenStatus, credentialDrift } from './_ghlAuth.js'
 
 const GHL_BASE   = 'https://services.leadconnectorhq.com'
 const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
@@ -54,6 +54,16 @@ export default async function handler(req, res) {
     // network/5xx blip on GHL's side rather than treating it the same as a
     // genuinely dead refresh token (e.g. invalidated by a GHL Marketplace
     // app version change, which no retry will fix).
+    // Catch the mismatch before spending a network call on a refresh that
+    // cannot possibly succeed, and report the cause rather than GHL's opaque
+    // "Invalid client credentials".
+    const drift = credentialDrift(company)
+    if (drift) {
+      console.error('[cron-refresh-token] credential drift:', drift)
+      await setTokenStatus(false, drift)
+      return res.status(409).json({ error: 'Credential mismatch', diagnosis: drift })
+    }
+
     let { ok, tokens } = await attemptRefresh(company.refreshToken)
     if (!ok && !isCredentialError(tokens)) {
       await sleep(3000)

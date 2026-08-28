@@ -14,6 +14,44 @@ const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
 // instead of silently failing until someone notices. Written on every
 // company-token refresh attempt (cron and reactive), not on the more
 // frequent per-location calls.
+// Tokens are shared across Vercel projects via one Supabase table, but each
+// project refreshes using ITS OWN env vars. When those drift apart, GHL
+// rejects every refresh with "Invalid client credentials" and the token dies
+// at its 24h mark with no way to renew — which is exactly what happened
+// undetected for weeks. Recording which credentials issued a token lets the
+// refresher detect the mismatch itself instead of failing mysteriously.
+//
+// The client ID is stored as-is (it is not a secret). The secret is stored
+// only as a truncated SHA-256 fingerprint — enough to detect that it changed,
+// impossible to recover the value from.
+import { createHash } from 'node:crypto'
+
+export function credentialIdentity() {
+  const clientId = process.env.GHL_CLIENT_ID || ''
+  const secret   = process.env.GHL_CLIENT_SECRET || ''
+  return {
+    clientId,
+    secretFp: secret ? createHash('sha256').update(secret).digest('hex').slice(0, 12) : null,
+  }
+}
+
+// Returns a human-readable explanation if this deployment's credentials are
+// not the ones that issued the stored token, else null. Tokens issued before
+// this tracking existed have no issuedBy — treated as unknown, not as drift.
+export function credentialDrift(tokenData) {
+  const issuedBy = tokenData?.issuedBy
+  if (!issuedBy?.clientId) return null
+
+  const mine = credentialIdentity()
+  if (mine.clientId && issuedBy.clientId !== mine.clientId) {
+    return `GHL_CLIENT_ID on this deployment (…${mine.clientId.slice(-6)}) is not the one that issued this token (…${issuedBy.clientId.slice(-6)}). Refresh will be rejected until they match.`
+  }
+  if (issuedBy.secretFp && mine.secretFp && issuedBy.secretFp !== mine.secretFp) {
+    return `GHL_CLIENT_SECRET on this deployment does not match the one that issued this token (fingerprint ${mine.secretFp} vs ${issuedBy.secretFp}). Refresh will be rejected until they match.`
+  }
+  return null
+}
+
 const STATUS_KEY = 'ghl:token_status'
 export async function setTokenStatus(ok, reason = null) {
   try {
