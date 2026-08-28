@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
 import { ClerkProvider, SignedIn, SignedOut, SignIn, useUser, useClerk } from '@clerk/clerk-react'
 import { RoleContext } from './contexts/RoleContext'
 import HealthDashboard from './components/health/HealthDashboard'
@@ -146,15 +146,28 @@ function LegacyAuthApp() {
   )
 }
 
+// ─── Error boundary: if Clerk fails to load (DNS not configured, network error,
+//     bad key), fall back to legacy auth instead of white-screening ─────────────
+class ClerkErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() {
+    if (this.state.failed) return <LegacyAuthApp />
+    return this.props.children
+  }
+}
+
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function HealthStandaloneApp() {
   useEffect(() => { document.title = 'LGM — Customer Health Dashboard' }, [])
 
   if (CLERK_KEY) {
     return (
-      <ClerkProvider publishableKey={CLERK_KEY}>
-        <ClerkAuthApp />
-      </ClerkProvider>
+      <ClerkErrorBoundary>
+        <ClerkProvider publishableKey={CLERK_KEY}>
+          <ClerkAuthApp />
+        </ClerkProvider>
+      </ClerkErrorBoundary>
     )
   }
 
