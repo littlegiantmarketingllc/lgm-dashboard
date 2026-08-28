@@ -4,9 +4,12 @@ import { RoleContext } from './contexts/RoleContext'
 import HealthDashboard from './components/health/HealthDashboard'
 import LoginPage       from './components/health/LoginPage'
 
-// Clerk activates automatically when this env var is set in Vercel project settings.
-// Without it the app falls back to the existing password+cookie auth — no regression.
-const CLERK_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+// Clerk requires a DNS CNAME (clerk.littlegiantmarketing.com → frontend-api.clerk.services)
+// before the production key works. Set VITE_CLERK_ENABLED=true in Vercel after DNS is live.
+// Until then the app runs on legacy password+cookie auth with no interruption.
+const CLERK_KEY = import.meta.env.VITE_CLERK_ENABLED === 'true'
+  ? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+  : null
 
 const COOKIE = 'lgm-health-auth'
 function getSessionCookie() {
