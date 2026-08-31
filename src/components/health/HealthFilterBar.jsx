@@ -109,6 +109,7 @@ export default function HealthFilterBar({ filters, setFilters, accountTypes, tot
             <option value="all">All Billing</option>
             <option value="matched">Stripe Matched</option>
             <option value="unmatched">Unmatched (no Stripe)</option>
+            <option value="past_due_or_open">Past Due or Open Invoice</option>
           </select>
           <InfoTip
             text="Filter by Stripe billing match. 'Unmatched' shows accounts not yet linked to a Stripe customer — coordinate with Cliff to resolve these via his mapping sheet."

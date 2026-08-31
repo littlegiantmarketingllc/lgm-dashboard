@@ -247,11 +247,12 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                     <td className="px-2 py-2 text-center">
                       {bound ? (
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                          a.stripeStatus === 'active'   ? 'bg-green-50 border-green-200 text-green-700' :
-                          a.stripeStatus === 'trialing' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                          a.stripeStatus === 'past_due' ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                          a.stripeStatus === 'active'       ? 'bg-green-50 border-green-200 text-green-700' :
+                          a.stripeStatus === 'trialing'     ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                          a.stripeStatus === 'past_due'     ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                          a.stripeStatus === 'open_invoice' ? 'bg-amber-50 border-amber-300 text-amber-700' :
                           'bg-red-50 border-red-200 text-red-600'
-                        }`}>{a.stripeStatus ?? '—'}</span>
+                        }`}>{a.stripeStatus === 'open_invoice' ? 'open invoice' : (a.stripeStatus ?? '—')}</span>
                       ) : <span className="text-brand-border text-[10px]">—</span>}
                     </td>
                   )}

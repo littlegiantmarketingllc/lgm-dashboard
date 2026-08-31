@@ -53,6 +53,34 @@ async function fetchAllSubscriptions(key) {
   return all
 }
 
+// Returns a Set of Stripe customer IDs that have at least one open invoice
+// with amount_remaining > 0. These are "active" subs that still owe money.
+async function fetchOpenInvoiceCustomerIds(key) {
+  const customerIds = new Set()
+  let startingAfter = null
+
+  while (true) {
+    const params = new URLSearchParams({ limit: '100', status: 'open' })
+    if (startingAfter) params.set('starting_after', startingAfter)
+
+    const page = await stripeGet(`/invoices?${params}`, key)
+    const batch = page.data || []
+
+    for (const inv of batch) {
+      if (Number(inv.amount_remaining || 0) <= 0) continue
+      const customerId = typeof inv.customer === 'string'
+        ? inv.customer
+        : inv.customer?.id || ''
+      if (customerId) customerIds.add(customerId)
+    }
+
+    if (!page.has_more || batch.length === 0) break
+    startingAfter = batch[batch.length - 1].id
+  }
+
+  return customerIds
+}
+
 // Priority used when a customer has multiple subscriptions — prefer active over trialing
 const STATUS_PRIORITY = { active: 0, trialing: 1, past_due: 2, canceled: 3 }
 
@@ -63,7 +91,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const allSubs = await fetchAllSubscriptions(key)
+    const [allSubs, openInvoiceCustomerIds] = await Promise.all([
+      fetchAllSubscriptions(key),
+      fetchOpenInvoiceCustomerIds(key),
+    ])
 
     // Group subscriptions by customer email
     const subsByEmail = {}
@@ -188,6 +219,11 @@ export default async function handler(req, res) {
         lcWalletCharges: 0,
         transactions:    0,
         gp:              0,
+      }
+
+      // Override active → open_invoice when the customer has an unpaid open invoice
+      if (record.stripeStatus === 'active' && openInvoiceCustomerIds.has(customer.id)) {
+        record.stripeStatus = 'open_invoice'
       }
 
       byEmail[email] = record
