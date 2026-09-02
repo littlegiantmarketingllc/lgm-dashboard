@@ -10,8 +10,8 @@ const GHL_VER    = '2021-07-28'
 const COMPANY_ID = 'MKJeZKBhrN9uLt4ZWZCa'
 
 // Hardcoded GHL marketplace app Client ID — same app as lgm-goals-dashboard.
-// Secret is in GHL_CLIENT_SECRET env var (65069ed9-2c96-4a99-9c52-f2a540b70fcb).
-const GOALS_APP_CLIENT_ID = '6a6dea0af575e7245fd2313c-msp4gmsf'
+// Secret is in GHL_CLIENT_SECRET env var (Vercel production secret).
+const GOALS_APP_CLIENT_ID = '6a6dea0af575e7245fd2313c-mtkerbtj'
 
 async function refreshToken(tokenData) {
   try {
@@ -127,7 +127,7 @@ async function ghlFetch(path, token, method = 'GET', body = null) {
 // Fetch GHL portal last-login for a location using the agency PIT key.
 // This is a real-time agency-level call that doesn't need per-location OAuth.
 async function fetchLocationLastLogin(locationId) {
-  const agencyKey = process.env.GHL_AGENCY_KEY
+  const agencyKey = process.env.GHL_AGENCY_API_KEY
   if (!agencyKey) return null
   try {
     const res = await fetch(`${GHL_BASE}/locations/${locationId}`, {
