@@ -1,9 +1,6 @@
 import { useMemo } from 'react'
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-const ORG = '#FF6112'
-const G   = '#8CC63F'
-
 function startOfWeek(dateStr) {
   const d = new Date(dateStr)
   d.setHours(0, 0, 0, 0)
@@ -15,42 +12,42 @@ function weekLabel(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// Matches QuickSight's "Rate too high rate by Date Created" chart — weekly
-// count of leads x-dated for "rate is too high" (bars) plus the rate as a
-// % of that week's leads (line), so a spike in volume vs. a spike in rate
-// read as visually distinct signals.
-export default function RateTooHighTrend({ leads, delay = 0 }) {
+// Generic weekly count+rate trend — bars for the weekly count of leads
+// matching `matchFn`, line for that count as a % of that week's leads.
+// Matches QuickSight's "X rate by Date Created" charts; reused for both
+// Rate Too High and Quote Rate so the two read as one consistent chart type.
+export default function WeeklyTrendChart({ leads, matchFn, title, subtitle, countLabel, rateLabel, barColor, lineColor, emptyText, delay = 0 }) {
   const data = useMemo(() => {
     const buckets = new Map()
     for (const l of leads) {
       if (!l.dateAdded) continue
       const wk = startOfWeek(l.dateAdded)
       const key = wk.getTime()
-      if (!buckets.has(key)) buckets.set(key, { date: wk, total: 0, rateTooHigh: 0 })
+      if (!buckets.has(key)) buckets.set(key, { date: wk, total: 0, count: 0 })
       const b = buckets.get(key)
       b.total += 1
-      if ((l.xdatedReason || '').toLowerCase().includes('rate is too high')) b.rateTooHigh += 1
+      if (matchFn(l)) b.count += 1
     }
     return [...buckets.values()]
       .sort((a, b) => a.date - b.date)
       .map(b => ({
         label: weekLabel(b.date),
-        rateTooHigh: b.rateTooHigh,
-        rate: b.total > 0 ? Math.round((b.rateTooHigh / b.total) * 1000) / 10 : 0,
+        count: b.count,
+        rate: b.total > 0 ? Math.round((b.count / b.total) * 1000) / 10 : 0,
       }))
-  }, [leads])
+  }, [leads, matchFn])
 
-  const hasAnyData = data.some(d => d.rateTooHigh > 0)
+  const hasAnyData = data.some(d => d.count > 0)
 
   return (
     <div className="animate-fade-in-up rounded-2xl border border-brand-border bg-white p-5 sm:p-6"
       style={{ animationDelay: `${delay}ms`, boxShadow: '0 4px 24px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.04)' }}>
 
-      <h2 className="text-brand-heading font-semibold text-sm">Rate Too High — By Date Created</h2>
-      <p className="text-brand-muted text-[10px] mt-0.5 mb-3">Weekly count and rate of leads x-dated for "rate is too high"</p>
+      <h2 className="text-brand-heading font-semibold text-sm">{title}</h2>
+      <p className="text-brand-muted text-[10px] mt-0.5 mb-3">{subtitle}</p>
 
       {!hasAnyData ? (
-        <p className="text-brand-muted text-sm py-12 text-center">No X-dated Reason data for this window.</p>
+        <p className="text-brand-muted text-sm py-12 text-center">{emptyText}</p>
       ) : (
         <div className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -60,11 +57,11 @@ export default function RateTooHighTrend({ leads, delay = 0 }) {
               <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
               <YAxis yAxisId="right" orientation="right" unit="%" tick={{ fontSize: 10, fill: '#6B7280' }} axisLine={false} tickLine={false} />
               <Tooltip
-                formatter={(value, name) => name === 'rate' ? [`${value}%`, 'Rate too high rate'] : [value, 'Rate too high']}
+                formatter={(value, name) => name === 'rate' ? [`${value}%`, rateLabel] : [value, countLabel]}
                 contentStyle={{ fontSize: 11, border: '1px solid #E5E7E5', borderRadius: 8 }}
               />
-              <Bar yAxisId="left" dataKey="rateTooHigh" fill={ORG} radius={[4, 4, 0, 0]} barSize={28} />
-              <Line yAxisId="right" type="monotone" dataKey="rate" stroke={G} strokeWidth={2} dot={{ r: 3, fill: G }} />
+              <Bar yAxisId="left" dataKey="count" fill={barColor} radius={[4, 4, 0, 0]} barSize={28} />
+              <Line yAxisId="right" type="monotone" dataKey="rate" stroke={lineColor} strokeWidth={2} dot={{ r: 3, fill: lineColor }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

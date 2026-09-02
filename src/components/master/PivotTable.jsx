@@ -40,12 +40,19 @@ const COLS = [
   { key: 'ppl',              label: 'PPL',            align: 'right', fmt: fmtSignedMoney },
 ]
 
+// Metrics that only make sense when leads are actually bought — hidden
+// (cards and these columns alike) when John's "Lead Buying" toggle is off,
+// since lead cost isn't tracked the same way in that mode.
+const LEAD_BUYING_ONLY = new Set(['leadCost', 'profit', 'ppl'])
+
 // Generic pivot table — takes rows already shaped by pivotBySource()/pivotByOwner()
 // in lib/masterMetrics.js. Same sortable-header pattern as MasterAccountsTable.jsx
 // in the Health dashboard, so both parts of the app read as one product.
-export default function PivotTable({ title, subtitle, rows, delay = 0 }) {
+export default function PivotTable({ title, subtitle, rows, delay = 0, leadBuyingEnabled = true }) {
   const [sortCol, setSortCol] = useState('leadCount')
   const [sortDir, setSortDir] = useState('desc')
+
+  const cols = leadBuyingEnabled ? COLS : COLS.filter(c => !LEAD_BUYING_ONLY.has(c.key))
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
@@ -78,7 +85,7 @@ export default function PivotTable({ title, subtitle, rows, delay = 0 }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {COLS.map(col => (
+              {cols.map(col => (
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
@@ -99,11 +106,11 @@ export default function PivotTable({ title, subtitle, rows, delay = 0 }) {
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={COLS.length} className="py-10 text-center text-brand-muted text-sm">No data for this window.</td></tr>
+              <tr><td colSpan={cols.length} className="py-10 text-center text-brand-muted text-sm">No data for this window.</td></tr>
             )}
             {sorted.map(row => (
               <tr key={row.label} className="group border-b border-brand-border/40 hover:bg-brand-bg/60 transition-colors duration-100">
-                {COLS.map(col => (
+                {cols.map(col => (
                   <td key={col.key}
                     className={`px-3 py-2 first:pl-5 last:pr-4 text-[11px] text-${col.align} ${col.key === 'label' ? 'font-medium text-brand-text truncate max-w-[220px] sticky left-0 z-10 bg-white group-hover:bg-[#f3f6f2] border-r border-brand-border' : 'num text-brand-text'}`}
                   >

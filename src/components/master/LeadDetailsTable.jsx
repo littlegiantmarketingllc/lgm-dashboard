@@ -2,7 +2,10 @@ import { useState, useMemo, useEffect } from 'react'
 import InfoTip from '../health/InfoTip'
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString() : '—' }
+function fmtMoney(n) { return hasValue(n) ? '$' + Math.round(Number(n)).toLocaleString() : '—' }
 function hasValue(v) { return v !== null && v !== undefined && v !== '' }
+
+const QA_COLS = 17
 
 const PAGE_SIZE = 25
 
@@ -36,7 +39,11 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-brand-border bg-brand-bg/50">
-              {['Lead Created', 'Last Status Change', 'Name', 'Assigned To', 'Sales Stage', 'New Customer', 'Bad Lead', 'Reason', 'Lead Source', 'Lead Profile'].map(h => (
+              {[
+                'Lead Created', 'Last Status Change', 'Name', 'Assigned To', 'Sales Stage',
+                'New Customer', 'Bad Lead', 'Reason', 'Lead Source', 'Sub Source', 'Lead Profile',
+                'Lead Price', 'Call Count', 'Disposition Date', 'Quoted Timestamp', 'SMS Reply Date', 'Opt Out Date',
+              ].map(h => (
                 <th key={h} className="px-3 py-2 first:pl-5 last:pr-4 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap text-left text-brand-muted">
                   <span className="inline-flex items-center gap-1">
                     {h}
@@ -50,7 +57,7 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
           </thead>
           <tbody>
             {pageRows.length === 0 && (
-              <tr><td colSpan={10} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
+              <tr><td colSpan={QA_COLS} className="py-10 text-center text-brand-muted text-sm">No leads match the current filters.</td></tr>
             )}
             {pageRows.map(l => {
               const isCustomer = hasValue(l.oppSoldDate)
@@ -83,7 +90,17 @@ export default function LeadDetailsTable({ leads, delay = 0 }) {
                   </td>
                   <td className="px-3 py-2 text-[11px] text-brand-muted truncate max-w-[160px]">{reason || '—'}</td>
                   <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.source || '—'}</td>
-                  <td className="px-3 pr-4 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.leadProfile || '—'}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.subSource || '—'}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-text truncate max-w-[140px]">{l.leadProfile || '—'}</td>
+                  {/* QA columns — every field a calculation reads from, visible here so a
+                      calculation that looks wrong can be checked against the raw value
+                      without pulling the API directly. */}
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtMoney(l.leadPrice)}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{hasValue(l.callCount) ? l.callCount : '—'}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.dispositionDate)}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.quotedTimestamp)}</td>
+                  <td className="px-3 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.smsReplyDate)}</td>
+                  <td className="px-3 pr-4 py-2 text-[11px] text-brand-muted whitespace-nowrap">{fmtDate(l.optOutDate)}</td>
                 </tr>
               )
             })}

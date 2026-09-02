@@ -1,15 +1,23 @@
 import { useState, useMemo } from 'react'
 import { useMasterLeads } from '../../hooks/useMasterLeads'
-import { computeOverview, pivotBySource, pivotByOwner, pivotByLeadProfile, salesStageBreakdown } from '../../lib/masterMetrics'
+import { computeOverview, pivotBySource, pivotByOwner, pivotByLeadProfile, pivotBySubSource, salesStageBreakdown } from '../../lib/masterMetrics'
 import MasterHeader from './MasterHeader'
 import MasterTabBar, { TABS } from './MasterTabBar'
 import DateFilterBar from './DateFilterBar'
 import OwnerSourceFilter from './OwnerSourceFilter'
+import CommissionControls from './CommissionControls'
 import OverviewCards from './OverviewCards'
 import PivotTable from './PivotTable'
+import Leaderboard from './Leaderboard'
 import SalesStageChart from './SalesStageChart'
-import RateTooHighTrend from './RateTooHighTrend'
+import WeeklyTrendChart from './WeeklyTrendChart'
 import LeadDetailsTable from './LeadDetailsTable'
+
+const ORG = '#FF6112'
+const G   = '#8CC63F'
+function hasValue(v) { return v !== null && v !== undefined && v !== '' }
+const isRateTooHigh = l => (l.xdatedReason || '').toLowerCase().includes('rate is too high')
+const isQuoted = l => hasValue(l.quotedTimestamp)
 
 function fmtAgo(ms) {
   if (ms === null || ms === undefined || ms < 0) return null
@@ -104,6 +112,12 @@ export default function MasterDashboard({ locationId }) {
   const [ownerFilter, setOwnerFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
 
+  // Commission rate and the Lead Buying toggle are John-editable, per-session
+  // controls (not persisted) — Commission/Profit/PPL/Lead Cost/CPP all key off
+  // these. See CommissionControls.jsx and lib/masterMetrics.js.
+  const [commissionRate, setCommissionRate] = useState(0.105)
+  const [leadBuyingEnabled, setLeadBuyingEnabled] = useState(true)
+
   // These must run on every render, before any early return — React requires
   // the same hooks in the same order every time. `leads` defaults to [] when
   // data hasn't loaded yet, so the memos are cheap no-ops until then.
@@ -126,10 +140,11 @@ export default function MasterDashboard({ locationId }) {
     })
   }, [leads, ownerFilter, sourceFilter])
 
-  const overview      = useMemo(() => computeOverview(filteredLeads), [filteredLeads])
-  const bySource       = useMemo(() => pivotBySource(filteredLeads), [filteredLeads])
-  const byOwner         = useMemo(() => pivotByOwner(filteredLeads), [filteredLeads])
-  const byLeadProfile    = useMemo(() => pivotByLeadProfile(filteredLeads), [filteredLeads])
+  const overview      = useMemo(() => computeOverview(filteredLeads, commissionRate), [filteredLeads, commissionRate])
+  const bySource       = useMemo(() => pivotBySource(filteredLeads, commissionRate), [filteredLeads, commissionRate])
+  const byOwner         = useMemo(() => pivotByOwner(filteredLeads, commissionRate), [filteredLeads, commissionRate])
+  const byLeadProfile    = useMemo(() => pivotByLeadProfile(filteredLeads, commissionRate), [filteredLeads, commissionRate])
+  const bySubSource      = useMemo(() => pivotBySubSource(filteredLeads, commissionRate), [filteredLeads, commissionRate])
   const stageBreakdown = useMemo(() => salesStageBreakdown(filteredLeads), [filteredLeads])
 
   // Non-Lead-Details tabs don't depend on this page's data fetch at all —
@@ -184,17 +199,27 @@ export default function MasterDashboard({ locationId }) {
           </details>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl border border-brand-border p-3"
+        <div className="flex flex-col gap-3 bg-white rounded-2xl border border-brand-border p-3"
           style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <DateFilterBar value={dateRange} onChange={setDateRange} />
-          <OwnerSourceFilter
-            owners={owners}
-            sources={sources}
-            ownerValue={ownerFilter}
-            sourceValue={sourceFilter}
-            onOwnerChange={setOwnerFilter}
-            onSourceChange={setSourceFilter}
-          />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <DateFilterBar value={dateRange} onChange={setDateRange} />
+            <OwnerSourceFilter
+              owners={owners}
+              sources={sources}
+              ownerValue={ownerFilter}
+              sourceValue={sourceFilter}
+              onOwnerChange={setOwnerFilter}
+              onSourceChange={setSourceFilter}
+            />
+          </div>
+          <div className="pt-2 border-t border-brand-border">
+            <CommissionControls
+              commissionRate={commissionRate}
+              onCommissionRateChange={setCommissionRate}
+              leadBuyingEnabled={leadBuyingEnabled}
+              onLeadBuyingChange={setLeadBuyingEnabled}
+            />
+          </div>
         </div>
 
         {!isDemo && stale && (
@@ -225,35 +250,94 @@ export default function MasterDashboard({ locationId }) {
           </div>
         )}
 
-        <OverviewCards overview={overview} />
+        <OverviewCards overview={overview} leadBuyingEnabled={leadBuyingEnabled} commissionRate={commissionRate} />
 
+        {/* Leaderboards — ranked by Quotes → Close rate (min 3 quotes, so a
+            single lucky quote can't rank #1 over real volume). */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <SalesStageChart rows={stageBreakdown} total={filteredLeads.length} delay={400} />
-          <RateTooHighTrend leads={filteredLeads} delay={420} />
+          <Leaderboard
+            title="Producer Leaderboard"
+            subtitle="Ranked by Quotes → Close rate"
+            rows={byOwner}
+            valueKey="quotesToCloseRate"
+            sampleKey="quotes"
+            minSample={3}
+            delay={360}
+          />
+          <Leaderboard
+            title="Lead Source Leaderboard"
+            subtitle="Ranked by Quotes → Close rate"
+            rows={bySource}
+            valueKey="quotesToCloseRate"
+            sampleKey="quotes"
+            minSample={3}
+            delay={380}
+          />
         </div>
 
-        {/* Full width, stacked — each table has 7 data columns and needs the
-            room; three of these side by side forced horizontal scrolling. */}
+        {/* No-opportunity leads are excluded inside salesStageBreakdown() so
+            this ratio reflects leads actually worked into the pipeline. */}
+        <SalesStageChart rows={stageBreakdown} total={stageBreakdown.reduce((s, r) => s + r.count, 0)} delay={400} />
+
+        {/* Full width, stacked — each table has ~18 data columns and needs the
+            room; three side by side forced horizontal scrolling. */}
         <PivotTable
           title="By Lead Source"
           subtitle={`${bySource.length} sources`}
           rows={bySource}
+          leadBuyingEnabled={leadBuyingEnabled}
           delay={440}
         />
         <PivotTable
           title="By Assigned Owner"
           subtitle={`${byOwner.length} owners`}
           rows={byOwner}
+          leadBuyingEnabled={leadBuyingEnabled}
           delay={480}
         />
         <PivotTable
           title="By Lead Profile"
           subtitle={`${byLeadProfile.length} profiles`}
           rows={byLeadProfile}
+          leadBuyingEnabled={leadBuyingEnabled}
           delay={520}
         />
+        <PivotTable
+          title="By Sub-Source"
+          subtitle={`${bySubSource.length} sub-sources`}
+          rows={bySubSource}
+          leadBuyingEnabled={leadBuyingEnabled}
+          delay={540}
+        />
 
-        <LeadDetailsTable leads={filteredLeads} delay={560} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <WeeklyTrendChart
+            leads={filteredLeads}
+            matchFn={isRateTooHigh}
+            title="Rate Too High — By Date Created"
+            subtitle='Weekly count and rate of leads x-dated for "rate is too high"'
+            countLabel="Rate too high"
+            rateLabel="Rate too high rate"
+            barColor={ORG}
+            lineColor={G}
+            emptyText="No X-dated Reason data for this window."
+            delay={560}
+          />
+          <WeeklyTrendChart
+            leads={filteredLeads}
+            matchFn={isQuoted}
+            title="Quote Rate — By Date Created"
+            subtitle="Weekly count and rate of leads with a Quoted Timestamp"
+            countLabel="Quotes"
+            rateLabel="Quote rate"
+            barColor={G}
+            lineColor={ORG}
+            emptyText="No Quoted Timestamp data for this window."
+            delay={580}
+          />
+        </div>
+
+        <LeadDetailsTable leads={filteredLeads} delay={600} />
       </div>
 
       <footer className="mt-12 py-5 border-t border-brand-border text-center text-[11px] text-brand-muted/60 tracking-widest uppercase">

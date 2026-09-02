@@ -55,6 +55,7 @@ const FIELD_TARGETS = {
   leadProfile:      ['lead profile'],
   badLeadReason:    ['bad lead reason'],
   optOutDate:       ['opt out date', 'opted out date', 'opt-out date', 'unsubscribed date', 'opt out'],
+  subSource:        ['sub source', 'sub-source', 'subsource'],
 }
 
 async function getCustomFieldMap(token, locationId) {
@@ -271,6 +272,7 @@ export function buildLeads(raw, fromMs, toMs) {
         leadProfile:        readCustomFieldValue(c, fieldMap.leadProfile),
         badLeadReason:      readCustomFieldValue(c, fieldMap.badLeadReason),
         optOutDate:         readCustomFieldValue(c, fieldMap.optOutDate),
+        subSource:          readCustomFieldValue(c, fieldMap.subSource),
         customFields:       resolveAllCustomFields(c, fieldsById),
         opportunities:      opps,
       }

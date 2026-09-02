@@ -2,7 +2,7 @@
 // All formulas match the QS Calculated Fields spec shared by Steve (2026-08-25).
 // Commission is a static 10.5% of Written Premium — confirmed by Steve.
 
-const COMMISSION_RATE = 0.105
+const DEFAULT_COMMISSION_RATE = 0.105
 const POLICY_SOLD_STAGE = 'Policy Sold'
 const BAD_LEAD_DNC_STAGE = 'Bad Lead / DNC'
 
@@ -14,7 +14,10 @@ function hasValue(v) {
   return v !== null && v !== undefined && v !== ''
 }
 
-export function computeOverview(leads) {
+// commissionRate is a John-editable variable in the UI (default 10.5%,
+// confirmed by Steve) rather than hardcoded, so Commission/Profit/PPL can be
+// recalculated without a code change if that rate ever differs by account.
+export function computeOverview(leads, commissionRate = DEFAULT_COMMISSION_RATE) {
   const leadCount = leads.length
   const allOpps   = leads.flatMap(l => l.opportunities || [])
   const policySoldOpps = allOpps.filter(isPolicySold)
@@ -111,8 +114,8 @@ export function computeOverview(leads) {
   // Commission rate = 0.105, static, confirmed by Steve — see COMMISSION_RATE above.
 
   // ── COMPOUND CALCULATIONS ─────────────────────────────────────────────────
-  // 0. Commission — {Written Premium} * 0.105
-  const commission = writtenPremium * COMMISSION_RATE
+  // 0. Commission — {Written Premium} * commissionRate
+  const commission = writtenPremium * commissionRate
 
   // 1. Profit — Commission - {Lead Cost}
   const profit = leadCost !== null ? commission - leadCost : null
@@ -176,19 +179,23 @@ export function computeOverview(leads) {
   }
 }
 
+// Leads with no opportunity at all are excluded from both the chart and the
+// percentage base — per John, counting them would skew "% of leads in each
+// pipeline stage" against leads that were never worked into a pipeline to
+// begin with.
 export function salesStageBreakdown(leads) {
+  const withStage = leads.filter(l => l.salesStage)
   const counts = new Map()
-  for (const lead of leads) {
-    const stage = lead.salesStage || '(no opportunity)'
-    counts.set(stage, (counts.get(stage) || 0) + 1)
+  for (const lead of withStage) {
+    counts.set(lead.salesStage, (counts.get(lead.salesStage) || 0) + 1)
   }
-  const total = leads.length
+  const total = withStage.length
   return [...counts.entries()]
     .map(([stage, count]) => ({ stage, count, pct: total > 0 ? (count / total) * 100 : 0 }))
     .sort((a, b) => b.count - a.count)
 }
 
-function pivotBy(leads, keyFn, labelFn) {
+function pivotBy(leads, keyFn, labelFn, commissionRate) {
   const groups = new Map()
   for (const lead of leads) {
     const key = keyFn(lead) ?? '(none)'
@@ -196,18 +203,22 @@ function pivotBy(leads, keyFn, labelFn) {
     groups.get(key).leads.push(lead)
   }
   return [...groups.values()]
-    .map(g => ({ label: g.label, ...computeOverview(g.leads) }))
+    .map(g => ({ label: g.label, ...computeOverview(g.leads, commissionRate) }))
     .sort((a, b) => b.leadCount - a.leadCount)
 }
 
-export function pivotBySource(leads) {
-  return pivotBy(leads, l => l.source, l => l.source || '(no source)')
+export function pivotBySource(leads, commissionRate) {
+  return pivotBy(leads, l => l.source, l => l.source || '(no source)', commissionRate)
 }
 
-export function pivotByOwner(leads) {
-  return pivotBy(leads, l => l.assignedTo, l => l.assignedToName || l.assignedTo || '(unassigned)')
+export function pivotByOwner(leads, commissionRate) {
+  return pivotBy(leads, l => l.assignedTo, l => l.assignedToName || l.assignedTo || '(unassigned)', commissionRate)
 }
 
-export function pivotByLeadProfile(leads) {
-  return pivotBy(leads, l => l.leadProfile, l => l.leadProfile || '(no profile)')
+export function pivotByLeadProfile(leads, commissionRate) {
+  return pivotBy(leads, l => l.leadProfile, l => l.leadProfile || '(no profile)', commissionRate)
+}
+
+export function pivotBySubSource(leads, commissionRate) {
+  return pivotBy(leads, l => l.subSource, l => l.subSource || '(no sub-source)', commissionRate)
 }

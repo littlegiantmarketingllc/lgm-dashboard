@@ -56,7 +56,7 @@ function SectionLabel({ children }) {
   )
 }
 
-export default function OverviewCards({ overview }) {
+export default function OverviewCards({ overview, leadBuyingEnabled = true, commissionRate = 0.105 }) {
   const {
     leadCount, newCustomers, writtenPremium, premiumAvgPerCustomer,
     leadCost, commission, profit, ppl,
@@ -96,23 +96,29 @@ export default function OverviewCards({ overview }) {
       {/* ── FINANCIALS ───────────────────────────────────────────── */}
       <SectionLabel>Financials</SectionLabel>
 
-      <Card label="Lead Cost" value={leadCost} prefix="$" icon="🧾" delay={160}
-        sub="sum({Lead Price}) across all leads"
-        infoText="sum({Lead Price}) — total spend on leads in the date range." />
+      {leadBuyingEnabled && (
+        <Card label="Lead Cost" value={leadCost} prefix="$" icon="🧾" delay={160}
+          sub="sum({Lead Price}) across all leads"
+          infoText="sum({Lead Price}) — total spend on leads in the date range." />
+      )}
 
-      <Card label="Commission (10.5%)" value={commission} prefix="$" icon="💼" delay={200} accentColor={G}
-        sub="Written Premium × 10.5%"
-        infoText="{Written Premium} × $0.105 — static commission rate confirmed by Steve." />
+      <Card label={`Commission (${fmt(commissionRate * 100, commissionRate * 100 % 1 === 0 ? 0 : 1)}%)`} value={commission} prefix="$" icon="💼" delay={200} accentColor={G}
+        sub={`Written Premium × ${fmt(commissionRate * 100, 1)}%`}
+        infoText="{Written Premium} × commission rate — set the rate in the controls above." />
 
-      <Card label="Profit" value={profit} prefix="$" icon="📈" delay={240}
-        accentColor={profit !== null ? (profit >= 0 ? G : RED) : undefined}
-        sub="Commission − Lead Cost"
-        infoText="Commission − {Lead Cost}" />
+      {leadBuyingEnabled && (
+        <Card label="Profit" value={profit} prefix="$" icon="📈" delay={240}
+          accentColor={profit !== null ? (profit >= 0 ? G : RED) : undefined}
+          sub="Commission − Lead Cost"
+          infoText="Commission − {Lead Cost}" />
+      )}
 
-      <Card label="PPL (Profit Per Lead)" value={ppl} prefix="$" decimals={2} icon="💹" delay={280}
-        accentColor={ppl !== null ? (ppl >= 0 ? G : RED) : undefined}
-        sub="Profit ÷ Leads"
-        infoText="Profit / Leads — how much profit each lead generates on average." />
+      {leadBuyingEnabled && (
+        <Card label="PPL (Profit Per Lead)" value={ppl} prefix="$" decimals={2} icon="💹" delay={280}
+          accentColor={ppl !== null ? (ppl >= 0 ? G : RED) : undefined}
+          sub="Profit ÷ Leads"
+          infoText="Profit / Leads — how much profit each lead generates on average." />
+      )}
 
       {/* ── SALES EFFICIENCY ─────────────────────────────────────── */}
       <SectionLabel>Sales Efficiency</SectionLabel>
@@ -121,9 +127,11 @@ export default function OverviewCards({ overview }) {
         sub="New Customers ÷ Leads"
         infoText="{New Customers} / Leads" />
 
-      <Card label="Cost Per Policy (CPP)" value={cpp} prefix="$" decimals={0} icon="🧮" delay={360}
-        sub="Lead Cost ÷ New Customers"
-        infoText="{Lead Cost} / {New Customers}" />
+      {leadBuyingEnabled && (
+        <Card label="Cost Per Policy (CPP)" value={cpp} prefix="$" decimals={0} icon="🧮" delay={360}
+          sub="Lead Cost ÷ New Customers"
+          infoText="{Lead Cost} / {New Customers}" />
+      )}
 
       <Card label="Quote Rate" value={quoteRate} suffix="%" decimals={1} icon="📋" delay={400}
         sub="Quotes ÷ Leads"
