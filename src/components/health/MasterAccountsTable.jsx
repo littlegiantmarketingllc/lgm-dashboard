@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import InfoTip from './InfoTip'
 import { useRole } from '../../contexts/RoleContext'
 
@@ -22,8 +22,8 @@ function HealthPill({ score, band }) {
   )
 }
 
-function ActivityBadge({ days, source }) {
-  if (source === 'ghl' || days === null || days === undefined)
+function ActivityBadge({ days }) {
+  if (days === null || days === undefined)
     return <span className="text-brand-muted text-[10px]">—</span>
   const d = Number(days)
   const color = d <= 7 ? G : d <= 30 ? AMB : RED
@@ -66,7 +66,7 @@ const COLS = [
   { key: 'lcWalletCharges',    label: 'LC Wallet',    sortable: true,  align: 'right',  tip: 'Cumulative LC platform spend from Cliff\'s data: SMS, AI calls, email, voice. All-time total — not monthly.' },
   { key: 'users',              label: 'Billed Users', sortable: true,  align: 'center', tip: 'Billed user seat count from Stripe. Does not include free/unlicensed GHL members — total member count coming from Cliff\'s daily sync.' },
   { key: '_estGP',             label: 'Est. GP%',     sortable: false, align: 'right',  tip: 'Estimated gross profit %: (Monthly Revenue − Est. Monthly LC Cost) ÷ Revenue. LC cost is estimated from all-time wallet spend ÷ tenure months. Will be exact once Cliff\'s daily LC sync is live.' },
-  { key: 'lastActivity',       label: 'Activity',     sortable: true,  align: 'center', tip: 'Days since last LC wallet charge (SMS, calls, AI, email usage). Only LC-tracked activity shown — accounts with no LC history show —. Green = within 7 days · Amber = 8–30 days · Red = 30+ days.' },
+  { key: 'lastActivity',       label: 'Activity',     sortable: true,  align: 'center', tip: 'Days since last activity — whichever is more recent: GHL sub-account last updated, or LC wallet charge (SMS, calls, AI, email). Green = within 7 days · Amber = 8–30 days · Red = 30+ days.' },
   { key: '_healthScore',       label: 'Health',       sortable: true,  align: 'center', tip: 'Health score 0–100 based on GHL activity recency. 70+ = Healthy · 40–69 = Watch · <40 = At-Risk. Click any row to see the full breakdown.' },
 ]
 
@@ -80,7 +80,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
   const [page,    setPage]    = useState(1)
 
   const accountsKey = accounts.length
-  useMemo(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1) }, [accountsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stripeCount  = useMemo(() => accounts.filter(a => a._stripeBound).length, [accounts])
   const lcCount      = useMemo(() => accounts.filter(a => (a.lcWalletCharges ?? 0) > 0).length, [accounts])
@@ -93,7 +93,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
     const startDate = account.stripeStartDate || account.ghlDateAdded
     if (!startDate) return null
     try {
-      const months = Math.max(1, (Date.now() - new Date(startDate + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24 * 30))
+      const months = Math.max(1, (Date.now() - new Date(startDate + 'T12:00:00').getTime()) / (1000 * 60 * 60 * 24 * 30))
       const monthlyLC = lc / months
       const gp = Math.round(((account.totalRev - monthlyLC) / account.totalRev) * 100)
       return gp > 100 ? 100 : gp < -99 ? null : gp
@@ -238,7 +238,7 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   {/* Joined GHL */}
                   <td className="px-2 py-2 text-[10px] text-brand-muted whitespace-nowrap">
                     {a.ghlDateAdded
-                      ? new Date(a.ghlDateAdded + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                      ? new Date(a.ghlDateAdded + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                       : '—'}
                   </td>
 
@@ -246,13 +246,24 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   {isAdmin && (
                     <td className="px-2 py-2 text-center">
                       {bound ? (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                          a.stripeStatus === 'active'       ? 'bg-green-50 border-green-200 text-green-700' :
-                          a.stripeStatus === 'trialing'     ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                          a.stripeStatus === 'past_due'     ? 'bg-orange-50 border-orange-200 text-orange-700' :
-                          a.stripeStatus === 'open_invoice' ? 'bg-amber-50 border-amber-300 text-amber-700' :
-                          'bg-red-50 border-red-200 text-red-600'
-                        }`}>{a.stripeStatus === 'open_invoice' ? 'open invoice' : (a.stripeStatus ?? '—')}</span>
+                        <span className="inline-flex flex-col items-center gap-0.5">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                            a.stripeCanceling                 ? 'bg-amber-50 border-amber-300 text-amber-700' :
+                            a.stripeStatus === 'active'       ? 'bg-green-50 border-green-200 text-green-700' :
+                            a.stripeStatus === 'trialing'     ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                            a.stripeStatus === 'past_due'     ? 'bg-orange-50 border-orange-200 text-orange-700' :
+                            a.stripeStatus === 'open_invoice' ? 'bg-amber-50 border-amber-300 text-amber-700' :
+                            a.stripeStatus === 'paused'       ? 'bg-yellow-50 border-yellow-300 text-yellow-700' :
+                            'bg-red-50 border-red-200 text-red-600'
+                          }`}>
+                            {a.stripeCanceling ? 'canceling' : a.stripeStatus === 'open_invoice' ? 'open invoice' : (a.stripeStatus ?? '—')}
+                          </span>
+                          {a.ghlDisabled && (
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded border bg-purple-50 border-purple-200 text-purple-700 whitespace-nowrap">GHL paused</span>
+                          )}
+                        </span>
+                      ) : a.ghlDisabled ? (
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded border bg-purple-50 border-purple-200 text-purple-700 whitespace-nowrap">GHL paused</span>
                       ) : <span className="text-brand-border text-[10px]">—</span>}
                     </td>
                   )}
@@ -312,7 +323,6 @@ export default function MasterAccountsTable({ accounts, dateFiltered = false, da
                   <td className="px-2 py-2 text-center">
                     <ActivityBadge
                       days={a.lastActivity ?? a.ghlDaysSinceUpdate}
-                      source={a.lastLcActivityMonth ? 'lc' : 'ghl'}
                     />
                   </td>
 

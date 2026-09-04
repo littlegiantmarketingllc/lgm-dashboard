@@ -46,6 +46,24 @@ export default async function handler(req, res) {
       'kitajima insurance',
       'lgm add-ons',
       'data forest',
+      // Synced from frontend EXCLUDED_NAMES (useMergedHealthData.js)
+      'lgm nps survey',
+      "joe perniciaro's account",
+      'hlpt saas snapshot',
+      'tippy taps',
+      'mallard',
+      'lgm add-on',
+      'lgm add on',
+      'lgm addon',
+      'lgm training',
+      'lgm training account',
+      'lgm test',
+      'lgm demo',
+      'lgm demo account',
+      'little giant marketing',
+      'little giant marketing agency',
+      'data forest lgm add-on',
+      'data forest lgm add on',
     ])
     const realLocs = all.filter(loc => {
       const name = (loc.name || '').trim()
@@ -76,6 +94,7 @@ export default async function handler(req, res) {
         ghlDaysSinceUpdate: daysSinceUpdate,
         ghlPermissions:     loc.permissions     || {},
         ghlSnapshotId:      loc.snapshotId      || '',
+        ghlDisabled:        loc.disabled        || false,
 
         // ⚠️ Null = needs additional GHL API scope — will show as pending in UI
         ghlUserCount:       null,  // needs users.readonly scope

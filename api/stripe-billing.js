@@ -40,7 +40,9 @@ async function fetchAllSubscriptions(key) {
   let startingAfter = null
 
   while (true) {
-    const params = new URLSearchParams({ limit: '100', 'expand[]': 'data.customer' })
+    // 'all' includes active, trialing, past_due, unpaid, paused — excludes nothing.
+    // Without this, Stripe defaults to active only and past_due accounts disappear.
+    const params = new URLSearchParams({ limit: '100', status: 'all', 'expand[]': 'data.customer' })
     if (startingAfter) params.set('starting_after', startingAfter)
 
     const page = await stripeGet(`/subscriptions?${params}`, key)
@@ -82,7 +84,7 @@ async function fetchOpenInvoiceCustomerIds(key) {
 }
 
 // Priority used when a customer has multiple subscriptions — prefer active over trialing
-const STATUS_PRIORITY = { active: 0, trialing: 1, past_due: 2, canceled: 3 }
+const STATUS_PRIORITY = { active: 0, trialing: 1, past_due: 2, unpaid: 2, paused: 3, canceled: 4 }
 
 export default async function handler(req, res) {
   const key = process.env.STRIPE_SECRET_KEY
@@ -96,18 +98,26 @@ export default async function handler(req, res) {
       fetchOpenInvoiceCustomerIds(key),
     ])
 
-    // Group subscriptions by customer email
+    // Group subscriptions by customer — email as primary key, customer ID as fallback
+    // for customers with no email (e.g. district offices) so manual overrides can find them.
     const subsByEmail = {}
+    const subsByCustomerId = {} // customers with no email
     for (const sub of allSubs) {
       const cust = sub.customer
-      if (typeof cust !== 'object' || !cust?.email) continue
-      const email = cust.email.toLowerCase().trim()
-      if (!subsByEmail[email]) subsByEmail[email] = { customer: cust, subs: [] }
-      subsByEmail[email].subs.push(sub)
+      if (typeof cust !== 'object' || !cust?.id) continue
+      if (cust.email) {
+        const email = cust.email.toLowerCase().trim()
+        if (!subsByEmail[email]) subsByEmail[email] = { customer: cust, subs: [] }
+        subsByEmail[email].subs.push(sub)
+      } else {
+        if (!subsByCustomerId[cust.id]) subsByCustomerId[cust.id] = { customer: cust, subs: [] }
+        subsByCustomerId[cust.id].subs.push(sub)
+      }
     }
 
     // Build per-email billing summary
     const byEmail = {}
+    const byCustomerIdNoEmail = {} // billing records for email-less customers
 
     for (const [email, { customer, subs }] of Object.entries(subsByEmail)) {
       let planPrice = 0
@@ -172,6 +182,11 @@ export default async function handler(req, res) {
         canceledAt = new Date(primarySub.canceled_at * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
       }
 
+      // Scheduled cancellation flags — sub is still active but set to cancel at period end
+      const cancelAtPeriodEnd = primarySub?.cancel_at_period_end || false
+      const cancelAt          = primarySub?.cancel_at || null
+      const stripeCanceling   = cancelAtPeriodEnd || !!cancelAt
+
       // DM detection: monthly plan ≈ $250, or annual plan where monthly equiv ≈ $208 ($2500/yr)
       const monthlyBase = planInterval === 'month' ? planPrice : planPrice / 12
       const isDM =
@@ -216,6 +231,9 @@ export default async function handler(req, res) {
         users:           userCount,
         accountType:     isDM ? 'DM' : 'Agent',
         canceledAt,
+        cancelAtPeriodEnd,
+        cancelAt,
+        stripeCanceling,
         lcWalletCharges: 0,
         transactions:    0,
         gp:              0,
@@ -227,6 +245,60 @@ export default async function handler(req, res) {
       }
 
       byEmail[email] = record
+    }
+
+    // Process customers with no email — keyed by Stripe customer ID so manual overrides work
+    for (const [custId, { customer, subs }] of Object.entries(subsByCustomerId)) {
+      let primaryStatus = 'canceled', primarySubId = null, startDate = null, canceledAt = null
+      let planPrice = 0, planNickname = '', planInterval = 'month'
+      let monthlyUserSub = 0, addOns = 0, userCount = 0
+
+      for (const sub of subs) {
+        if ((STATUS_PRIORITY[sub.status] ?? 9) < (STATUS_PRIORITY[primaryStatus] ?? 9)) {
+          primaryStatus = sub.status; primarySubId = sub.id
+        }
+        const subDate = new Date(sub.created * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+        if (!startDate || subDate < startDate) startDate = subDate
+        for (const item of sub.items?.data || []) {
+          const plan = item.plan || {}
+          const amtDollars = (plan.amount || 0) / 100
+          const qty = item.quantity || 0
+          if (qty === 0 || amtDollars === 0) continue
+          const interval = plan.interval || 'month'
+          const nick = (plan.nickname || '').toLowerCase()
+          const monthlyEquiv = interval === 'month' ? amtDollars : amtDollars / 12
+          if (nick.includes('additional user') || nick.includes('user seat') || nick.includes('@ 64')) {
+            monthlyUserSub += monthlyEquiv * qty; userCount += qty
+          } else if (nick.includes('leadflow') || nick.includes('ai assistant') || nick.includes('add-on') || nick.includes('addon')) {
+            addOns += monthlyEquiv * qty
+          } else {
+            if (monthlyEquiv > planPrice) { planPrice = monthlyEquiv; planNickname = plan.nickname || ''; planInterval = interval }
+          }
+        }
+      }
+      const primarySub = subs.find(s => s.id === primarySubId) ?? subs[0]
+      if (primarySub?.status === 'canceled' && primarySub?.canceled_at) {
+        canceledAt = new Date(primarySub.canceled_at * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+      }
+      const catelAtPeriodEnd2 = primarySub?.cancel_at_period_end || false
+      const cancelAt2         = primarySub?.cancel_at || null
+      const stripeCanceling2  = catelAtPeriodEnd2 || !!cancelAt2
+      const totalRev = planPrice + monthlyUserSub + addOns
+      const record = {
+        stripeCustomerId: custId, stripeCustomerName: customer.name || '',
+        stripePhone: normalizePhone(customer.phone), stripeNormName: normalizeName(customer.name),
+        stripeGhlLocationId: null, stripeStatus: primaryStatus, stripeSubscriptionId: primarySubId,
+        stripeStartDate: startDate, planNickname, planInterval,
+        planPrice: Math.round(planPrice * 100) / 100, monthlyUserSub: Math.round(monthlyUserSub * 100) / 100,
+        addOns: Math.round(addOns * 100) / 100, totalRev: Math.round(totalRev * 100) / 100,
+        users: userCount, accountType: 'Agent', canceledAt,
+        cancelAtPeriodEnd: catelAtPeriodEnd2, cancelAt: cancelAt2, stripeCanceling: stripeCanceling2,
+        lcWalletCharges: 0, transactions: 0, gp: 0,
+      }
+      if (record.stripeStatus === 'active' && openInvoiceCustomerIds.has(custId)) {
+        record.stripeStatus = 'open_invoice'
+      }
+      byCustomerIdNoEmail[custId] = record
     }
 
     // Build secondary lookup maps — phone and normalized name (unique only, skip collisions)
@@ -259,6 +331,7 @@ export default async function handler(req, res) {
       byPhone,
       byNormName,
       byLocId,
+      byCustomerIdNoEmail,  // email-less customers (district offices etc.) — for manual overrides
       count:     Object.keys(byEmail).length,
       totalSubs: allSubs.length,
       syncedAt:  new Date().toISOString(),

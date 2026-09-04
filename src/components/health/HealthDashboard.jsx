@@ -112,6 +112,21 @@ export default function HealthDashboard({ filters, setFilters }) {
   const [freshdesk, setFreshdesk] = useState(null)
   const [ticketsModalFilter, setTicketsModalFilter] = useState(null) // null closed · 'open' | 'urgent' | 'all'
 
+  // Upsell "Mark Contacted" state — persisted in localStorage
+  const [upsellContacted, setUpsellContacted] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lgm-upsell-contacted') || '{}') } catch { return {} }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('lgm-upsell-contacted', JSON.stringify(upsellContacted)) } catch {}
+  }, [upsellContacted])
+  const isContacted     = (id) => !!upsellContacted[String(id)]
+  const toggleContacted = (id) => setUpsellContacted(prev => {
+    const k = String(id)
+    if (prev[k]) { const next = { ...prev }; delete next[k]; return next }
+    return { ...prev, [k]: new Date().toISOString() }
+  })
+  const getContactedAt  = (id) => upsellContacted[String(id)] || null
+
   useEffect(() => {
     let cancelled = false
     const load = () => fetch('/api/freshdesk-summary')
@@ -186,6 +201,10 @@ export default function HealthDashboard({ filters, setFilters }) {
       if (billing === 'matched'          && !a._stripeBound) return false
       if (billing === 'unmatched'        &&  a._stripeBound) return false
       if (billing === 'past_due_or_open' && a.stripeStatus !== 'past_due' && a.stripeStatus !== 'open_invoice') return false
+      if (billing === 'canceling'     && !a.stripeCanceling) return false
+      if (billing === 'paused_stripe' && a.stripeStatus !== 'paused') return false
+      if (billing === 'paused_ghl'    && !a.ghlDisabled) return false
+      if (billing === 'paused_both'   && !(a.stripeStatus === 'paused' && a.ghlDisabled)) return false
       if (filters.dateRange.type !== 'all') {
         const d = a.ghlDateAdded || ''
         if (!d || d < from || d > to) return false
@@ -518,9 +537,9 @@ export default function HealthDashboard({ filters, setFilters }) {
           accounts={upsellAccounts}
           hasBilling={billedAccounts.length > 0}
           stripeLoading={stripeLoading}
-          isContacted={() => false}
-          toggleContacted={() => {}}
-          getContactedAt={() => null}
+          isContacted={isContacted}
+          toggleContacted={toggleContacted}
+          getContactedAt={getContactedAt}
           onAccountClick={setSelectedAccount}
           potentialMRR={BILLING.upsellMRR}
         />
