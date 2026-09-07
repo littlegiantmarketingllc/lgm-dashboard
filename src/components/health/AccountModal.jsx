@@ -4,6 +4,36 @@ import { recommendAction, enhancedScoreAccount, classify } from '../../lib/healt
 import GHLInfoPanel from './GHLInfoPanel'
 import InfoTip from './InfoTip'
 
+function CopyIdButton({ id }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(id).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={copy}
+      title="Copy Sub-Account ID"
+      className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-150"
+      style={copied
+        ? { color: '#3a6b10', background: '#8CC63F18', borderColor: '#8CC63F50' }
+        : { color: '#6B7280', background: '#F4F6F4',   borderColor: '#E5E7E5'   }}
+    >
+      {copied ? '✓ Copied!' : (
+        <>
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+            <path d="M11 5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6.5A1.5 1.5 0 0 0 3 11h2"/>
+          </svg>
+          {id}
+        </>
+      )}
+    </button>
+  )
+}
+
 const NOISE = /\b(agency|llc|inc|corp|insurance|marketing|services|group|associates|co\.?|ltd|the)\b/gi
 function buildGHLQuery(name) {
   return name.replace(NOISE, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 2).join(' ')
@@ -22,6 +52,16 @@ function bandLabel(band) {
   if (band === 'healthy') return 'Active'
   if (band === 'watch')   return 'Slowing'
   return 'Stale'
+}
+
+function fmtTs(ts) {
+  if (!ts) return '—'
+  return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+function fmtCents(amount, currency = 'usd') {
+  if (amount === null || amount === undefined) return '—'
+  const sym = currency === 'usd' ? '$' : currency.toUpperCase() + ' '
+  return `${sym}${(amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function SubScoreBar({ label, score }) {
@@ -54,6 +94,14 @@ export default function AccountModal({ account, onClose }) {
 
   const [lcCharges,        setLcCharges]        = useState(null)
   const [lcLoading,        setLcLoading]        = useState(true)
+
+  const [stripeAcct,        setStripeAcct]        = useState(null)
+  const [stripeAcctLoading, setStripeAcctLoading] = useState(false)
+  const [stripeAcctError,   setStripeAcctError]   = useState(null)
+  const [expandedSubId,     setExpandedSubId]     = useState(null)
+  const [expandedInvId,     setExpandedInvId]     = useState(null)
+  const [invLoadingMore,    setInvLoadingMore]    = useState(false)
+  const [pmtLoadingMore,    setPmtLoadingMore]    = useState(false)
 
   const fetchGHLInfo = useCallback(async () => {
     if (ghlLoading) return
@@ -104,6 +152,55 @@ export default function AccountModal({ account, onClose }) {
       .catch(() => { setLcLoading(false) })
   }, [account.ghlId])
 
+  // Auto-fetch detailed Stripe subscriptions + invoices for this customer
+  useEffect(() => {
+    if (!account.stripeCustomerId) return
+    setStripeAcctLoading(true)
+    setStripeAcctError(null)
+    fetch(`/api/stripe-account?customerId=${encodeURIComponent(account.stripeCustomerId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error)
+        setStripeAcct(data)
+      })
+      .catch(err => setStripeAcctError(err.message))
+      .finally(() => setStripeAcctLoading(false))
+  }, [account.stripeCustomerId])
+
+  function loadMoreInvoices() {
+    if (!stripeAcct?.lastInvoiceId || invLoadingMore) return
+    setInvLoadingMore(true)
+    fetch(`/api/stripe-account?customerId=${encodeURIComponent(account.stripeCustomerId)}&invoiceStartingAfter=${stripeAcct.lastInvoiceId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return
+        setStripeAcct(prev => ({
+          ...prev,
+          invoices:       [...(prev.invoices || []), ...(data.invoices || [])],
+          hasMoreInvoices: data.hasMoreInvoices,
+          lastInvoiceId:   data.lastInvoiceId,
+        }))
+      })
+      .finally(() => setInvLoadingMore(false))
+  }
+
+  function loadMorePayments() {
+    if (!stripeAcct?.lastPaymentId || pmtLoadingMore) return
+    setPmtLoadingMore(true)
+    fetch(`/api/stripe-account?customerId=${encodeURIComponent(account.stripeCustomerId)}&paymentStartingAfter=${stripeAcct.lastPaymentId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return
+        setStripeAcct(prev => ({
+          ...prev,
+          payments:       [...(prev.payments || []), ...(data.payments || [])],
+          hasMorePayments: data.hasMorePayments,
+          lastPaymentId:   data.lastPaymentId,
+        }))
+      })
+      .finally(() => setPmtLoadingMore(false))
+  }
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -137,16 +234,14 @@ export default function AccountModal({ account, onClose }) {
 
   const initials = account.accountName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
-  // LC wallet proxy (batch data, last month with charges)
+  // Activity source: most-recent of GHL dateUpdated and LC wallet latest month
+  const activitySource = account._lastActivitySource || (account.lastLcActivityMonth ? 'lc' : 'ghl')
   const lcDays   = account.lastLcActivityMonth ? account.lastActivity : null
   const lcSource = account.lastLcActivityMonth ? `LC · ${account.lastLcActivityMonth}` : null
 
-  // The activity sub-score is real LC wallet data only when we actually have it for
-  // this account — otherwise it's silently using the GHL "record last updated" fallback,
-  // which can reflect LGM staff touching the sub-account rather than the client using it.
-  const activityLabel = account.lastLcActivityMonth
+  const activityLabel = activitySource === 'lc'
     ? `LC Platform Activity (last wallet charge, ${account.lastLcActivityMonth})`
-    : 'GHL Sub-Account Activity (no LC data — record last updated, may not reflect real client usage)'
+    : 'GHL Sub-Account Activity (last record update)'
 
   // Real-time activity: most recently updated contact (CRM signal — client's team is working in GHL)
   const realtimeDays = liveMetrics?.lastContactUpdate
@@ -213,8 +308,8 @@ export default function AccountModal({ account, onClose }) {
               <div className="absolute top-2 right-2">
                 <InfoTip
                   text={isEnhanced
-                    ? `Enhanced score: Activity 30% (${account.lastLcActivityMonth ? 'days since last LC wallet charge' : 'no LC data — using GHL record-updated date instead'}) · CRM Contacts 40% (how much data is in their system) · Pipeline Opportunities 30% (deals being tracked). Higher = more active client.`
-                    : `Activity score: 100 = active today, 90 = last 7 days, 75 = last 2 weeks, 60 = last 30 days, 40 = last 60 days, 20 = last 90 days, 5 = 90+ days. ${account.lastLcActivityMonth ? 'Based on LC wallet data.' : 'No LC wallet data for this account yet — based on GHL record-updated date, which is not a reliable usage signal.'} Enhanced score (contacts + pipeline) loads automatically below.`}
+                    ? `Enhanced score: Activity 30% (most recent of GHL sub-account update or LC wallet charge) · CRM Contacts 40% (how much data is in their system) · Pipeline Opportunities 30% (deals being tracked). Higher = more active client.`
+                    : `Activity score: 100 = active today, 90 = last 7 days, 75 = last 2 weeks, 60 = last 30 days, 40 = last 60 days, 20 = last 90 days, 5 = 90+ days. Uses most recent signal: GHL sub-account last updated or LC wallet charge (whichever is more recent). Enhanced score (contacts + pipeline) loads automatically below.`}
                   position="top-end"
                 />
               </div>
@@ -274,7 +369,7 @@ export default function AccountModal({ account, onClose }) {
           {/* GHL location details */}
           <div className="rounded-xl border border-brand-border p-4 grid grid-cols-2 gap-3 text-[12px]">
             {account.ghlId && (
-              <div className="col-span-2">
+              <div className="col-span-2 flex flex-wrap items-center gap-2">
                 <a
                   href={`https://app.gohighlevel.com/v2/location/${account.ghlId}/dashboard`}
                   target="_blank"
@@ -284,6 +379,7 @@ export default function AccountModal({ account, onClose }) {
                 >
                   Open in GHL →
                 </a>
+                <CopyIdButton id={account.ghlId} />
               </div>
             )}
             <div>
@@ -327,6 +423,352 @@ export default function AccountModal({ account, onClose }) {
                   style={{ color: G }}>
                   {account.ghlWebsite}
                 </a>
+              </div>
+            )}
+          </div>
+
+          {/* Billing */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
+              Billing
+              <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
+                style={{ background: '#635bff15', color: '#635bff', border: '1px solid #635bff30' }}>
+                Stripe
+              </span>
+            </p>
+            {account.stripeCustomerId ? (
+              <div className="rounded-xl border border-brand-border overflow-hidden">
+                {/* Status + Stripe button row */}
+                <div className="px-4 py-3 bg-brand-bg/60 border-b border-brand-border flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const s = account.stripeStatus
+                      const cfg =
+                        s === 'active'       ? { label: 'Active',       bg: '#8CC63F12', color: G,       border: '#8CC63F30' } :
+                        s === 'trialing'     ? { label: 'Trialing',     bg: '#3b82f612', color: '#3b82f6', border: '#3b82f630' } :
+                        s === 'past_due'     ? { label: 'Past Due',     bg: '#EF444412', color: RED,      border: '#EF444430' } :
+                        s === 'open_invoice' ? { label: 'Open Invoice', bg: '#EAB30812', color: AMB,      border: '#EAB30830' } :
+                        s === 'unpaid'       ? { label: 'Unpaid',       bg: '#EF444412', color: RED,      border: '#EF444430' } :
+                        s === 'paused'       ? { label: 'Paused',       bg: '#6b728012', color: '#6b7280', border: '#6b728030' } :
+                        s === 'canceled'     ? { label: 'Canceled',     bg: '#6b728012', color: '#6b7280', border: '#6b728030' } :
+                                              { label: s || 'Unknown',  bg: '#6b728012', color: '#6b7280', border: '#6b728030' }
+                      return (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border"
+                          style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}>
+                          {cfg.label}
+                        </span>
+                      )
+                    })()}
+                    {account.planNickname && (
+                      <span className="text-[11px] text-brand-muted truncate max-w-[160px]">{account.planNickname}</span>
+                    )}
+                  </div>
+                  <a
+                    href={`https://dashboard.stripe.com/customers/${account.stripeCustomerId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border flex-shrink-0 transition-colors"
+                    style={{ color: '#635bff', background: '#635bff10', borderColor: '#635bff30' }}
+                  >
+                    View in Stripe →
+                  </a>
+                </div>
+                {/* Revenue breakdown */}
+                <div className="grid grid-cols-4 divide-x divide-brand-border border-b border-brand-border">
+                  {[
+                    { label: 'Total / mo',  value: account.totalRev      > 0 ? `$${Math.round(account.totalRev).toLocaleString()}`      : '—' },
+                    { label: 'Base Plan',   value: account.planPrice     > 0 ? `$${Math.round(account.planPrice).toLocaleString()}`     : '—' },
+                    { label: `Users (${account.users > 0 ? account.users : 0})`, value: account.monthlyUserSub > 0 ? `$${Math.round(account.monthlyUserSub).toLocaleString()}` : '—' },
+                    { label: 'Add-ons',     value: account.addOns        > 0 ? `$${Math.round(account.addOns).toLocaleString()}`        : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="px-2 py-2.5 text-center bg-white">
+                      <p className="num text-sm font-bold text-brand-text">{value}</p>
+                      <p className="text-[10px] text-brand-muted mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Start date */}
+                <div className="px-4 py-2.5 flex items-center justify-between gap-2 bg-brand-bg/30">
+                  <div>
+                    <span className="text-[10px] text-brand-muted">Customer since: </span>
+                    <span className="text-[11px] font-semibold text-brand-text">
+                      {account.stripeStartDate
+                        ? new Date(account.stripeStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── Subscriptions ───────────────────────────────── */}
+                <div className="border-t border-brand-border">
+                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-muted">
+                    Subscriptions
+                  </p>
+                  {stripeAcctLoading ? (
+                    <div className="px-4 py-3 flex items-center gap-2 text-[11px] text-brand-muted">
+                      <div className="w-3 h-3 rounded-full border-2 border-brand-border border-t-[#635bff] animate-spin flex-shrink-0" />
+                      Loading…
+                    </div>
+                  ) : stripeAcctError ? (
+                    <div className="px-4 py-3 text-[11px] text-red-600">{stripeAcctError}</div>
+                  ) : !stripeAcct?.subscriptions?.length ? (
+                    <div className="px-4 py-3 text-[11px] text-brand-muted">No subscriptions found.</div>
+                  ) : (
+                    <div className="divide-y divide-brand-border/50">
+                      {stripeAcct.subscriptions.map(sub => {
+                        const isOpen = expandedSubId === sub.id
+                        const sCfg =
+                          sub.status === 'active'    ? { label: 'Active',    color: G,         bg: '#8CC63F12', border: '#8CC63F30' } :
+                          sub.status === 'past_due'  ? { label: 'Past Due',  color: RED,       bg: '#EF444412', border: '#EF444430' } :
+                          sub.status === 'trialing'  ? { label: 'Trialing',  color: '#3b82f6', bg: '#3b82f612', border: '#3b82f630' } :
+                          sub.status === 'canceled'  ? { label: 'Canceled',  color: '#6b7280', bg: '#6b728012', border: '#6b728030' } :
+                          sub.status === 'paused'    ? { label: 'Paused',    color: '#6b7280', bg: '#6b728012', border: '#6b728030' } :
+                                                       { label: sub.status,  color: '#6b7280', bg: '#6b728012', border: '#6b728030' }
+                        const summary = sub.items
+                          .map(i => i.quantity > 1 ? `${i.description || 'Plan'} × ${i.quantity}` : (i.description || 'Plan'))
+                          .join(' + ')
+                        const firstItem = sub.items[0]
+                        const frequency = firstItem
+                          ? (firstItem.intervalCount === 1
+                              ? `Billing ${firstItem.interval}ly`
+                              : `Every ${firstItem.intervalCount} ${firstItem.interval}s`)
+                          : ''
+                        const willCancel = sub.cancelAtPeriodEnd || sub.cancelAt
+                        const cancelDate = sub.cancelAt
+                          ? fmtTs(sub.cancelAt)
+                          : (sub.cancelAtPeriodEnd && sub.currentPeriodEnd ? fmtTs(sub.currentPeriodEnd) : null)
+                        const nextDate   = sub.currentPeriodEnd ? fmtTs(sub.currentPeriodEnd) : '—'
+                        const nextAmount = sub.items.reduce((sum, i) => sum + (i.unitAmount * i.quantity), 0)
+                        const nextInvoice = willCancel
+                          ? (cancelDate ? `Cancels ${cancelDate}` : 'Canceling')
+                          : (nextAmount > 0 ? `${nextDate} for ${fmtCents(nextAmount)}` : nextDate)
+                        return (
+                          <div key={sub.id}>
+                            <button
+                              className="w-full px-4 py-2.5 flex items-start justify-between gap-2 text-left hover:bg-brand-bg/40 transition-colors"
+                              onClick={() => setExpandedSubId(isOpen ? null : sub.id)}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 pt-0.5">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0"
+                                  style={{ color: sCfg.color, background: sCfg.bg, borderColor: sCfg.border }}>
+                                  {sCfg.label}
+                                </span>
+                                {willCancel && cancelDate && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full border flex-shrink-0"
+                                    style={{ color: '#f59e0b', background: '#f59e0b12', borderColor: '#f59e0b30' }}>
+                                    Cancels {cancelDate}
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-brand-text truncate">{summary}</span>
+                              </div>
+                              <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-brand-muted">{frequency}</span>
+                                  <span className="text-[10px] text-brand-muted">{isOpen ? '▲' : '▼'}</span>
+                                </div>
+                                {!willCancel && <span className="text-[10px] text-brand-muted">Next: {nextInvoice}</span>}
+                              </div>
+                            </button>
+                            {isOpen && (
+                              <div className="bg-brand-bg/60 border-t border-brand-border/50 px-4 py-3 space-y-2">
+                                {sub.items.map(item => (
+                                  <div key={item.id} className="flex items-center justify-between text-[11px]">
+                                    <span className="text-brand-text">{item.description || 'Plan'}</span>
+                                    <span className="num font-semibold text-brand-text tabular-nums">
+                                      {item.quantity > 1 ? `${item.quantity} × ` : ''}{fmtCents(item.unitAmount, item.currency)}<span className="text-brand-muted font-normal">/{item.interval}</span>
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="pt-1.5 border-t border-brand-border/40 text-[10px] text-brand-muted">
+                                  Current period: {fmtTs(sub.currentPeriodStart)} – {fmtTs(sub.currentPeriodEnd)}
+                                </div>
+                                <a
+                                  href={`https://dashboard.stripe.com/subscriptions/${sub.id}`}
+                                  target="_blank" rel="noopener noreferrer"
+                                  className="text-[10px] font-medium"
+                                  style={{ color: '#635bff' }}
+                                >
+                                  View in Stripe →
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Payments ────────────────────────────────────── */}
+                <div className="border-t border-brand-border">
+                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-muted">
+                    Payments
+                  </p>
+                  {stripeAcctLoading ? (
+                    <div className="px-4 py-3 flex items-center gap-2 text-[11px] text-brand-muted">
+                      <div className="w-3 h-3 rounded-full border-2 border-brand-border border-t-[#635bff] animate-spin flex-shrink-0" />
+                      Loading…
+                    </div>
+                  ) : !stripeAcct?.payments?.length ? (
+                    <div className="px-4 py-3 text-[11px] text-brand-muted">No payments found.</div>
+                  ) : (
+                    <>
+                    <div className="divide-y divide-brand-border/50">
+                      {stripeAcct.payments.map(pmt => {
+                        const pCfg =
+                          pmt.status === 'succeeded' ? { label: 'Succeeded', color: G,        bg: '#8CC63F12', border: '#8CC63F30' } :
+                          pmt.status === 'failed'    ? { label: 'Failed',    color: RED,       bg: '#EF444412', border: '#EF444430' } :
+                                                       { label: 'Pending',   color: AMB,       bg: '#EAB30812', border: '#EAB30830' }
+                        return (
+                          <div key={pmt.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="num text-[12px] font-bold text-brand-text tabular-nums flex-shrink-0">
+                                {fmtCents(pmt.amount, pmt.currency)}
+                              </span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0"
+                                style={{ color: pCfg.color, background: pCfg.bg, borderColor: pCfg.border }}>
+                                {pCfg.label}
+                              </span>
+                              {pmt.description && (
+                                <span className="text-[10px] text-brand-muted truncate">{pmt.description}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[10px] text-brand-muted">{fmtTs(pmt.created)}</span>
+                              {pmt.receiptUrl && (
+                                <a href={pmt.receiptUrl} target="_blank" rel="noopener noreferrer"
+                                  className="text-[10px] font-medium flex-shrink-0"
+                                  style={{ color: '#635bff' }}>
+                                  Receipt →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {stripeAcct.hasMorePayments && (
+                      <div className="px-4 py-2.5 border-t border-brand-border/50">
+                        <button
+                          onClick={loadMorePayments}
+                          disabled={pmtLoadingMore}
+                          className="text-[11px] font-medium transition-colors disabled:opacity-50"
+                          style={{ color: '#635bff' }}
+                        >
+                          {pmtLoadingMore ? 'Loading…' : 'Load more payments →'}
+                        </button>
+                      </div>
+                    )}
+                    </>
+                  )}
+                </div>
+
+                {/* ── Invoices ────────────────────────────────────── */}
+                <div className="border-t border-brand-border">
+                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-muted">
+                    Invoices
+                  </p>
+                  {stripeAcctLoading ? (
+                    <div className="px-4 py-3 flex items-center gap-2 text-[11px] text-brand-muted">
+                      <div className="w-3 h-3 rounded-full border-2 border-brand-border border-t-[#635bff] animate-spin flex-shrink-0" />
+                      Loading…
+                    </div>
+                  ) : !stripeAcct?.invoices?.length ? (
+                    <div className="px-4 py-3 text-[11px] text-brand-muted">No invoices found.</div>
+                  ) : (
+                    <>
+                      <div className="divide-y divide-brand-border/50">
+                        {stripeAcct.invoices.map(inv => {
+                          const isOpen = expandedInvId === inv.id
+                          const iCfg =
+                            inv.status === 'paid'   ? { label: 'Paid',   color: G,   bg: '#8CC63F12', border: '#8CC63F30' } :
+                            inv.status === 'open'   ? { label: 'Open',   color: RED, bg: '#EF444412', border: '#EF444430' } :
+                            inv.status === 'draft'  ? { label: 'Draft',  color: '#6b7280', bg: '#6b728012', border: '#6b728030' } :
+                                                      { label: inv.status, color: '#6b7280', bg: '#6b728012', border: '#6b728030' }
+                          return (
+                            <div key={inv.id}>
+                              <button
+                                className="w-full px-4 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-brand-bg/40 transition-colors"
+                                onClick={() => setExpandedInvId(isOpen ? null : inv.id)}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0"
+                                    style={{ color: iCfg.color, background: iCfg.bg, borderColor: iCfg.border }}>
+                                    {iCfg.label}
+                                  </span>
+                                  <span className="num text-[11px] font-semibold text-brand-text tabular-nums">{fmtCents(inv.total, inv.currency)}</span>
+                                  {inv.number && <span className="text-[10px] text-brand-muted truncate">{inv.number}</span>}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-[10px] text-brand-muted">{fmtTs(inv.created)}</span>
+                                  <span className="text-[10px] text-brand-muted">{isOpen ? '▲' : '▼'}</span>
+                                </div>
+                              </button>
+                              {isOpen && (
+                                <div className="bg-brand-bg/60 border-t border-brand-border/50 px-4 py-3 space-y-1.5">
+                                  {inv.lines.map(line => (
+                                    <div key={line.id} className="flex items-start justify-between gap-2 text-[11px]">
+                                      <div className="min-w-0">
+                                        <p className="text-brand-text leading-snug">{line.description || '—'}</p>
+                                        {line.periodStart && (
+                                          <p className="text-[10px] text-brand-muted mt-0.5">
+                                            {fmtTs(line.periodStart)} – {fmtTs(line.periodEnd)}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <span className="num font-semibold text-brand-text flex-shrink-0 tabular-nums">
+                                        {line.quantity > 1 ? `${line.quantity} × ` : ''}{fmtCents(line.amount, line.currency)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="pt-2 border-t border-brand-border/40 grid grid-cols-3 gap-2 text-[10px]">
+                                    {[
+                                      { label: 'Subtotal', value: fmtCents(inv.subtotal, inv.currency) },
+                                      { label: 'Tax',      value: inv.tax > 0 ? fmtCents(inv.tax, inv.currency) : '—' },
+                                      { label: 'Total',    value: fmtCents(inv.total, inv.currency) },
+                                    ].map(({ label, value }) => (
+                                      <div key={label}>
+                                        <p className="text-brand-muted">{label}</p>
+                                        <p className="num font-semibold text-brand-text tabular-nums">{value}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {inv.amountRemaining > 0 && (
+                                    <p className="text-[10px] font-semibold" style={{ color: RED }}>
+                                      Amount remaining: {fmtCents(inv.amountRemaining, inv.currency)}
+                                    </p>
+                                  )}
+                                  {inv.hostedUrl && (
+                                    <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer"
+                                      className="text-[10px] font-medium" style={{ color: '#635bff' }}>
+                                      View invoice →
+                                    </a>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {stripeAcct.hasMoreInvoices && (
+                        <div className="px-4 py-2.5 border-t border-brand-border/50">
+                          <button
+                            onClick={loadMoreInvoices}
+                            disabled={invLoadingMore}
+                            className="text-[11px] font-medium transition-colors disabled:opacity-50"
+                            style={{ color: '#635bff' }}
+                          >
+                            {invLoadingMore ? 'Loading…' : 'Load more invoices →'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-brand-border bg-brand-bg p-3 text-[11px] text-brand-muted">
+                No Stripe customer matched for this account.
               </div>
             )}
           </div>
