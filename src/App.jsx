@@ -46,6 +46,7 @@ import ActivityFeed        from './components/ActivityFeed'
 import CallDetailModal     from './components/modals/CallDetailModal'
 import EmployeeDetailModal from './components/modals/EmployeeDetailModal'
 import CoachingModal       from './components/modals/CoachingModal'
+import { ActiveCallsBar } from './components/ActiveCallsBar'
 
 // ─── Loading / Error screens ──────────────────────────────────────────────────
 function LoadingScreen() {
@@ -179,6 +180,8 @@ const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHea
         lastUpdated={lastUpdated}  onRefresh={refetch}
         isRefreshing={loading}     retrying={retrying} dataError={error}
       />
+
+      <ActiveCallsBar />
 
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
