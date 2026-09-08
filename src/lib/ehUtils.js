@@ -94,11 +94,14 @@ export function calcSummary(calls) {
 }
 
 // ─── Employee aggregation (per-row, not per-meeting) ─────────────────────────
+const EXCLUDED_EMPLOYEES = new Set(['Nick'])
+
 export function aggregateEmployees(calls) {
   const map = {}
   const sorted = [...calls].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
   for (const c of sorted) {
     if (!c.employee) continue
+    if (EXCLUDED_EMPLOYEES.has(c.employee)) continue
     if (!map[c.employee]) {
       map[c.employee] = {
         name: c.employee,
