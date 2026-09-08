@@ -206,7 +206,7 @@ export default function HealthDashboard({ filters, setFilters }) {
       if (billing === 'paused_ghl'    && !a.ghlDisabled) return false
       if (billing === 'paused_both'   && !(a.stripeStatus === 'paused' && a.ghlDisabled)) return false
       if (filters.dateRange.type !== 'all') {
-        const d = a.ghlDateAdded || ''
+        const d = a.stripeStartDate || a.ghlDateAdded || ''
         if (!d || d < from || d > to) return false
       }
       return true
