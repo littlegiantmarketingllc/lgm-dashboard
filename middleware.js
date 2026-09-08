@@ -18,7 +18,8 @@ async function verifyToken(cookieValue, secret) {
       'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
     )
     const b64 = sig.replace(/-/g, '+').replace(/_/g, '/')
-    const sigBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4)
+    const sigBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0))
     return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(payload))
   } catch {
     return false
