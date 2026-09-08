@@ -3,12 +3,15 @@
 // Handles CallCompleted / MissedCall / VoicemailCompleted / NoAnswer → delete from active_calls.
 // The active_calls table has Supabase Realtime enabled, so the frontend updates instantly.
 //
-// Configure in GHL Marketplace App → Notifications:
+// Configure in GHL on LGM's own internal sub-account (NOT the marketplace app):
+//   Sub-account → Settings → Integrations → Webhooks → Add Webhook
 //   URL: https://calls.littlegiantmarketing.com/api/call-webhook
 //   Events: InboundCallConnected, OutboundCallConnected, CallCompleted, MissedCall
 //
-// Optional: set GHL_WEBHOOK_SECRET in Vercel env vars to the app's Shared Secret for
-// signature verification. If not set, the endpoint accepts all POST requests.
+// This fires only for LGM team calls — not client sub-accounts.
+//
+// Optional: set GHL_WEBHOOK_SECRET in Vercel env vars to the webhook key shown in GHL
+// for signature verification. If not set, the endpoint accepts all POST requests.
 
 import { createClient } from '@supabase/supabase-js';
 import { createHmac }   from 'node:crypto';

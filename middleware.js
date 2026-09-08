@@ -1,32 +1,47 @@
-// Vercel Edge Middleware — gates the Customer Health dashboard.
+// Vercel Edge Middleware — gates the AI Team Assistant dashboard.
 // Only active when AUTH_ENABLED=true is set in the Vercel project env vars.
-// Set AUTH_ENABLED=true on lgm-customer-health only; leave unset on lgm-dashboard.
 
 export const config = {
   matcher: ['/((?!api/|assets/|_vercel|favicon\\.ico|lgm-logo\\.png).*)'],
 }
 
-export default function middleware(request) {
-  // Skip auth if not enabled for this project
+const COOKIE = 'lgm-team-auth'
+
+async function verifyToken(cookieValue, secret) {
+  if (!cookieValue?.startsWith('g.')) return false
+  const parts = cookieValue.split('.')
+  if (parts.length !== 3) return false
+  const [, payload, sig] = parts
+  try {
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    )
+    const b64 = sig.replace(/-/g, '+').replace(/_/g, '/')
+    const sigBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(payload))
+  } catch {
+    return false
+  }
+}
+
+export default async function middleware(request) {
   if (!process.env.AUTH_ENABLED) return
 
   const url = new URL(request.url)
+  if (url.searchParams.get('login') === '1') return
 
-  // Parse the session cookie from the Cookie header
   const cookieHeader = request.headers.get('cookie') || ''
   const sessionValue = cookieHeader
     .split(';')
     .map(c => c.trim())
-    .find(c => c.startsWith('lgm-health-auth='))
-    ?.slice('lgm-health-auth='.length)
+    .find(c => c.startsWith(`${COOKIE}=`))
+    ?.slice(COOKIE.length + 1)
 
-  // Valid session — let the request through
-  if (sessionValue && sessionValue === process.env.SESSION_SECRET) return
+  const secret  = process.env.SESSION_SECRET
+  const isValid = secret ? await verifyToken(sessionValue, secret) : false
+  if (isValid) return
 
-  // Already on the login page — let it through so the login form can render
-  if (url.searchParams.get('login') === '1') return
-
-  // Block everything else — redirect to login
   const loginUrl = new URL(request.url)
   loginUrl.pathname = '/'
   loginUrl.search = '?login=1'

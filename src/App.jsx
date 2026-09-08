@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useCallback } from 'react'
+import TeamLoginPage from './components/TeamLoginPage'
 
 // VITE_APP_MODE=health is set on the lgm-customer-health Vercel project.
 // VITE_APP_MODE=master is set on the Master Dashboard Vercel project (GHL-embedded).
@@ -87,10 +88,31 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+const TEAM_COOKIE = 'lgm-team-auth'
+function getTeamCookie() {
+  return document.cookie
+    .split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith(TEAM_COOKIE + '='))
+    ?.slice(TEAM_COOKIE.length + 1) || null
+}
+
+// ─── Router — picks which app to render ───────────────────────────────────────
 export default function App() {
   if (IS_HEALTH_MODE) return <Suspense fallback={null}><HealthStandaloneApp /></Suspense>
   if (IS_MASTER_MODE) return <Suspense fallback={null}><MasterStandaloneApp /></Suspense>
+
+  const params      = new URLSearchParams(window.location.search)
+  const loginForced = params.get('login') === '1'
+  const cookie      = getTeamCookie()
+  if (loginForced || !cookie) return <TeamLoginPage />
+
+  return <QCDashboard />
+}
+
+// ─── QC Dashboard — all hooks live here (never conditionally skipped) ─────────
+function QCDashboard() {
   // ── QC state ────────────────────────────────────────────────────────────────
   const [filter, setFilter]                 = useState({ type: 'today', from: '', to: '' })
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -179,6 +201,7 @@ const { calls, loading, error, lastUpdated, refetch, retrying } = useEmployeeHea
         searchResultCount={searchQuery.trim() ? filteredCalls.length : null}
         lastUpdated={lastUpdated}  onRefresh={refetch}
         isRefreshing={loading}     retrying={retrying} dataError={error}
+        onSignOut={() => { window.location.href = '/api/auth-team-logout' }}
       />
 
       <ActiveCallsBar />

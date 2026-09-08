@@ -185,6 +185,7 @@ export default function Header({
   employeeFilter, setEmployeeFilter, allEmployees,
   searchQuery, setSearchQuery, searchResultCount,
   lastUpdated, onRefresh, isRefreshing, retrying, dataError,
+  onSignOut,
 }) {
   const [elapsed, setElapsed]   = useState('—')
   const [isStale, setIsStale]   = useState(false)
@@ -249,6 +250,14 @@ export default function Header({
             <div className="flex items-center gap-0.5 bg-brand-bg border border-brand-border rounded-lg p-0.5">
               <FilterPills filter={filter} setFilter={setFilter} />
             </div>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="text-[11px] text-brand-muted hover:text-brand-heading transition-colors px-3 py-1.5 rounded-lg hover:bg-brand-bg border border-transparent hover:border-brand-border ml-1"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </div>
 
