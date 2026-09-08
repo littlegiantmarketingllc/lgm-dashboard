@@ -3,6 +3,7 @@ import { differenceInDays, parseISO, isValid, format } from 'date-fns'
 import { recommendAction, enhancedScoreAccount, classify } from '../../lib/healthEngine'
 import GHLInfoPanel from './GHLInfoPanel'
 import InfoTip from './InfoTip'
+import { useRole } from '../../contexts/RoleContext'
 
 function CopyIdButton({ id }) {
   const [copied, setCopied] = useState(false)
@@ -81,6 +82,7 @@ function SubScoreBar({ label, score }) {
 }
 
 export default function AccountModal({ account, onClose }) {
+  const { isAdmin } = useRole()
   const [ghlData,    setGhlData]    = useState(null)
   const [ghlLoading, setGhlLoading] = useState(false)
   const [ghlError,   setGhlError]   = useState(null)
@@ -427,8 +429,8 @@ export default function AccountModal({ account, onClose }) {
             )}
           </div>
 
-          {/* Billing */}
-          <div>
+          {/* Billing — admin only */}
+          {isAdmin && <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-brand-muted mb-2">
               Billing
               <span className="ml-2 text-[9px] font-semibold px-1.5 py-0.5 rounded-full normal-case"
@@ -771,7 +773,7 @@ export default function AccountModal({ account, onClose }) {
                 No Stripe customer matched for this account.
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Live Metrics — users, contacts, opportunities via OAuth KV */}
           <div>

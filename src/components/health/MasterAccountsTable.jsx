@@ -71,7 +71,7 @@ const COLS = [
 ]
 
 const PAGE_SIZE = 25
-const BILLING_COLS = new Set(['stripeStatus', 'totalRev', 'planPrice', 'addOns', 'lcWalletCharges', 'users', '_estGP'])
+const BILLING_COLS = new Set(['stripeStatus', 'totalRev', 'planPrice', 'addOns', 'users', '_estGP'])
 
 export default function MasterAccountsTable({ accounts, dateFiltered = false, dateLabel = null, onAccountClick }) {
   const { isAdmin }           = useRole()
