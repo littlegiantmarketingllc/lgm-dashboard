@@ -13,14 +13,19 @@ async function verifyToken(cookieValue, secret) {
   if (parts.length !== 3) return false
   const [, payload, sig] = parts
   try {
-    const encoder = new TextEncoder()
+    const enc = new TextEncoder()
+    // Re-sign the payload with the server secret, then compare to the cookie sig.
+    // Avoids atob/Uint8Array decode issues in Edge runtime entirely.
     const key = await crypto.subtle.importKey(
-      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+      'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
     )
-    const b64 = sig.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4)
-    const sigBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0))
-    return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(payload))
+    const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(payload))
+    // Convert raw bytes → base64url
+    const bytes = new Uint8Array(sigBuf)
+    let bin = ''
+    bytes.forEach(b => { bin += String.fromCharCode(b) })
+    const expected = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+    return expected === sig
   } catch {
     return false
   }

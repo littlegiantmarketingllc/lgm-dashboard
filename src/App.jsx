@@ -103,10 +103,8 @@ export default function App() {
   if (IS_HEALTH_MODE) return <Suspense fallback={null}><HealthStandaloneApp /></Suspense>
   if (IS_MASTER_MODE) return <Suspense fallback={null}><MasterStandaloneApp /></Suspense>
 
-  const params      = new URLSearchParams(window.location.search)
-  const loginForced = params.get('login') === '1'
-  const cookie      = getTeamCookie()
-  if (loginForced || !cookie) return <TeamLoginPage />
+  const cookie = getTeamCookie()
+  if (!cookie) return <TeamLoginPage />
 
   return <QCDashboard />
 }

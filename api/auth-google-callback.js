@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
     const token = makeToken(email, sessionSecret)
     res.setHeader('Set-Cookie', [
-      `${COOKIE}=${token}; Path=/; Max-Age=${ONE_YEAR}; SameSite=Strict; Secure`,
+      `${COOKIE}=${token}; Path=/; Max-Age=${ONE_YEAR}; SameSite=Lax; Secure`,
     ])
     res.redirect(302, '/')
   } catch (err) {
