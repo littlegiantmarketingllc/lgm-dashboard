@@ -109,8 +109,10 @@ export default function MasterDashboard({ locationId }) {
   const [dateRange, setDateRange] = useState({ from: '', to: '' }) // empty = API default (last 3 months)
   const { data, loading, error, refetch, isDemo } = useMasterLeads(locationId, dateRange)
 
-  const [ownerFilter, setOwnerFilter] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
+  // Arrays now (multi-select) — an empty array means "All", same convention
+  // the old single-select used with "".
+  const [ownerFilter, setOwnerFilter] = useState([])
+  const [sourceFilter, setSourceFilter] = useState([])
 
   // Commission rate and the Lead Buying toggle are John-editable, per-session
   // controls (not persisted) — Commission/Profit/PPL/Lead Cost/CPP all key off
@@ -134,8 +136,8 @@ export default function MasterDashboard({ locationId }) {
 
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
-      if (ownerFilter && (l.assignedToName || l.assignedTo) !== ownerFilter) return false
-      if (sourceFilter && l.source !== sourceFilter) return false
+      if (ownerFilter.length > 0 && !ownerFilter.includes(l.assignedToName || l.assignedTo)) return false
+      if (sourceFilter.length > 0 && !sourceFilter.includes(l.source)) return false
       return true
     })
   }, [leads, ownerFilter, sourceFilter])
