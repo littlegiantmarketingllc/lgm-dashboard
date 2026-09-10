@@ -17,7 +17,22 @@ function hasValue(v) {
 // commissionRate is a John-editable variable in the UI (default 10.5%,
 // confirmed by Steve) rather than hardcoded, so Commission/Profit/PPL can be
 // recalculated without a code change if that rate ever differs by account.
-export function computeOverview(leads, commissionRate = DEFAULT_COMMISSION_RATE) {
+//
+// missingFields comes from the API's field-registry check (api/_masterLeadsCore.js) —
+// it's fixed per account/date-window and independent of any owner/source filter
+// or pivot grouping. That's the only correct source of truth for "is this
+// field actually mapped to a real GHL custom field on this account".
+//
+// A prior version instead asked "does at least one lead IN THIS GROUP have a
+// value for this field" — which works fine for the whole-account overview,
+// but breaks the moment you filter to one owner, one source, or a narrow date
+// range: a genuinely-mapped field with zero matches in a small slice (e.g. no
+// quotes yet today, or this one producer never quotes) was indistinguishable
+// from the field not existing at all, and both showed the same scary "Field
+// not found in GHL" warning. Using missingFields instead means a real zero
+// shows as a real 0/0%, and the warning only fires when the field is truly
+// unmapped account-wide.
+export function computeOverview(leads, commissionRate = DEFAULT_COMMISSION_RATE, missingFields = []) {
   const leadCount = leads.length
   const allOpps   = leads.flatMap(l => l.opportunities || [])
   const policySoldOpps = allOpps.filter(isPolicySold)
@@ -29,17 +44,16 @@ export function computeOverview(leads, commissionRate = DEFAULT_COMMISSION_RATE)
   // 2. Written Premium — sumIf(monetaryValue, pipelineStageId = 'Policy Sold')
   const writtenPremium = policySoldOpps.reduce((s, o) => s + (Number(o.monetaryValue) || 0), 0)
 
-  // Custom-field availability — only compute a metric if at least one lead actually has the field,
-  // so a genuinely-missing field shows as a pending "—" instead of a misleading 0.
-  const hasLeadCost   = leads.some(l => hasValue(l.leadPrice))
-  const hasCallCount  = leads.some(l => hasValue(l.callCount))
-  const hasDispoDate  = leads.some(l => hasValue(l.dispositionDate))
-  const hasBadLead    = leads.some(l => hasValue(l.badLeadDate))
-  const hasSmsReply   = leads.some(l => hasValue(l.smsReplyDate))
-  const hasOppSold    = leads.some(l => hasValue(l.oppSoldDate))
-  const hasQuoted     = leads.some(l => hasValue(l.quotedTimestamp))
-  const hasXdated     = leads.some(l => hasValue(l.xdatedReason))
-  const hasOptOut     = leads.some(l => hasValue(l.optOutDate))
+  const missing = key => missingFields.includes(key)
+  const hasLeadCost   = !missing('leadPrice')
+  const hasCallCount  = !missing('callCount')
+  const hasDispoDate  = !missing('dispositionDate')
+  const hasBadLead    = !missing('badLeadDate')
+  const hasSmsReply   = !missing('smsReplyDate')
+  const hasOppSold    = !missing('oppSoldDate')
+  const hasQuoted     = !missing('quotedTimestamp')
+  const hasXdated     = !missing('xdatedReason')
+  const hasOptOut     = !missing('optOutDate')
 
   // 3. Bad Leads — count({Bad Lead Date})
   const badLeads = hasBadLead
@@ -195,7 +209,7 @@ export function salesStageBreakdown(leads) {
     .sort((a, b) => b.count - a.count)
 }
 
-function pivotBy(leads, keyFn, labelFn, commissionRate) {
+function pivotBy(leads, keyFn, labelFn, commissionRate, missingFields) {
   const groups = new Map()
   for (const lead of leads) {
     const key = keyFn(lead) ?? '(none)'
@@ -203,22 +217,22 @@ function pivotBy(leads, keyFn, labelFn, commissionRate) {
     groups.get(key).leads.push(lead)
   }
   return [...groups.values()]
-    .map(g => ({ label: g.label, ...computeOverview(g.leads, commissionRate) }))
+    .map(g => ({ label: g.label, ...computeOverview(g.leads, commissionRate, missingFields) }))
     .sort((a, b) => b.leadCount - a.leadCount)
 }
 
-export function pivotBySource(leads, commissionRate) {
-  return pivotBy(leads, l => l.source, l => l.source || '(no source)', commissionRate)
+export function pivotBySource(leads, commissionRate, missingFields) {
+  return pivotBy(leads, l => l.source, l => l.source || '(no source)', commissionRate, missingFields)
 }
 
-export function pivotByOwner(leads, commissionRate) {
-  return pivotBy(leads, l => l.assignedTo, l => l.assignedToName || l.assignedTo || '(unassigned)', commissionRate)
+export function pivotByOwner(leads, commissionRate, missingFields) {
+  return pivotBy(leads, l => l.assignedTo, l => l.assignedToName || l.assignedTo || '(unassigned)', commissionRate, missingFields)
 }
 
-export function pivotByLeadProfile(leads, commissionRate) {
-  return pivotBy(leads, l => l.leadProfile, l => l.leadProfile || '(no profile)', commissionRate)
+export function pivotByLeadProfile(leads, commissionRate, missingFields) {
+  return pivotBy(leads, l => l.leadProfile, l => l.leadProfile || '(no profile)', commissionRate, missingFields)
 }
 
-export function pivotBySubSource(leads, commissionRate) {
-  return pivotBy(leads, l => l.subSource, l => l.subSource || '(no sub-source)', commissionRate)
+export function pivotBySubSource(leads, commissionRate, missingFields) {
+  return pivotBy(leads, l => l.subSource, l => l.subSource || '(no sub-source)', commissionRate, missingFields)
 }

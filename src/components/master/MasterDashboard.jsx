@@ -142,11 +142,15 @@ export default function MasterDashboard({ locationId }) {
     })
   }, [leads, ownerFilter, sourceFilter])
 
-  const overview      = useMemo(() => computeOverview(filteredLeads, commissionRate), [filteredLeads, commissionRate])
-  const bySource       = useMemo(() => pivotBySource(filteredLeads, commissionRate), [filteredLeads, commissionRate])
-  const byOwner         = useMemo(() => pivotByOwner(filteredLeads, commissionRate), [filteredLeads, commissionRate])
-  const byLeadProfile    = useMemo(() => pivotByLeadProfile(filteredLeads, commissionRate), [filteredLeads, commissionRate])
-  const bySubSource      = useMemo(() => pivotBySubSource(filteredLeads, commissionRate), [filteredLeads, commissionRate])
+  // missingFields is computed server-side once per date-window, against the
+  // account's actual custom-field registry — not per owner/source/pivot group
+  // — so it's the correct fixed reference for "is this field really missing"
+  // regardless of how narrow a slice ends up being filtered/grouped to zero.
+  const overview      = useMemo(() => computeOverview(filteredLeads, commissionRate, missingFields), [filteredLeads, commissionRate, missingFields])
+  const bySource       = useMemo(() => pivotBySource(filteredLeads, commissionRate, missingFields), [filteredLeads, commissionRate, missingFields])
+  const byOwner         = useMemo(() => pivotByOwner(filteredLeads, commissionRate, missingFields), [filteredLeads, commissionRate, missingFields])
+  const byLeadProfile    = useMemo(() => pivotByLeadProfile(filteredLeads, commissionRate, missingFields), [filteredLeads, commissionRate, missingFields])
+  const bySubSource      = useMemo(() => pivotBySubSource(filteredLeads, commissionRate, missingFields), [filteredLeads, commissionRate, missingFields])
   const stageBreakdown = useMemo(() => salesStageBreakdown(filteredLeads), [filteredLeads])
 
   // Non-Lead-Details tabs don't depend on this page's data fetch at all —
