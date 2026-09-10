@@ -11,7 +11,7 @@ function fmt(n, decimals = 0) {
   return decimals > 0 ? Number(n).toFixed(decimals) : Math.round(n).toLocaleString()
 }
 
-function Card({ label, value, prefix = '', suffix = '', decimals = 0, sub, icon, accentColor, delay, infoText }) {
+function Card({ label, value, prefix = '', suffix = '', decimals = 0, sub, icon, accentColor, delay, infoText, naText = 'Field not found in GHL' }) {
   const num = typeof value === 'number' ? value : 0
   const displayed = useCountUp(num, { duration: 1100, delay, decimals })
   const isNull = value === null || value === undefined
@@ -42,7 +42,7 @@ function Card({ label, value, prefix = '', suffix = '', decimals = 0, sub, icon,
         )}
       </div>
       {sub && <p className="text-brand-muted text-[11px] leading-snug">{sub}</p>}
-      {isNull && <p className="text-[10px] text-amber-500 font-medium">Field not found in GHL</p>}
+      {isNull && <p className="text-[10px] text-amber-500 font-medium">{naText}</p>}
     </div>
   )
 }
@@ -91,6 +91,7 @@ export default function OverviewCards({ overview, leadBuyingEnabled = true, comm
 
       <Card label="Avg Premium / Customer" value={premiumAvgPerCustomer} prefix="$" decimals={0} icon="📊" delay={120}
         sub="Written Premium ÷ New Customers"
+        naText={writtenPremium === 0 ? 'No Policy Sold opportunities in this window' : 'Field not found in GHL'}
         infoText="avgIf(monetaryValue, pipelineStageId = 'Policy Sold')" />
 
       {/* ── FINANCIALS ───────────────────────────────────────────── */}
@@ -130,6 +131,7 @@ export default function OverviewCards({ overview, leadBuyingEnabled = true, comm
       {leadBuyingEnabled && (
         <Card label="Cost Per Policy (CPP)" value={cpp} prefix="$" decimals={0} icon="🧮" delay={360}
           sub="Lead Cost ÷ New Customers"
+          naText={leadCost === null ? 'Field not found in GHL' : 'No new customers in this window'}
           infoText="{Lead Cost} / {New Customers}" />
       )}
 
@@ -139,6 +141,7 @@ export default function OverviewCards({ overview, leadBuyingEnabled = true, comm
 
       <Card label="Quotes to Close" value={quotesToCloseRate} suffix="%" decimals={1} icon="🔒" delay={440}
         sub="New Customers ÷ Quotes"
+        naText={quotes === null || newCustomers === null ? 'Field not found in GHL' : 'No quotes in this window'}
         infoText="{New Customers} / Quotes" />
 
       {/* ── CALL ACTIVITY ────────────────────────────────────────── */}
@@ -158,6 +161,7 @@ export default function OverviewCards({ overview, leadBuyingEnabled = true, comm
 
       <Card label="Calls to Close" value={callsToClose} decimals={1} icon="🏁" delay={600} accentColor={AMB}
         sub="Calls for Customers ÷ New Customers"
+        naText={callsForCustomers === null ? 'Field not found in GHL' : 'No new customers in this window'}
         infoText="{Calls for Customers} / {New Customers} — avg calls to win a deal." />
 
       {/* ── LEAD QUALITY ─────────────────────────────────────────── */}
