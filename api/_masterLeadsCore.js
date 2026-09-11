@@ -51,7 +51,7 @@ export const FIELD_TARGETS = {
   smsReplyDate:     ['sms reply date', 'sms reply'],
   oppSoldDate:      ['opp sold date', 'opportunity sold date', 'sold date', 'date sold', 'policy sold date'],
   quotedTimestamp:  ['quoted timestamp', 'quoted date', 'quote date', 'quoted'],
-  xdatedReason:     ['x-dated reason', 'xdated reason', 'x dated reason', 'reason x-dated'],
+  xdatedReason:     ['x-dated reason', 'xdated reason', 'x dated reason', 'reason x-dated', 'x-date reason', 'x date reason'],
   leadProfile:      ['lead profile'],
   badLeadReason:    ['bad lead reason'],
   optOutDate:       ['opt out date', 'opted out date', 'opt-out date', 'unsubscribed date', 'opt out'],
