@@ -5,6 +5,9 @@
     },
     "api/cron-refresh-master-cache.js": {
       "maxDuration": 300
+    },
+    "api/field-audit.js": {
+      "maxDuration": 300
     }
   },
   "crons": [

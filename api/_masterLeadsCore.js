@@ -43,7 +43,7 @@ export async function touchKnownLocations(locationId) {
   }
 }
 
-const FIELD_TARGETS = {
+export const FIELD_TARGETS = {
   leadPrice:        ['lead price', 'lead cost'],
   callCount:        ['call count', 'calls count'],
   dispositionDate:  ['disposition date and time', 'disposition date'],
@@ -58,7 +58,9 @@ const FIELD_TARGETS = {
   subSource:        ['sub source', 'sub-source', 'subsource'],
 }
 
-async function getCustomFieldMap(token, locationId) {
+// Exported so api/field-audit.js can run the exact same name-matching logic
+// across every client account, instead of drifting into a second copy.
+export async function getCustomFieldMap(token, locationId) {
   const { ok, json, text } = await ghlFetch(`/locations/${locationId}/customFields`, token)
   if (!ok) throw new Error(`Failed to fetch custom fields: ${text}`)
   const contactFields = json?.customFields || []
