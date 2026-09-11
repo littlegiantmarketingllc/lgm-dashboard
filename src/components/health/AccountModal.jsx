@@ -373,7 +373,7 @@ export default function AccountModal({ account, onClose }) {
             {account.ghlId && (
               <div className="col-span-2 flex flex-wrap items-center gap-2">
                 <a
-                  href={`https://app.gohighlevel.com/v2/location/${account.ghlId}/dashboard`}
+                  href={`https://app.littlegiantmarketing.com/v2/location/${account.ghlId}/dashboard`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors"
