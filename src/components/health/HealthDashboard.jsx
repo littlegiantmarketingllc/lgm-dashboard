@@ -18,6 +18,7 @@ import UpsellTable                from './UpsellTable'
 import TransactionBreakdown       from './TransactionBreakdown'
 import TicketsModal               from './TicketsModal'
 import DmFootprintTab             from './DmFootprintTab'
+import ChurnMetrics              from './ChurnMetrics'
 
 const G = '#8CC63F'
 
@@ -362,6 +363,25 @@ export default function HealthDashboard({ filters, setFilters }) {
     [upsellAccounts]
   )
 
+  // ── Cohort churn — John's formula: of clients who STARTED in window, how many cancelled
+  const churnMetrics = useMemo(() => {
+    const today = new Date()
+    return [30, 60, 90].map(days => {
+      const cutoff = format(subDays(today, days), 'yyyy-MM-dd')
+      // Denominator: Stripe-matched accounts whose billing start falls within the window
+      const cohort = accounts.filter(a => {
+        const start = a.stripeStartDate || a.ghlDateAdded || ''
+        return a._stripeBound && start >= cutoff
+      })
+      // Numerator: cohort members who have since cancelled (canceledAt set in Stripe)
+      const churned = cohort.filter(a => !!a.canceledAt)
+      const rate = cohort.length > 0
+        ? Math.round((churned.length / cohort.length) * 1000) / 10
+        : null
+      return { days, cohortSize: cohort.length, churned: churned.length, rate }
+    })
+  }, [accounts])
+
   if (loading && raw.length === 0) return <LoadingScreen />
   if (error   && raw.length === 0) return <ErrorBanner message={error} onRetry={refetch} />
 
@@ -495,7 +515,15 @@ export default function HealthDashboard({ filters, setFilters }) {
         isAdmin={isAdmin}
       />
 
-      {/* 2. Quick Wins — stale, upsell, newest */}
+      {/* 2. Cohort churn — admin only */}
+      {isAdmin && (
+        <ChurnMetrics
+          metrics={churnMetrics}
+          stripeLoading={stripeLoading}
+        />
+      )}
+
+      {/* 3. Quick Wins — stale, upsell, newest */}
       <QuickWins
         topStale={top3Stale}
         topNew={top3New}
@@ -503,7 +531,7 @@ export default function HealthDashboard({ filters, setFilters }) {
         onAccountClick={setSelectedAccount}
       />
 
-      {/* 3. DM vs Agent breakdown — admin only (contains revenue split) */}
+      {/* 4. DM vs Agent breakdown — admin only (contains revenue split) */}
       {isAdmin && (
         <DmAgentBreakdown
           hasBilling={billedAccounts.length > 0}
