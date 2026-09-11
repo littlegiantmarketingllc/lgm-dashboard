@@ -366,7 +366,10 @@ export default function HealthDashboard({ filters, setFilters }) {
   // ── Cohort churn — John's formula: of clients who STARTED in window, how many cancelled
   const churnMetrics = useMemo(() => {
     const today = new Date()
-    return [30, 60, 90].map(days => {
+    // Accounts that set cancel_at_period_end but haven't actually cancelled yet
+    const scheduledToCancel = accounts.filter(a => a._stripeBound && a.stripeCanceling && !a.canceledAt)
+
+    const windows = [30, 60, 90].map(days => {
       const cutoff = format(subDays(today, days), 'yyyy-MM-dd')
       // Denominator: Stripe-matched accounts whose billing start falls within the window
       const cohort = accounts.filter(a => {
@@ -374,12 +377,15 @@ export default function HealthDashboard({ filters, setFilters }) {
         return a._stripeBound && start >= cutoff
       })
       // Numerator: cohort members who have since cancelled (canceledAt set in Stripe)
-      const churned = cohort.filter(a => !!a.canceledAt)
+      const churnedAccounts = cohort.filter(a => !!a.canceledAt)
+      const mrrLost = churnedAccounts.reduce((sum, a) => sum + (a.planPrice || 0), 0)
       const rate = cohort.length > 0
-        ? Math.round((churned.length / cohort.length) * 1000) / 10
+        ? Math.round((churnedAccounts.length / cohort.length) * 1000) / 10
         : null
-      return { days, cohortSize: cohort.length, churned: churned.length, rate }
+      return { days, cohortSize: cohort.length, churned: churnedAccounts.length, churnedAccounts, mrrLost, rate }
     })
+
+    return { windows, scheduledToCancel }
   }, [accounts])
 
   if (loading && raw.length === 0) return <LoadingScreen />
@@ -518,8 +524,10 @@ export default function HealthDashboard({ filters, setFilters }) {
       {/* 2. Cohort churn — admin only */}
       {isAdmin && (
         <ChurnMetrics
-          metrics={churnMetrics}
+          metrics={churnMetrics.windows}
+          scheduledToCancel={churnMetrics.scheduledToCancel}
           stripeLoading={stripeLoading}
+          onAccountClick={setSelectedAccount}
         />
       )}
 
